@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
-import { View, Text, TouchableOpacity, Animated, Image, StyleSheet } from 'react-native'
+import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { auth } from '@/lib/firebase'
@@ -11,9 +11,10 @@ interface AuthorInfoProps {
   item: Video
   username?: string
   userPhotoURL?: string
+  hashtags?: string[]
 }
 
-export const AuthorInfo = memo(function AuthorInfo({ item, username, userPhotoURL }: AuthorInfoProps) {
+export const AuthorInfo = memo(function AuthorInfo({ item, username, userPhotoURL, hashtags }: AuthorInfoProps) {
   const currentUserId = auth.currentUser?.uid ?? ''
   const displayName = item.userName ?? username ?? 'Utilisateur'
   const avatarURL = item.userPhotoURL || userPhotoURL
@@ -23,17 +24,6 @@ export const AuthorInfo = memo(function AuthorInfo({ item, username, userPhotoUR
   const { toggleFollow } = useFollowAction()
   const [followState, setFollowState] = useState<'idle' | 'done' | 'hidden'>('idle')
   const followTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-
-  const [discRotation] = useState(() => new Animated.Value(0))
-
-  useEffect(() => {
-    discRotation.setValue(0)
-    const anim = Animated.loop(
-      Animated.timing(discRotation, { toValue: 1, duration: 5000, useNativeDriver: true }),
-    )
-    anim.start()
-    return () => anim.stop()
-  }, [discRotation])
 
   useEffect(() => () => clearTimeout(followTimer.current), [])
 
@@ -78,23 +68,24 @@ export const AuthorInfo = memo(function AuthorInfo({ item, username, userPhotoUR
         </TouchableOpacity>
       </View>
 
+      {hashtags && hashtags.length > 0 && (
+        <View style={styles.hashtagsRow}>
+          {hashtags.map((t) => (
+            <Text
+              key={t}
+              style={styles.hashtag}
+              onPress={() => router.push({ pathname: '/hashtag/[tag]', params: { tag: t } })}
+            >
+              #{t}
+            </Text>
+          ))}
+        </View>
+      )}
+
       <View style={styles.audioRow}>
-        {avatarURL ? (
-          <View style={styles.disc}>
-            <Animated.Image
-              source={{ uri: avatarURL }}
-              style={{
-                width: '100%', height: '100%', borderRadius: 12,
-                borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
-                transform: [{ rotate: discRotation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }],
-              }}
-            />
-          </View>
-        ) : (
-          <View style={[styles.disc, styles.avatarPlaceholder]}>
-            <Ionicons name="musical-notes" size={14} color="#FFF" />
-          </View>
-        )}
+        <View style={styles.disc}>
+          <Ionicons name="musical-notes" size={14} color="#FFF" />
+        </View>
         <Text style={styles.audioText} numberOfLines={1}>Son original · {displayName}</Text>
       </View>
     </View>
@@ -114,6 +105,8 @@ const styles = StyleSheet.create({
   },
   displayName: { color: '#FFF', fontSize: 15, fontWeight: '700' },
   audioRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6, maxWidth: '80%' },
-  disc: { width: 24, height: 24, borderRadius: 12, overflow: 'hidden', marginRight: 8 },
+  disc: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#2a2a2a', alignItems: 'center', justifyContent: 'center', marginRight: 8 },
   audioText: { color: '#FFF', fontSize: 13, flexShrink: 1 },
+  hashtagsRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 6, gap: 4 },
+  hashtag: { color: '#4FC3F7', fontSize: 13, fontWeight: '600' },
 })

@@ -108,6 +108,7 @@ export function useNewsFeed() {
   const lastPublicRef = useRef<QueryDocumentSnapshot | null>(null)
   const lastFollowingRef = useRef<QueryDocumentSnapshot | null>(null)
   const requestRunningRef = useRef(false)
+  const hasFetchedRef = useRef(false)
 
   useEffect(() => {
     if (!uid) {
@@ -133,7 +134,8 @@ export function useNewsFeed() {
       setRefreshing(true)
       lastPublicRef.current = null
       lastFollowingRef.current = null
-    } else if (posts.length === 0) {
+      hasFetchedRef.current = false
+    } else if (!hasFetchedRef.current) {
       setLoading(true)
     } else {
       setLoadingMore(true)
@@ -232,7 +234,9 @@ export function useNewsFeed() {
         error instanceof Error ? error : new Error(String(error)),
         { context: 'useNewsFeed.fetchPage' },
       )
+      setHasMore(false)
     } finally {
+      hasFetchedRef.current = true
       requestRunningRef.current = false
       setLoading(false)
       setRefreshing(false)

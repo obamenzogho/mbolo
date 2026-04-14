@@ -12,10 +12,11 @@ import BottomSheet from '@gorhom/bottom-sheet'
 import { useTabBarVisibility } from '../../contexts/TabBarVisibilityContext'
 import { useFeedData } from './hooks/useFeedData'
 import { useFollowingFeedData } from './hooks/useFollowingFeedData'
+import { useLocalFeedData } from './hooks/useLocalFeedData'
 import { useVideoPlayerPool } from './hooks/useVideoPlayerPool'
 import { usePrefetch } from './hooks/usePrefetch'
 import { FeedList } from './components/FeedList'
-import { forYouFeedStore, followingFeedStore } from './store/feedStore'
+import { forYouFeedStore, followingFeedStore, localFeedStore } from './store/feedStore'
 import { auth } from '../../lib/firebase'
 import { colors } from '../../lib/theme'
 import { captureException } from '../../lib/sentry'
@@ -27,17 +28,23 @@ import VideoOptionsSheet from './components/VideoOptionsSheet'
 import ShareModal from '../share/components/ShareModal'
 import { useShareStore } from '../share/store/shareStore'
 import type { PreviewComment } from '../../types'
+import type { Place } from '../location/useUserLocation'
 
-type FeedType = 'forYou' | 'following'
+type FeedType = 'forYou' | 'following' | 'local'
 
 interface FeedScreenProps {
   feedType?: FeedType
   isActive?: boolean
+  place?: Place | null
 }
 
-export default function FeedScreen({ feedType = 'forYou', isActive = true }: FeedScreenProps) {
-  const store = feedType === 'forYou' ? forYouFeedStore : followingFeedStore
-  const instanceId = feedType === 'forYou' ? 'feed-foryou' : 'feed-following'
+export default function FeedScreen({ feedType = 'forYou', isActive = true, place = null }: FeedScreenProps) {
+  const store = feedType === 'forYou' ? forYouFeedStore
+    : feedType === 'following' ? followingFeedStore
+    : localFeedStore
+  const instanceId = feedType === 'forYou' ? 'feed-foryou'
+    : feedType === 'following' ? 'feed-following'
+    : 'feed-local'
   const [refreshing, setRefreshing] = useState(false)
   const { hideTabBar, showTabBar } = useTabBarVisibility()
   const [commentTarget, setCommentTarget] = useState<{
@@ -59,10 +66,12 @@ export default function FeedScreen({ feedType = 'forYou', isActive = true }: Fee
 
   const feedData = feedType === 'forYou'
     ? useFeedData({ store })
-    : useFollowingFeedData({ store, isActive })
+    : feedType === 'following'
+      ? useFollowingFeedData({ store, isActive })
+      : useLocalFeedData({ store, place })
 
   const pool = useVideoPlayerPool(instanceId, skipToNext)
-  usePrefetch(feedData.videos, currentIndex)
+  usePrefetch(feedData.videos, currentIndex, isActive)
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true)
@@ -122,6 +131,15 @@ export default function FeedScreen({ feedType = 'forYou', isActive = true }: Fee
       showTabBar()
     }
   }, [commentTarget, hideTabBar, showTabBar])
+
+  // Même pattern que les commentaires : la sheet monte fermée (index={-1}) puis
+  // on l'ouvre explicitement. Un BottomSheet monté directement à index={0}
+  // n'anime pas son ouverture de façon fiable → le menu ne s'affichait pas.
+  useEffect(() => {
+    if (!videoOptionsTarget) return
+    const timer = setTimeout(() => videoOptionsSheetRef.current?.snapToIndex(0), 50)
+    return () => clearTimeout(timer)
+  }, [videoOptionsTarget])
 
   useEffect(() => {
     VideoCache.warm().catch((e) => {
@@ -190,9 +208,6 @@ export default function FeedScreen({ feedType = 'forYou', isActive = true }: Fee
   return (
     <View
       style={{ flex: 1, backgroundColor: colors.black }}
-      onLayout={(e) =>
-        console.log('[FeedScreen:layout] feedType=', feedType, 'w=', e.nativeEvent.layout.width, 'h=', e.nativeEvent.layout.height)
-      }
     >
       <FeedList
         videos={feedData.videos}
@@ -213,6 +228,7 @@ export default function FeedScreen({ feedType = 'forYou', isActive = true }: Fee
         refreshing={refreshing}
         onRefresh={handleRefresh}
         scrollEnabled={!commentTarget}
+        commentsOpen={!!commentTarget}
       />
 
       {commentTarget && (

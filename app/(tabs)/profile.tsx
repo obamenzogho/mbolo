@@ -5,13 +5,6 @@ import {
   Dimensions, RefreshControl, ScrollView, Modal, Animated, Share,
   StyleSheet,
 } from 'react-native'
-import { GestureDetector, Gesture } from 'react-native-gesture-handler'
-import {
-  useSharedValue,
-  withSpring,
-  runOnJS,
-  useDerivedValue,
-} from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import {
@@ -27,7 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useStartupStore } from '../../src/features/startup/store/startupStore'
 import { uploadToCloudinary } from '../../src/lib/cloudinary'
 import FollowButton from '../../src/components/FollowButton'
-import OrbitLoader from '../../src/components/OrbitLoader'
+import { ProfileSkeleton, FollowListSkeleton } from '../../src/features/news/components/Skeletons'
 import BottomSheet from '../../src/components/ui/BottomSheet'
 import { Avatar } from '../../src/components/ui/Avatar'
 import { colors } from '../../src/lib/theme'
@@ -286,14 +279,7 @@ export default function Profile() {
     }
   }, [followersModal, page])
 
-  const tabConfig: ProfileTab[] = ['grid', 'saved', 'liked', 'reposted', 'tagged']
-
-  const translateX = useSharedValue(0)
-  const tabCount = tabConfig.length
-  const swipeOffsetPx = useDerivedValue(() => {
-    'worklet'
-    return -translateX.value / tabCount
-  })
+  const tabConfig: ProfileTab[] = ['grid']
 
   const handleTabChange = useCallback((tab: ProfileTab) => {
     if (tab === 'grid' && activeTab === 'grid') {
@@ -302,33 +288,13 @@ export default function Profile() {
     }
     setFilterOpen(false)
     setActiveTab(tab)
-    translateX.value = 0
   }, [setActiveTab, activeTab])
-
-  const swipeGesture = Gesture.Pan()
-    .minDistance(10)
-    .activeOffsetX([-10, 10])
-    .failOffsetY([-5, 5])
-    .onUpdate((e) => {
-      translateX.value = e.translationX
-    })
-    .onEnd((e) => {
-      const idx = tabConfig.indexOf(activeTab)
-      const threshold = SCREEN_WIDTH * 0.2
-      if (e.translationX < -threshold && idx < tabConfig.length - 1) {
-        runOnJS(handleTabChange)(tabConfig[idx + 1])
-      } else if (e.translationX > threshold && idx > 0) {
-        runOnJS(handleTabChange)(tabConfig[idx - 1])
-      } else {
-        translateX.value = withSpring(0, { damping: 20, stiffness: 250 })
-      }
-    })
 
   if (!ready) {
     return (
       <PageWrapper type="fadeSlide" style={{ backgroundColor: colors.black }}>
-        <SafeAreaView style={{ flex: 1, backgroundColor: colors.black, justifyContent: 'center', alignItems: 'center' }}>
-          <OrbitLoader size={80} />
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.black }}>
+          <ProfileSkeleton />
         </SafeAreaView>
       </PageWrapper>
     )
@@ -337,7 +303,6 @@ export default function Profile() {
   return (
     <PageWrapper type="fadeSlide" style={{ backgroundColor: colors.black }}>
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.black }}>
-      <GestureDetector gesture={swipeGesture}>
         <VideoGrid
           videos={filteredVideos}
           tab={activeTab}
@@ -442,7 +407,7 @@ export default function Profile() {
               )}
 
               <View style={{ position: 'relative', zIndex: 100 }}>
-                <ProfileTabBar tabs={tabConfig} activeTab={activeTab} onTabChange={handleTabChange} swipeOffsetPx={swipeOffsetPx} />
+                <ProfileTabBar tabs={tabConfig} activeTab={activeTab} onTabChange={handleTabChange} />
                 {filterOpen && (
                   <View style={{ position: 'absolute', top: 44, left: 8, backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.border, elevation: 10 }}>
                     {(['publications', 'reels', 'photos'] as const).map((opt) => (
@@ -463,35 +428,42 @@ export default function Profile() {
             </View>
           }
           />
-      </GestureDetector>
     </SafeAreaView>
 
     {/* MENU */}
-    <Modal transparent visible={menuVisible} animationType="slide" onRequestClose={closeMenu}>
+    <Modal transparent visible={menuVisible} animationType="fade" onRequestClose={closeMenu}>
       <View style={{ flex: 1, justifyContent: 'flex-end' }}>
         <TouchableOpacity activeOpacity={1} onPress={closeMenu} style={{ flex: 1, backgroundColor: colors.overlay }} />
-        <Animated.View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingBottom: 34, transform: [{ translateY: menuAnim.interpolate({ inputRange: [0, 1], outputRange: [300, 0] }) }] }}>
-          <View style={{ paddingVertical: 12, alignItems: 'center' }}><View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border }} /></View>
-          {[
-            { icon: 'settings-outline', label: 'Paramètres', action: () => { closeMenu(); router.push('/settings') } },
-            { icon: 'shield-checkmark-outline', label: 'Confidentialité', action: () => { closeMenu(); router.push('/settings') } },
-            { icon: 'time-outline', label: 'Activité', action: () => { closeMenu(); router.push('/settings') } },
-            { icon: 'bookmark-outline', label: 'Vidéos sauvegardées', action: () => { closeMenu(); setActiveTab('saved') } },
-            { icon: 'heart-outline', label: 'Vidéos aimées', action: () => { closeMenu(); setActiveTab('liked') } },
-            { icon: 'notifications-outline', label: 'Notifications', action: () => closeMenu() },
-            { icon: 'help-circle-outline', label: 'Aide', action: () => closeMenu() },
-            { icon: 'information-circle-outline', label: 'À propos de Mbolo', action: () => closeMenu() },
-          ].map((item, i) => (
-            <TouchableOpacity key={i} onPress={item.action} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 20 }}>
-              <Ionicons name={item.icon as any} size={22} color={colors.white} />
-              <Text style={{ color: colors.white, fontSize: 15 }}>{item.label}</Text>
+        <Animated.View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 16, borderTopRightRadius: 16, transform: [{ translateY: menuAnim.interpolate({ inputRange: [0, 1], outputRange: [300, 0] }) }] }}>
+          <View style={{ paddingVertical: 24, alignItems: 'center', position: 'relative', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
+            <TouchableOpacity onPress={closeMenu} style={{ position: 'absolute', right: 16, top: 6, width: 34, height: 34, borderRadius: 17, backgroundColor: colors.surfaceLight, justifyContent: 'center', alignItems: 'center' }}>
+              <Ionicons name="close" size={26} color={colors.white} />
             </TouchableOpacity>
-          ))}
-          <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 8 }} />
-          <TouchableOpacity onPress={() => { closeMenu(); handleLogout() }} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 20 }}>
-            <Ionicons name="log-out-outline" size={22} color={colors.error} />
-            <Text style={{ color: colors.error, fontSize: 15, fontWeight: '600' }}>Se déconnecter</Text>
-          </TouchableOpacity>
+          </View>
+          <ScrollView style={{ maxHeight: Dimensions.get('window').height * 0.65 }} showsVerticalScrollIndicator={false}>
+            {[
+              { icon: 'settings-outline', label: 'Paramètres', action: () => { closeMenu(); router.push('/settings') } },
+              { icon: 'shield-checkmark-outline', label: 'Confidentialité', action: () => { closeMenu(); router.push('/settings') } },
+              { icon: 'time-outline', label: 'Activité', action: () => { closeMenu(); router.push('/settings') } },
+              { icon: 'bookmark-outline', label: 'Vidéos sauvegardées', action: () => { closeMenu(); setActiveTab('saved') } },
+              { icon: 'heart-outline', label: 'Vidéos aimées', action: () => { closeMenu(); setActiveTab('liked') } },
+              { icon: 'repeat-outline', label: 'Republications', action: () => { closeMenu(); setActiveTab('reposted') } },
+              { icon: 'pricetags-outline', label: 'Identifications', action: () => { closeMenu(); setActiveTab('tagged') } },
+              { icon: 'notifications-outline', label: 'Notifications', action: () => closeMenu() },
+              { icon: 'help-circle-outline', label: 'Aide', action: () => closeMenu() },
+              { icon: 'information-circle-outline', label: 'À propos de Mbolo', action: () => closeMenu() },
+            ].map((item, i) => (
+              <TouchableOpacity key={i} onPress={item.action} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 20 }}>
+                <Ionicons name={item.icon as any} size={24} color={colors.white} />
+                <Text style={{ color: colors.white, fontSize: 16 }}>{item.label}</Text>
+              </TouchableOpacity>
+            ))}
+            <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 8 }} />
+            <TouchableOpacity onPress={() => { closeMenu(); handleLogout() }} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 20, paddingBottom: 24 }}>
+              <Ionicons name="log-out-outline" size={24} color={colors.error} />
+              <Text style={{ color: colors.error, fontSize: 16, fontWeight: '600' }}>Se déconnecter</Text>
+            </TouchableOpacity>
+          </ScrollView>
         </Animated.View>
       </View>
     </Modal>
@@ -651,9 +623,7 @@ export default function Profile() {
                   contentContainerStyle={{ padding: 16 }}
                   ListEmptyComponent={
                     followListLoading ? (
-                      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 40 }}>
-                        <OrbitLoader size={80} />
-                      </View>
+                      <FollowListSkeleton count={8} />
                     ) : (
                       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 40 }}>
                         <Ionicons name="people-outline" size={48} color={colors.border} />
@@ -695,9 +665,7 @@ export default function Profile() {
                   contentContainerStyle={{ padding: 16 }}
                   ListEmptyComponent={
                     followListLoading ? (
-                      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 40 }}>
-                        <OrbitLoader size={80} />
-                      </View>
+                      <FollowListSkeleton count={8} />
                     ) : (
                       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 40 }}>
                         <Ionicons name="people-outline" size={48} color={colors.border} />
@@ -739,9 +707,7 @@ export default function Profile() {
                   contentContainerStyle={{ padding: 16 }}
                   ListEmptyComponent={
                     pendingRequestsLoading ? (
-                      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 40 }}>
-                        <OrbitLoader size={80} />
-                      </View>
+                      <FollowListSkeleton count={8} />
                     ) : (
                       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 40 }}>
                         <Ionicons name="people-outline" size={48} color={colors.border} />

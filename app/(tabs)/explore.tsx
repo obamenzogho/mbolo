@@ -5,8 +5,8 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { router } from 'expo-router'
-import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore'
+import { router, useLocalSearchParams } from 'expo-router'
+import { collection, query, where, getDocs, orderBy, limit, type QueryDocumentSnapshot } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { colors } from '@/lib/theme'
 import { useTrendingHashtags } from '@/hooks/useTrendingHashtags'
@@ -14,6 +14,7 @@ import { useFollowSuggestions } from '@/features/suggestions/hooks/useFollowSugg
 import { useInterestGraph } from '@/features/suggestions/hooks/useInterestGraph'
 import { SuggestionsSection } from '@/features/suggestions/components/SuggestionsSection'
 import OrbitLoader from '@/components/OrbitLoader'
+import { BackButton } from '@/components/ui/BackButton'
 
 type ResultType = 'user' | 'post'
 
@@ -28,6 +29,15 @@ interface SearchResult {
 }
 
 export default function Explore() {
+  const { from } = useLocalSearchParams<{ from?: string }>()
+  // Explore est un onglet ouvert depuis plusieurs écrans (Actus, feed vidéo…).
+  // Entre onglets, router.back() est peu fiable, donc on renvoie explicitement
+  // vers l'écran d'origine passé en paramètre (repli : le feed).
+  const backTo = typeof from === 'string' && from ? from : '/(tabs)/feed'
+  const handleBack = useCallback(() => {
+    router.replace(backTo as any)
+  }, [backTo])
+
   const [search, setSearch] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
@@ -50,22 +60,10 @@ export default function Explore() {
     if (!q) { setResults([]); setLoading(false); return }
     setLoading(true)
 
-    try {
-      const out: SearchResult[] = []
-
-      const usersSnap = await getDocs(query(
-        collection(db, 'users'),
-        where('pseudo', '>=', q),
-        where('pseudo', '<=', q + '\uf8ff'),
-        limit(10),
-      ))
-      usersSnap.forEach((d) => {
-        const data = d.data()
-        out.push({ id: d.id, type: 'user', nom: data.nom, pseudo: data.pseudo, photoURL: data.photoURL })
-      })
-
-      if (q.startsWith('#')) {
-        const tag = q.slice(1).toLowerCase()
+    // Recherche par hashtag : on ne cherche que des publications.
+    if (q.startsWith('#')) {
+      const tag = q.slice(1).toLowerCase()
+      try {
         const postsSnap = await getDocs(query(
           collection(db, 'posts'),
           where('hashtags', 'array-contains', tag),
@@ -73,15 +71,43 @@ export default function Explore() {
           orderBy('createdAt', 'desc'),
           limit(20),
         ))
-        postsSnap.forEach((d) => {
+        const out: SearchResult[] = []
+        postsSnap.forEach((d: QueryDocumentSnapshot) => {
           const data = d.data()
           out.push({ id: d.id, type: 'post', text: data.text, thumbnailUrl: data.media?.[0]?.url })
         })
+        setResults(out)
+      } catch (e) {
+        console.error('Search error (hashtag):', e)
+        setResults([])
       }
+      setLoading(false)
+      return
+    }
 
+    // Recherche de profils : les pseudos sont stock\u00e9s en minuscules dans
+    // `pseudoLower`, donc on normalise le terme et on interroge ce champ
+    // (pr\u00e9fixe insensible \u00e0 la casse). L'ancienne requ\u00eate sur `pseudo`
+    // \u00e9tait sensible \u00e0 la casse \u2192 \u00ab aucun r\u00e9sultat \u00bb d\u00e8s qu'on tapait une
+    // majuscule.
+    const qLower = q.toLowerCase()
+    try {
+      const usersSnap = await getDocs(query(
+        collection(db, 'users'),
+        orderBy('pseudoLower'),
+        where('pseudoLower', '>=', qLower),
+        where('pseudoLower', '<=', qLower + '\uf8ff'),
+        limit(15),
+      ))
+      const out: SearchResult[] = []
+      usersSnap.forEach((d: QueryDocumentSnapshot) => {
+        const data = d.data()
+        out.push({ id: d.id, type: 'user', nom: data.nom, pseudo: data.pseudo, photoURL: data.photoURL })
+      })
       setResults(out)
     } catch (e) {
-      console.error('Search error:', e)
+      console.error('Search error (users):', e)
+      setResults([])
     }
     setLoading(false)
   }, [])
@@ -109,7 +135,7 @@ export default function Explore() {
     if (item.type === 'user') {
       return (
         <TouchableOpacity
-          onPress={() => router.push({ pathname: '/(tabs)/user/[userId]', params: { userId: item.id } })}
+          onPress={() => router.push({ pathname: '/user/[userId]', params: { userId: item.id } })}
           style={styles.resultRow}
         >
           {item.photoURL ? (
@@ -150,6 +176,7 @@ export default function Explore() {
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
       <View style={styles.header}>
+        <BackButton onPress={handleBack} />
         <Text style={styles.title}>Découvrir</Text>
         <TouchableOpacity onPress={() => setOptionsVisible(true)} hitSlop={10}>
           <Ionicons name="ellipsis-horizontal" size={22} color="#fff" />
@@ -272,7 +299,7 @@ export default function Explore() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#08090A' },
   header: { height: 54, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title: { color: '#fff', fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
+  title: { color: '#fff', fontSize: 26, fontWeight: '800', letterSpacing: -0.5, flex: 1, textAlign: 'center' },
   searchBar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginBottom: 8, paddingHorizontal: 14, height: 44, borderRadius: 22, backgroundColor: '#1A1B1E' },
   searchInput: { flex: 1, color: '#fff', fontSize: 15 },
   resultRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 16, borderBottomWidth: 0.5, borderBottomColor: '#1E1F22' },

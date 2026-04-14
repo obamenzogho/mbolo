@@ -5,20 +5,20 @@
 import { memo } from 'react'
 import { FeedItem } from '../components/FeedItem'
 import type { Video } from '../../../types'
-import type { ShareVideoData } from '../../../components/ShareModal'
 
 interface ProfileFeedItemProps {
   item: Video
   index: number
   isActive: boolean
   onPressComments: (videoId: string) => void
-  onOpenShare: (data: ShareVideoData) => void
+  onPressShare: (videoId: string) => void
   username: string
   instanceId: string
+  itemHeight?: number
 }
 
 function ProfileFeedItemComponent({
-  item, index, isActive, onPressComments, onOpenShare, username, instanceId,
+  item, index, isActive, onPressComments, onPressShare, username, instanceId, itemHeight,
 }: ProfileFeedItemProps) {
   return (
     <FeedItem
@@ -27,8 +27,10 @@ function ProfileFeedItemComponent({
       instanceId={instanceId}
       isActive={isActive}
       username={username}
+      itemHeight={itemHeight}
+      immersive={false}
       onPressComment={onPressComments}
-      onPressShare={onOpenShare}
+      onPressShare={onPressShare}
     />
   )
 }

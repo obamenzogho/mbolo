@@ -5,8 +5,8 @@
    useVisibleIndex réutilisé avec callbacks locaux. */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { View, FlatList, useWindowDimensions, Dimensions, StatusBar, Modal, TouchableOpacity, AppState } from 'react-native'
-import Animated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated'
+import { View, FlatList, useWindowDimensions, StatusBar, Modal, TouchableOpacity, AppState } from 'react-native'
+import BottomSheet from '@gorhom/bottom-sheet'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { FEED_DEBUG } from '../store/feedStore'
@@ -16,7 +16,9 @@ import { useVisibleIndex } from '../hooks/useVisibleIndex'
 import { ProfileFeedItem } from './ProfileFeedItem'
 import { useProfileFeedData } from './useProfileFeedData'
 import CommentSheet from '../components/CommentSheet'
-import ShareModal, { type ShareVideoData } from '../../../components/ShareModal'
+import ShareModal from '../../share/components/ShareModal'
+import { useShareStore } from '../../share/store/shareStore'
+import { auth } from '../../../lib/firebase'
 import type { Video } from '../../../types'
 
 interface ProfileVideoViewerProps {
@@ -34,11 +36,12 @@ export function ProfileVideoViewer({
   const insets = useSafeAreaInsets()
   const { currentIndex, setCurrentIndex, skipToNext } = useProfileFeedData({ videos, initialIndex })
   const [commentVideoId, setCommentVideoId] = useState<string | null>(null)
-  const [shareData, setShareData] = useState<ShareVideoData | null>(null)
   const [pendingActivation, setPendingActivation] = useState(false)
   const flatListRef = useRef<FlatList>(null)
+  const commentSheetRef = useRef<BottomSheet>(null)
   const isScrollingRef = useRef(false)
   const { height: SCREEN_HEIGHT } = useWindowDimensions()
+  const isShareModalVisible = useShareStore((s) => s.isModalVisible)
 
   const pool = useVideoPlayerPool('profile-viewer', skipToNext)
   const username = profileUser?.nom ?? userId
@@ -80,16 +83,27 @@ export function ProfileVideoViewer({
     return () => sub.remove()
   }, [pool, currentIndex, videos])
 
-  const sheetHeight = useSharedValue(0)
-  const profileVideoAreaStyle = useAnimatedStyle(() => ({
-    height: Dimensions.get('window').height - sheetHeight.value,
-    overflow: 'hidden',
-  }))
+  // Ouvre le BottomSheet des commentaires dès qu'une vidéo est ciblée.
+  useEffect(() => {
+    if (commentVideoId) {
+      const t = setTimeout(() => commentSheetRef.current?.snapToIndex(0), 80)
+      return () => clearTimeout(t)
+    }
+  }, [commentVideoId])
 
   const onPressComments = useCallback((videoId: string) => setCommentVideoId(videoId), [])
   const onCloseComments = useCallback(() => setCommentVideoId(null), [])
-  const onOpenShare = useCallback((data: ShareVideoData) => setShareData(data), [])
-  const onCloseShare = useCallback(() => setShareData(null), [])
+  const onPressShare = useCallback((videoId: string) => {
+    const video = videos.find((v) => v.id === videoId)
+    if (!video) return
+    useShareStore.getState().openShareModal({
+      id: video.id,
+      url: video.videoURL_480p || video.videoURL,
+      description: video.description,
+      thumbnailURL: video.thumbnailURL,
+      userName: video.userName,
+    })
+  }, [videos])
 
   if (videos.length === 0) return null
 
@@ -98,7 +112,7 @@ export function ProfileVideoViewer({
       <View style={{ flex: 1, backgroundColor: '#000' }}>
         <StatusBar hidden />
 
-        <Animated.View style={[profileVideoAreaStyle]}>
+        <View style={{ flex: 1 }}>
           <FlatList
             ref={flatListRef}
             data={videos}
@@ -109,9 +123,10 @@ export function ProfileVideoViewer({
                 index={index}
                 isActive={index === currentIndex}
                 onPressComments={onPressComments}
-                onOpenShare={onOpenShare}
+                onPressShare={onPressShare}
                 username={username}
                 instanceId="profile-viewer"
+                itemHeight={SCREEN_HEIGHT}
               />
             )}
             pagingEnabled
@@ -131,7 +146,7 @@ export function ProfileVideoViewer({
             removeClippedSubviews={false}
             style={{ flex: 1 }}
           />
-        </Animated.View>
+        </View>
 
         <TouchableOpacity
           onPress={onClose}
@@ -146,20 +161,25 @@ export function ProfileVideoViewer({
           <Ionicons name="chevron-back" size={28} color="#fff" />
         </TouchableOpacity>
 
-        {commentVideoId && (
-          <CommentSheet
-            key={commentVideoId}
-            videoId={commentVideoId}
-            videoOwnerId={userId}
-            isOwner={!!isOwn}
-            onClose={onCloseComments}
-            sheetHeight={sheetHeight}
-          />
-        )}
+        {commentVideoId && (() => {
+          // Le propriétaire est celui de la vidéo commentée (liste possiblement
+          // multi-auteurs, ex. onglet « à proximité »), pas le userId global.
+          const commentVideo = videos.find((v) => v.id === commentVideoId)
+          const ownerId = commentVideo?.userId ?? userId
+          return (
+            <CommentSheet
+              key={commentVideoId}
+              videoId={commentVideoId}
+              videoOwnerId={ownerId}
+              isOwner={isOwn ?? (ownerId === auth.currentUser?.uid)}
+              onClose={onCloseComments}
+              sheetRef={commentSheetRef}
+            />
+          )
+        })()}
         <ShareModal
-          visible={shareData !== null}
-          onClose={onCloseShare}
-          data={shareData as ShareVideoData}
+          visible={isShareModalVisible}
+          onClose={() => useShareStore.getState().closeShareModal()}
         />
       </View>
     </Modal>

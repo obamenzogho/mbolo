@@ -1,11 +1,13 @@
-import React, { useCallback } from 'react'
+import React, { useCallback, useState, useEffect } from 'react'
 import { View, Dimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { doc, onSnapshot, type QueryDocumentSnapshot } from 'firebase/firestore'
 import { colors } from '../../lib/theme'
 import { useHaptics } from '../../hooks/useHaptics'
 import { useTabBarVisibility } from '../../contexts/TabBarVisibilityContext'
 import { useUnreadNotifications } from '../../hooks/useUnreadNotifications'
+import { auth, db } from '../../lib/firebase'
 import TabItem from './TabItem'
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs'
 
@@ -46,6 +48,19 @@ const BottomTabBar = React.memo(function BottomTabBar({
   const activeRouteName = state.routes[state.index]?.name
   const isFeed = activeRouteName === 'feed'
   const unreadNotifs = useUnreadNotifications()
+  const [profilePhoto, setProfilePhoto] = useState<string | null>(auth.currentUser?.photoURL ?? null)
+
+  useEffect(() => {
+    const uid = auth.currentUser?.uid
+    if (!uid) return
+    const unsub = onSnapshot(doc(db, 'users', uid), (snap: QueryDocumentSnapshot) => {
+      const data = snap.data()
+      setProfilePhoto(data?.photoURL ?? auth.currentUser?.photoURL ?? null)
+    }, () => {
+      setProfilePhoto(auth.currentUser?.photoURL ?? null)
+    })
+    return unsub
+  }, [])
 
   const handleTabPress = useCallback(
     (routeName: string, routeIndex: number) => {
@@ -62,7 +77,10 @@ const BottomTabBar = React.memo(function BottomTabBar({
     [navigation, state.routes, lightImpact],
   )
 
-  if (isTabBarHidden) return null
+  // L'auto-masquage (mode immersif) ne concerne QUE le feed vidéo. Sur les
+  // autres onglets la navbar reste toujours visible, même si le feed a laissé
+  // l'état à « masqué » avant qu'on change d'onglet.
+  if (isTabBarHidden && isFeed) return null
 
   if (!(VISIBLE_TABS as readonly string[]).includes(activeRouteName)) {
     return null
@@ -117,6 +135,7 @@ const BottomTabBar = React.memo(function BottomTabBar({
                 isActive={isActive}
                 onPress={() => handleTabPress(route.name, index)}
                 badge={tabName === 'notifications' ? unreadNotifs : undefined}
+                profilePhotoURL={tabName === 'profile' ? profilePhoto : undefined}
               />
             </View>
           )

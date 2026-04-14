@@ -24,6 +24,7 @@ import { ContentActionsSheet } from '@/components/ContentActionsSheet'
 import { useStoriesFeed } from '@/features/stories/hooks/useStoriesFeed'
 import StoryViewer from '@/features/stories/components/StoryViewer'
 import { StoryCard, CreateStoryCard } from '@/features/stories/components/StoryCard'
+import { StoryCardSkeleton, PostCardSkeleton } from '@/features/news/components/Skeletons'
 import { useStories } from '@/hooks/useStories'
 import type { NewsPost } from '@/features/news/types'
 
@@ -32,7 +33,7 @@ export default function ActusScreen() {
   const { markAsViewed } = useStories()
 
   const {
-    posts, loading, refreshing, loadingMore,
+    posts, loading, refreshing, loadingMore, hasMore,
     refresh, loadMore, toggleLike, toggleSave, registerShare, deletePost, removePostsFromUser,
   } = useNewsFeed()
 
@@ -101,9 +102,11 @@ export default function ActusScreen() {
         ))}
 
         {storiesLoading && (
-          <View style={{ width: 108, height: 168, alignItems: 'center', justifyContent: 'center' }}>
-            <ActivityIndicator color={colors.primary} size="small" />
-          </View>
+          <>
+            <StoryCardSkeleton />
+            <StoryCardSkeleton />
+            <StoryCardSkeleton />
+          </>
         )}
       </ScrollView>
 
@@ -116,10 +119,7 @@ export default function ActusScreen() {
       <View style={styles.topBar}>
         <Text style={styles.title}>Actus</Text>
         <View style={{ flexDirection: 'row', gap: 8 }}>
-          <Pressable onPress={() => router.push('/(tabs)/explore')} style={styles.textBtn}>
-            <Text style={styles.textBtnLabel}>Explorer</Text>
-          </Pressable>
-          <Pressable onPress={() => router.push('/search')} style={styles.iconBtn}>
+          <Pressable onPress={() => router.push({ pathname: '/(tabs)/explore', params: { from: '/(tabs)/stories' } })} style={styles.iconBtn}>
             <Ionicons name="search" size={22} color="#fff" />
           </Pressable>
         </View>
@@ -150,13 +150,15 @@ export default function ActusScreen() {
         ListHeaderComponent={header}
         refreshing={refreshing}
         onRefresh={refresh}
-        onEndReached={loadMore}
+        onEndReached={hasMore ? loadMore : undefined}
         onEndReachedThreshold={0.5}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           loading ? (
-            <View style={styles.empty}>
-              <ActivityIndicator size="large" color={colors.primary} />
+            <View style={{ paddingTop: 8 }}>
+              <PostCardSkeleton />
+              <PostCardSkeleton />
+              <PostCardSkeleton />
             </View>
           ) : (
             <View style={styles.empty}>
@@ -216,8 +218,6 @@ const styles = StyleSheet.create({
   },
   title: { color: '#fff', fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
   iconBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#292B2F', alignItems: 'center', justifyContent: 'center' },
-  textBtn: { height: 38, borderRadius: 19, backgroundColor: '#292B2F', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
-  textBtnLabel: { color: '#fff', fontSize: 14, fontWeight: '600' },
 
   composer: {
     paddingHorizontal: 14,

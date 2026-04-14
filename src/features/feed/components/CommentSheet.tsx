@@ -12,6 +12,7 @@ import { useComments, matchesBlockedWords } from '../../../hooks/useComments'
 import { CommentItem, type CommentData } from '../comments/CommentItem'
 import { CommentInput } from '../comments/CommentInput'
 import OrbitLoader from '../../../components/OrbitLoader'
+import { CommentSheetSkeleton } from '../../../features/news/components/Skeletons'
 import type { PreviewComment } from '../../../types'
 import { colors } from '../../../lib/theme'
 
@@ -222,21 +223,6 @@ export default function CommentSheet({ videoId, videoOwnerId, isOwner, previewCo
     </View>
   ), [videoId, localReplyingTo, currentUserPhoto, currentUser, handleCancelReply, handlePostComment, handlePostReply])
 
-  const renderEmpty = useCallback(() => (
-    loading ? (
-      <View style={styles.emptyContainer}>
-        <OrbitLoader size={32} />
-        <Text style={styles.emptySubtext}>Chargement...</Text>
-      </View>
-    ) : (
-      <View style={styles.emptyContainer}>
-        <Ionicons name="chatbubble-ellipses-outline" size={48} color={colors.textFaint} />
-        <Text style={styles.emptyText}>Aucun commentaire</Text>
-        <Text style={styles.emptySubtext}>Soyez le premier à commenter</Text>
-      </View>
-    )
-  ), [loading])
-
   return (
     <>
     <BottomSheet
@@ -274,7 +260,9 @@ export default function CommentSheet({ videoId, videoOwnerId, isOwner, previewCo
         </TouchableOpacity>
       </View>
 
-      {sortedComments.length === 0 && !loading ? (
+      {loading && sortedComments.length === 0 ? (
+        <CommentSheetSkeleton count={6} />
+      ) : sortedComments.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="chatbubble-ellipses-outline" size={48} color={colors.textFaint} />
           <Text style={styles.emptyText}>Aucun commentaire</Text>
@@ -285,6 +273,7 @@ export default function CommentSheet({ videoId, videoOwnerId, isOwner, previewCo
           data={sortedComments}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
+          ListHeaderComponent={loading ? <CommentSheetSkeleton count={3} /> : undefined}
           ListFooterComponent={renderFooter}
           contentContainerStyle={{ flexGrow: 1 }}
           keyboardShouldPersistTaps="never"

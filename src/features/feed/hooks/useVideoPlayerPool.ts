@@ -59,6 +59,11 @@ export function useVideoPlayerPool(
   const mapRef = useRef<Map<string, number>>(new Map())
   const isScrollingRef = useRef(false)
   const isActiveRef = useRef(true)
+  // Timer de libération différée : quand un feed devient inactif, on coupe le son
+  // tout de suite mais on ne libère les sources (décodeurs + buffers) qu'après un
+  // court délai. Cela évite de recharger inutilement pendant un swipe rapide, tout
+  // en libérant vraiment les ressources quand on reste sur un autre onglet.
+  const releaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   if (slotsRef.current.length === 0) {
     try {
@@ -79,6 +84,7 @@ export function useVideoPlayerPool(
 
   useEffect(() => {
     return () => {
+      if (releaseTimerRef.current) clearTimeout(releaseTimerRef.current)
       const currentId = instanceIdRef.current
       for (const slot of slotsRef.current) {
         if (slot.videoId) {
@@ -310,17 +316,44 @@ export function useVideoPlayerPool(
     }
   }, [])
 
-  /** Bascule l'état actif du feed. Sur désactivation, coupe tout le pool. */
+  /** Libère les sources de TOUS les slots (décodeurs + buffers), sans détruire
+   *  les players eux-mêmes. Appelé quand le feed reste inactif : c'est ce qui
+   *  fait vraiment retomber la conso CPU/GPU (et la chauffe) d'un onglet non
+   *  visible. Le pool se recharge via syncPool à la réactivation. */
+  const releaseAllSources = useCallback(() => {
+    const cid = instanceIdRef.current
+    for (let i = 0; i < slotsRef.current.length; i++) {
+      const slot = slotsRef.current[i]
+      if (!slot.videoId && slot.state === 'IDLE') continue
+      recycleSlot(i)
+    }
+    mapRef.current.clear()
+  }, [])
+
+  /** Bascule l'état actif du feed. Sur désactivation, coupe tout le pool et
+   *  programme la libération des sources après un court délai (anti-thrash swipe). */
   const setActive = useCallback((active: boolean) => {
     isActiveRef.current = active
-    if (!active) {
-      for (const slot of slotsRef.current) {
-        if (slot.state === 'PLAYING') slot.state = 'PAUSED'
-        try { slot.player.pause() } catch {}
-        try { slot.player.volume = 0 } catch {}
+    if (active) {
+      if (releaseTimerRef.current) {
+        clearTimeout(releaseTimerRef.current)
+        releaseTimerRef.current = null
       }
+      return
     }
-  }, [])
+    // Inactif : coupe immédiatement lecture + son…
+    for (const slot of slotsRef.current) {
+      if (slot.state === 'PLAYING') slot.state = 'PAUSED'
+      try { slot.player.pause() } catch {}
+      try { slot.player.volume = 0 } catch {}
+    }
+    // …puis libère les sources si le feed reste inactif au-delà du délai.
+    if (releaseTimerRef.current) clearTimeout(releaseTimerRef.current)
+    releaseTimerRef.current = setTimeout(() => {
+      releaseTimerRef.current = null
+      if (!isActiveRef.current) releaseAllSources()
+    }, 500)
+  }, [releaseAllSources])
 
   const getPlayer = useCallback((videoId: string): VideoPlayer | null => {
     const slot = getSlot(videoId)

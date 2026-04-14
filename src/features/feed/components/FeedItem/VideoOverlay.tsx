@@ -6,9 +6,10 @@ interface VideoOverlayProps {
   player: any
   onDoubleTapLike: () => void
   onLongPress?: () => void
+  onInteraction?: () => void
 }
 
-export const VideoOverlay = memo(function VideoOverlay({ player, onDoubleTapLike, onLongPress }: VideoOverlayProps) {
+export const VideoOverlay = memo(function VideoOverlay({ player, onDoubleTapLike, onLongPress, onInteraction }: VideoOverlayProps) {
   const { width: SCREEN_WIDTH } = Dimensions.get('window')
 
   const [isPlaying, setIsPlaying] = useState(true)
@@ -85,11 +86,12 @@ export const VideoOverlay = memo(function VideoOverlay({ player, onDoubleTapLike
   const seekGestureTakenRef = useRef(false)
 
   const handleTouchStart = useCallback(() => {
+    onInteraction?.()
     longPressTimerRef.current = setTimeout(() => {
       longPressTimerRef.current = undefined
       longPressAction()
     }, 500)
-  }, [longPressAction])
+  }, [longPressAction, onInteraction])
 
   const handleTouchEnd = useCallback(() => {
     if (seekGestureTakenRef.current) { seekGestureTakenRef.current = false; return }

@@ -10,7 +10,7 @@ import type { FollowSuggestion } from '@/features/suggestions/types'
 const SUGGESTION_INTERVAL = 6
 const SUGGESTION_STRIDE = SUGGESTION_INTERVAL + 1
 
-type FeedMode = 'forYou' | 'following'
+type FeedMode = 'forYou' | 'following' | 'local'
 type FeedListItem = Video | { type: 'suggestion'; key: string }
 
 function isSuggestionItem(item: FeedListItem): item is { type: 'suggestion'; key: string } {
@@ -36,6 +36,7 @@ interface FeedListProps {
   refreshing?: boolean
   onRefresh?: () => void
   scrollEnabled?: boolean
+  commentsOpen?: boolean
 }
 
 function FeedListComponent({
@@ -57,6 +58,7 @@ function FeedListComponent({
   refreshing = false,
   onRefresh,
   scrollEnabled = true,
+  commentsOpen = false,
 }: FeedListProps) {
   const indexRef = useRef(currentIndex)
   indexRef.current = currentIndex
@@ -99,11 +101,9 @@ function FeedListComponent({
     ({ viewableItems }: { viewableItems: any[] }) => {
       const videoItems = viewableItems.filter((v) => v.item && !isSuggestionItem(v.item))
       const topVideo = videoItems[0]?.item as Video | undefined
-      console.log('[FeedList:viewable] count=', videoItems.length, 'topVideoId=', topVideo?.id, 'currentIndex=', indexRef.current)
       if (videoItems.length === 0) return
       // index réel via l'ID, plus aucun calcul de décalage
       const videoIdx = videosRef.current.findIndex((v) => v.id === topVideo!.id)
-      console.log('[FeedList:viewable] → videoIdx=', videoIdx)
       if (videoIdx !== -1 && videoIdx !== indexRef.current) {
         setCurrentIndex(videoIdx)
         // Ne pas forcer isScrolling=false ici : le scroll n'est pas terminé.
@@ -139,16 +139,14 @@ function FeedListComponent({
       }
       const video = item as Video
       const videoIndex = videos.findIndex((v) => v.id === video.id)
-      if (videoIndex === currentIndex) {
-        console.log('[FeedList:render] ACTIVE videoId=', video.id, 'videoIndex=', videoIndex)
-      }
       return (
         <FeedItem
           item={video}
           index={videoIndex}
           instanceId={instanceId}
-          isActive={videoIndex === currentIndex}
+          isActive={videoIndex === currentIndex && isActive}
           itemHeight={ITEM_HEIGHT}
+          commentsOpen={videoIndex === currentIndex ? commentsOpen : false}
           onLongPress={onLongPress ? () => onLongPress(video.id) : undefined}
           onPressComment={onPressComment ? () => onPressComment(video.id) : undefined}
           onPressShare={onPressShare ? () => onPressShare(video.id) : undefined}
@@ -156,7 +154,7 @@ function FeedListComponent({
         />
       )
     },
-    [instanceId, onLongPress, onPressComment, onPressShare, onPressMore, suggestions, onDismissSuggestion, feedType, data, currentIndex, videos, ITEM_HEIGHT],
+    [instanceId, onLongPress, onPressComment, onPressShare, onPressMore, suggestions, onDismissSuggestion, feedType, data, currentIndex, videos, ITEM_HEIGHT, commentsOpen, isActive],
   )
 
   const keyExtractor = useCallback((item: FeedListItem) => {

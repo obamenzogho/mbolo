@@ -56,7 +56,8 @@ export default function VideoEditorScreen() {
   const descriptionRef = useRef<TextInput>(null)
 
   const isVideo = mediaType === 'video'
-  const videoPlayer = useVideoPlayer(isVideo && mediaUri ? mediaUri : null, (p) => { p.loop = true; p.muted = false })
+  const stableUri = isVideo && mediaUri ? mediaUri : null
+  const videoPlayer = useVideoPlayer(stableUri, (p) => { p.loop = true; p.muted = false })
 
   // Generate thumbnail for video cover
   useEffect(() => {
@@ -94,6 +95,28 @@ export default function VideoEditorScreen() {
       setFetchingLocation(false)
     }
   }, [placeInfo])
+
+  // Le lieu est ajouté par défaut (alimente le feed « près de chez toi »). On
+  // pré-charge la position au montage si la permission est déjà accordée ;
+  // l'utilisateur reste libre de décocher via toggleLocation.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      setFetchingLocation(true)
+      try {
+        const place = await getCurrentPlace()
+        if (!cancelled && place) {
+          setPlaceInfo(place)
+          setIncludeLocation(true)
+        }
+      } catch {
+        // permission refusée / indisponible → on laisse décoché, silencieux
+      } finally {
+        if (!cancelled) setFetchingLocation(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
 
   const goToSettings = useCallback(() => {
     setStep('settings')

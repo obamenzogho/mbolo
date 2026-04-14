@@ -111,7 +111,7 @@ export default function VideoOptionsSheet({ videoId, isOwner, contentOwnerId, co
     <>
       <BottomSheet
         ref={sheetRef}
-        index={0}
+        index={-1}
         snapPoints={snapPoints}
         enablePanDownToClose
         backdropComponent={renderBackdrop}

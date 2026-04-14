@@ -7,7 +7,7 @@ import { createStore, useStore } from 'zustand'
 import type { UseBoundStore, StoreApi } from 'zustand'
 import type { Video } from '../../../types'
 
-export const FEED_DEBUG = true
+export const FEED_DEBUG = false
 
 type PlayerRole = 'PREV' | 'CURRENT' | 'NEXT'
 
@@ -88,6 +88,7 @@ function createFeedStore() {
 
 export const forYouFeedStore = createFeedStore()
 export const followingFeedStore = createFeedStore()
+export const localFeedStore = createFeedStore()
 
 export function useForYouFeedStore<T>(selector: (s: FeedState) => T): T {
   return useStore(forYouFeedStore, selector)

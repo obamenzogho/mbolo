@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react'
-import { Pressable, Text, View } from 'react-native'
+import { Pressable, Text, View, Image } from 'react-native'
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -15,6 +15,7 @@ interface TabItemProps {
   isActive: boolean
   onPress: () => void
   badge?: number
+  profilePhotoURL?: string | null
 }
 
 const ICON_SIZE = 26
@@ -26,6 +27,7 @@ const TabItem = React.memo(function TabItem({
   isActive,
   onPress,
   badge,
+  profilePhotoURL,
 }: TabItemProps) {
   const pressScale = useSharedValue(1)
   const activeScale = useSharedValue(isActive ? 1.05 : 1)
@@ -67,7 +69,20 @@ const TabItem = React.memo(function TabItem({
         style={[{ alignItems: 'center', justifyContent: 'center' }, animatedStyle]}
       >
         <View>
-          <Ionicons name={icon} size={ICON_SIZE} color={iconColor} />
+          {profilePhotoURL ? (
+            <Image
+              source={{ uri: profilePhotoURL }}
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 17,
+                borderWidth: 2,
+                borderColor: isActive ? colors.primary : 'transparent',
+              }}
+            />
+          ) : (
+            <Ionicons name={icon} size={ICON_SIZE} color={iconColor} />
+          )}
           {badge != null && badge > 0 && (
             <View style={{
               position: 'absolute', top: -6, right: -10,
@@ -100,7 +115,8 @@ const TabItem = React.memo(function TabItem({
     prev.isActive === next.isActive &&
     prev.icon === next.icon &&
     prev.label === next.label &&
-    prev.badge === next.badge
+    prev.badge === next.badge &&
+    prev.profilePhotoURL === next.profilePhotoURL
   )
 })
 

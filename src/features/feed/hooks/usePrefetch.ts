@@ -38,10 +38,12 @@ async function extractAndCacheFirstFrame(video: Video) {
   }
 }
 
-export function usePrefetch(videos: Video[], customIndex?: number) {
-  const globalIndex = useFeedStore((s) => s.currentIndex)
+export function usePrefetch(videos: Video[], customIndex: number = 0, isActive: boolean = true) {
+  // On ne s'abonne PAS à currentIndex du store (haute fréquence pendant le
+  // scroll → re-render des 3 feeds pré-montés). L'index est fourni par
+  // l'appelant. Seul networkQuality (basse fréquence) reste observé.
   const networkQuality = useFeedStore((s) => s.networkQuality)
-  const currentIndex = customIndex ?? globalIndex
+  const currentIndex = customIndex
   const lastIndexRef = useRef(currentIndex)
   const scrollSpeedRef = useRef(0)
 
@@ -59,6 +61,9 @@ export function usePrefetch(videos: Video[], customIndex?: number) {
   }, [currentIndex])
 
   useEffect(() => {
+    // Un feed inactif (onglet non visible) ne préfetch rien : inutile de
+    // télécharger + extraire des first-frames pour un écran qu'on ne regarde pas.
+    if (!isActive) return
     if (videos.length === 0) return
 
     const isFastScrolling = scrollSpeedRef.current > SCROLL_SPEED_THRESHOLD
@@ -100,5 +105,5 @@ export function usePrefetch(videos: Video[], customIndex?: number) {
         if (FEED_DEBUG) console.log('[FEED_DEBUG] PREFETCH: cancel', videoId)
       }
     }
-  }, [currentIndex, customIndex, videos, networkQuality])
+  }, [currentIndex, isActive, videos, networkQuality])
 }

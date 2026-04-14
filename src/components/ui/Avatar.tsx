@@ -1,4 +1,5 @@
-import { View, Text, Image, TouchableOpacity } from 'react-native'
+import { View, Image, TouchableOpacity } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../lib/theme'
 
 interface AvatarProps {
@@ -11,8 +12,6 @@ interface AvatarProps {
 }
 
 export function Avatar({ uri, name, size, borderWidth = 0, borderColor = 'transparent', onPress }: AvatarProps) {
-  const initial = (name || 'U')[0].toUpperCase()
-
   const content = (
     <View
       style={{
@@ -22,7 +21,7 @@ export function Avatar({ uri, name, size, borderWidth = 0, borderColor = 'transp
         borderWidth,
         borderColor,
         overflow: 'hidden',
-        backgroundColor: uri ? undefined : colors.primary,
+        backgroundColor: uri ? undefined : '#1A1B1E',
       }}
     >
       {uri ? (
@@ -35,14 +34,12 @@ export function Avatar({ uri, name, size, borderWidth = 0, borderColor = 'transp
         <View
           style={{
             flex: 1,
-            backgroundColor: colors.primary,
+            backgroundColor: '#1A1B1E',
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <Text style={{ color: '#fff', fontSize: size * 0.4, fontWeight: '700' }}>
-            {initial}
-          </Text>
+          <Ionicons name="person" size={size * 0.5} color="#555" />
         </View>
       )}
     </View>

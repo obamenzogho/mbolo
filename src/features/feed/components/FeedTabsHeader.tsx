@@ -1,7 +1,8 @@
-/* FeedTabsHeader — header flottant "Pour toi / Suivi".
-   Rôle : affiche les deux onglets avec indicateur animé
-   synchronisé au geste via scrollPosition (0 → pour toi, 1 → suivi).
-   Positionné en absolute top, centré horizontalement. */
+/* FeedTabsHeader — header flottant "[Ville] / Pour toi / Suivi".
+   Rôle : affiche les trois onglets avec indicateur animé synchronisé au geste
+   via scrollPosition (0 → ville, 1 → pour toi, 2 → suivi). Le 1er onglet porte
+   comme libellé la ville actuelle de l'utilisateur (ou « À proximité » tant que
+   la localisation n'est pas connue). Positionné en absolute top, centré. */
 
 import { useMemo, useState, useCallback } from 'react'
 import {
@@ -16,67 +17,62 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useCreateModal } from '../../../contexts/CreateModalContext'
 import { router } from 'expo-router'
 
-const TAB_GAP = 32
+const TAB_GAP = 20
+
+type TabIndex = 0 | 1 | 2
 
 interface FeedTabsHeaderProps {
   scrollPosition: Animated.Value
-  onTabPress: (index: 0 | 1) => void
+  onTabPress: (index: TabIndex) => void
+  cityLabel: string
+  locationGranted: boolean
+  onRequestLocation: () => void
 }
 
-export default function FeedTabsHeader({ scrollPosition, onTabPress }: FeedTabsHeaderProps) {
+export default function FeedTabsHeader({
+  scrollPosition, onTabPress, cityLabel, locationGranted, onRequestLocation,
+}: FeedTabsHeaderProps) {
   const insets = useSafeAreaInsets()
   const { openCreateModal } = useCreateModal()
 
-  const [labelWidths, setLabelWidths] = useState({ forYou: 0, following: 0 })
-  const [labelPositions, setLabelPositions] = useState({ forYou: 0, following: 0 })
+  // Layout (x + largeur) de chaque libellé, mesuré à la volée.
+  const [widths, setWidths] = useState<[number, number, number]>([0, 0, 0])
+  const [positions, setPositions] = useState<[number, number, number]>([0, 0, 0])
 
-  const handleLayout0 = useCallback((e: LayoutChangeEvent) => {
+  const onLayoutFor = useCallback((i: TabIndex) => (e: LayoutChangeEvent) => {
     const { x, width } = e.nativeEvent.layout
-    setLabelWidths((prev) => ({ ...prev, forYou: width }))
-    setLabelPositions((prev) => ({ ...prev, forYou: x }))
-  }, [])
-
-  const handleLayout1 = useCallback((e: LayoutChangeEvent) => {
-    const { x, width } = e.nativeEvent.layout
-    setLabelWidths((prev) => ({ ...prev, following: width }))
-    setLabelPositions((prev) => ({ ...prev, following: x }))
+    setWidths((prev) => { const n = [...prev] as [number, number, number]; n[i] = width; return n })
+    setPositions((prev) => { const n = [...prev] as [number, number, number]; n[i] = x; return n })
   }, [])
 
   const indicatorX = useMemo(
-    () =>
-      scrollPosition.interpolate({
-        inputRange: [0, 1],
-        outputRange: [labelPositions.forYou, labelPositions.following],
-      }),
-    [scrollPosition, labelPositions],
+    () => scrollPosition.interpolate({
+      inputRange: [0, 1, 2],
+      outputRange: [positions[0], positions[1], positions[2]],
+    }),
+    [scrollPosition, positions],
   )
 
   const indicatorWidth = useMemo(
-    () =>
-      scrollPosition.interpolate({
-        inputRange: [0, 1],
-        outputRange: [labelWidths.forYou || 40, labelWidths.following || 40],
-      }),
-    [scrollPosition, labelWidths],
+    () => scrollPosition.interpolate({
+      inputRange: [0, 1, 2],
+      outputRange: [widths[0] || 40, widths[1] || 40, widths[2] || 40],
+    }),
+    [scrollPosition, widths],
   )
 
-  const forYouOpacity = useMemo(
-    () =>
-      scrollPosition.interpolate({
-        inputRange: [0, 1],
-        outputRange: [1, 0.5],
-      }),
-    [scrollPosition],
-  )
+  // Opacité de chaque onglet : plein quand sélectionné, atténué sinon.
+  const opacityFor = useCallback((i: TabIndex) => scrollPosition.interpolate({
+    inputRange: [0, 1, 2],
+    outputRange: [i === 0 ? 1 : 0.5, i === 1 ? 1 : 0.5, i === 2 ? 1 : 0.5],
+  }), [scrollPosition])
 
-  const followingOpacity = useMemo(
-    () =>
-      scrollPosition.interpolate({
-        inputRange: [0, 1],
-        outputRange: [0.5, 1],
-      }),
-    [scrollPosition],
-  )
+  const handleCityPress = useCallback(() => {
+    // Si la localisation n'est pas encore accordée, on la (re)demande ;
+    // sinon on bascule simplement sur l'onglet ville.
+    if (!locationGranted) onRequestLocation()
+    onTabPress(0)
+  }, [locationGranted, onRequestLocation, onTabPress])
 
   return (
     <>
@@ -96,41 +92,41 @@ export default function FeedTabsHeader({ scrollPosition, onTabPress }: FeedTabsH
         <View
           style={{
             flexDirection: 'row',
-            justifyContent: 'center',
+            justifyContent: 'flex-start',
             alignItems: 'center',
             gap: TAB_GAP,
+            paddingLeft: 16,
+            // Réserve la zone des icônes recherche/créer (à droite) pour que les
+            // onglets ne passent jamais dessous.
+            paddingRight: 104,
           }}
         >
-          <TouchableOpacity
-            onLayout={handleLayout0}
-            onPress={() => onTabPress(0)}
-            activeOpacity={0.7}
-          >
+          {/* Onglet ville */}
+          <TouchableOpacity onLayout={onLayoutFor(0)} onPress={handleCityPress} activeOpacity={0.7}>
+            <Animated.View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, opacity: opacityFor(0) }}>
+              <Ionicons name="location-sharp" size={13} color="#fff" />
+              <Animated.Text
+                numberOfLines={1}
+                style={{ color: '#fff', fontSize: 15, fontWeight: '700', letterSpacing: 0.3, maxWidth: 100 }}
+              >
+                {cityLabel}
+              </Animated.Text>
+            </Animated.View>
+          </TouchableOpacity>
+
+          {/* Onglet Pour toi */}
+          <TouchableOpacity onLayout={onLayoutFor(1)} onPress={() => onTabPress(1)} activeOpacity={0.7}>
             <Animated.Text
-              style={{
-                color: '#fff',
-                fontSize: 15,
-                fontWeight: '700',
-                letterSpacing: 0.3,
-                opacity: forYouOpacity,
-              }}
+              style={{ color: '#fff', fontSize: 15, fontWeight: '700', letterSpacing: 0.3, opacity: opacityFor(1) }}
             >
               Pour toi
             </Animated.Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            onLayout={handleLayout1}
-            onPress={() => onTabPress(1)}
-            activeOpacity={0.7}
-          >
+
+          {/* Onglet Suivi */}
+          <TouchableOpacity onLayout={onLayoutFor(2)} onPress={() => onTabPress(2)} activeOpacity={0.7}>
             <Animated.Text
-              style={{
-                color: '#fff',
-                fontSize: 15,
-                fontWeight: '700',
-                letterSpacing: 0.3,
-                opacity: followingOpacity,
-              }}
+              style={{ color: '#fff', fontSize: 15, fontWeight: '700', letterSpacing: 0.3, opacity: opacityFor(2) }}
             >
               Suivi
             </Animated.Text>
@@ -151,7 +147,7 @@ export default function FeedTabsHeader({ scrollPosition, onTabPress }: FeedTabsH
       </LinearGradient>
 
       <TouchableOpacity
-        onPress={() => router.push('/search')}
+        onPress={() => router.push({ pathname: '/(tabs)/explore', params: { from: '/(tabs)/feed' } })}
         activeOpacity={0.7}
         style={{
           position: 'absolute',

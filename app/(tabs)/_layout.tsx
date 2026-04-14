@@ -11,7 +11,7 @@ export default function TabsLayout() {
         <Tabs
           screenOptions={{
             headerShown: false,
-            lazy: false,
+            lazy: true,
           }}
           tabBar={(props: BottomTabBarProps) => <BottomTabBar {...props} />}
         >

@@ -64,10 +64,9 @@ function VideoPlayerSlotComponent({ videoId, thumbnailURL, instanceId }: VideoPl
   const revealVideo = useCallback(() => {
     if (firstFrameRef.current) return
     firstFrameRef.current = true
-    console.log('[Slot:reveal] videoId=', videoId, 'instanceId=', instanceId)
     setReady(true)
     thumbOpacity.value = 0
-  }, [thumbOpacity, videoId, instanceId])
+  }, [thumbOpacity])
 
   useEffect(() => {
     if (prevVideoId.current !== videoId) {

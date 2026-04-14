@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { auth } from '@/lib/firebase'
+import { useTabBarVisibility } from '@/contexts/TabBarVisibilityContext'
 
 import { VideoPlayerSlot, usePlayerForVideo } from '../VideoPlayerSlot'
 import { RepostedByBanner } from '@/features/repost/components/RepostedByBanner'
@@ -31,16 +32,23 @@ interface FeedItemProps {
   userPhotoURL?: string
   isActive?: boolean
   itemHeight?: number
+  commentsOpen?: boolean
+  // Mode immersif (auto-masquage navbar + descente du bloc info après 5 s).
+  // Désactivé dans les contextes SANS navbar (ex. viewer plein écran du profil
+  // ou de l'onglet « à proximité »), où le bloc doit rester ancré en bas.
+  immersive?: boolean
 }
 
 function FeedItemComponent({
   item, index, instanceId = 'feed',
   onPressComment, onPressShare, onPressMore, onLongPress,
-  username, userPhotoURL, isActive: isActiveProp, itemHeight,
+  username, userPhotoURL, isActive: isActiveProp, itemHeight, commentsOpen = false,
+  immersive = true,
 }: FeedItemProps) {
   const isActive = isActiveProp ?? false
   const insets = useSafeAreaInsets()
   const player = usePlayerForVideo(instanceId, item.id)
+  const { hideTabBar, showTabBar } = useTabBarVisibility()
 
   const { liked, saved, likeCount, saveCount, toggleLike, toggleSave } = useFeedItemActions(item)
 
@@ -60,6 +68,28 @@ function FeedItemComponent({
     repostToastTimer.current = setTimeout(() => setRepostToast(null), 2000)
   }, [])
 
+  const commentOpacity = useRef(new Animated.Value(1)).current
+  const commentTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const [commentVisible, setCommentVisible] = useState(true)
+
+  useEffect(() => {
+    if (isActive) {
+      commentOpacity.setValue(1)
+      setCommentVisible(true)
+      clearTimeout(commentTimer.current)
+      commentTimer.current = setTimeout(() => {
+        Animated.timing(commentOpacity, { toValue: 0, duration: 400, useNativeDriver: true }).start(() => {
+          setCommentVisible(false)
+        })
+      }, 5000)
+    } else {
+      clearTimeout(commentTimer.current)
+      commentOpacity.setValue(1)
+      setCommentVisible(true)
+    }
+    return () => clearTimeout(commentTimer.current)
+  }, [isActive, commentOpacity])
+
   useEffect(() => {
     if (!player) return
     if (!isActive) {
@@ -67,6 +97,71 @@ function FeedItemComponent({
       try { player.volume = 0 } catch {}
     }
   }, [isActive, player])
+
+  /* ── Mode immersif : après 5 s de visionnage, la navbar principale se masque
+     et le bloc info descend pour occuper l'espace libéré. Au toucher de l'écran,
+     tout se réaffiche, puis le cycle recommence. ── */
+  const IMMERSIVE_SHIFT = 64 // hauteur visible de la navbar (hors safe area)
+  const immersiveShift = useRef(new Animated.Value(0)).current
+  const immersiveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  const enterImmersive = useCallback(() => {
+    hideTabBar()
+    Animated.timing(immersiveShift, {
+      toValue: IMMERSIVE_SHIFT, duration: 300, useNativeDriver: true,
+    }).start()
+  }, [hideTabBar, immersiveShift])
+
+  const exitImmersive = useCallback(() => {
+    showTabBar()
+    Animated.timing(immersiveShift, {
+      toValue: 0, duration: 200, useNativeDriver: true,
+    }).start()
+  }, [showTabBar, immersiveShift])
+
+  const scheduleImmersive = useCallback(() => {
+    clearTimeout(immersiveTimer.current)
+    immersiveTimer.current = setTimeout(enterImmersive, 5000)
+  }, [enterImmersive])
+
+  // Démarre / relance le cycle quand la vidéo est active ET que les commentaires
+  // sont fermés. Suspend le cycle (timer annulé, décalage remis à zéro) tant que
+  // les commentaires sont ouverts, et restaure tout quand la vidéo n'est plus
+  // active (scroll, perte de focus…).
+  // Hors mode immersif (viewer sans navbar) : jamais de masquage, bloc ancré.
+  useEffect(() => {
+    if (!immersive) {
+      clearTimeout(immersiveTimer.current)
+      // Pas de navbar dans ce contexte → on descend le bloc (de façon STATIQUE)
+      // pour qu'il occupe l'espace du bas, sans cycle ni animation.
+      immersiveShift.setValue(IMMERSIVE_SHIFT)
+      return
+    }
+    if (isActive && !commentsOpen) {
+      // On (re)part toujours d'un état visible avant de lancer le compte à
+      // rebours — au cas où la navbar aurait été laissée masquée.
+      showTabBar()
+      immersiveShift.setValue(0)
+      scheduleImmersive()
+    } else {
+      clearTimeout(immersiveTimer.current)
+      if (commentsOpen) {
+        // Le CommentSheet gère déjà la navbar ; on remet juste le bloc en place.
+        immersiveShift.setValue(0)
+      } else {
+        showTabBar()
+        immersiveShift.setValue(0)
+      }
+    }
+    return () => clearTimeout(immersiveTimer.current)
+  }, [immersive, isActive, commentsOpen, scheduleImmersive, showTabBar, immersiveShift])
+
+  // Un toucher réaffiche tout et relance le compte à rebours de 5 s.
+  const handleInteraction = useCallback(() => {
+    if (!immersive || !isActive || commentsOpen) return
+    exitImmersive()
+    scheduleImmersive()
+  }, [immersive, isActive, commentsOpen, exitImmersive, scheduleImmersive])
 
   const handleLikePress = useCallback(() => { toggleLike(); animateLikeIcon() }, [toggleLike, animateLikeIcon])
   const handleComment = useCallback(() => onPressComment?.(item.id), [onPressComment, item.id])
@@ -85,6 +180,7 @@ function FeedItemComponent({
         player={player}
         onDoubleTapLike={() => toggleLike({ force: true })}
         onLongPress={onLongPress}
+        onInteraction={handleInteraction}
       />
 
       <LinearGradient
@@ -108,9 +204,9 @@ function FeedItemComponent({
         </View>
       )}
 
-      <View style={[styles.infoColumn, { bottom: BOTTOM_PADDING + insets.bottom }]}>
-        <AuthorInfo item={item} username={username} userPhotoURL={userPhotoURL} />
-        <CaptionBlock description={item.description} hashtags={item.hashtags} />
+      <Animated.View style={[styles.infoColumn, { bottom: BOTTOM_PADDING + insets.bottom, transform: [{ translateY: immersiveShift }] }]}>
+        <AuthorInfo item={item} username={username} userPhotoURL={userPhotoURL} hashtags={item.hashtags} />
+        <CaptionBlock description={item.description} />
         {item.place && (
           <TouchableOpacity
             onPress={() => router.push({ pathname: '/place/[id]', params: { id: item.place! } })}
@@ -121,8 +217,12 @@ function FeedItemComponent({
             <Text style={styles.locationText}>{item.place}</Text>
           </TouchableOpacity>
         )}
-        <CommentPreview item={item} onPressComment={onPressComment} />
-      </View>
+        {commentVisible && (
+          <Animated.View style={{ opacity: commentOpacity }}>
+            <CommentPreview item={item} onPressComment={onPressComment} />
+          </Animated.View>
+        )}
+      </Animated.View>
 
       <View style={[styles.actionColumn, { bottom: BOTTOM_PADDING + insets.bottom }]}>
         <ActionBar
@@ -142,7 +242,7 @@ function FeedItemComponent({
         />
       </View>
 
-      <ProgressBar player={player} bottomOffset={BOTTOM_PROGRESS} />
+      <ProgressBar player={player} bottomOffset={BOTTOM_PROGRESS} translateY={immersiveShift} />
     </View>
   )
 }
@@ -159,14 +259,16 @@ export const FeedItem = memo(FeedItemComponent, (prev, next) => {
   if (prev.item.latestRepostedBy?.userId !== next.item.latestRepostedBy?.userId) return false
   if (prev.username !== next.username) return false
   if (prev.isActive !== next.isActive) return false
+  if (prev.commentsOpen !== next.commentsOpen) return false
+  if (prev.immersive !== next.immersive) return false
   return true
 })
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   gradient: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 220 },
-  infoColumn: { position: 'absolute', left: 12, right: 80 },
-  actionColumn: { position: 'absolute', right: 8, alignItems: 'center' },
+  infoColumn: { position: 'absolute', left: 12, right: 80, flexDirection: 'column-reverse', alignItems: 'flex-start' },
+  actionColumn: { position: 'absolute', right: 8, alignItems: 'center', zIndex: 20, elevation: 20 },
   toast: {
     position: 'absolute', top: '45%', alignSelf: 'center',
     backgroundColor: 'rgba(0,0,0,0.8)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20,

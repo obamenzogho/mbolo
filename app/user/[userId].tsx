@@ -12,6 +12,7 @@ import {
 } from 'react-native-reanimated'
 import { GestureDetector, Gesture } from 'react-native-gesture-handler'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { doc, onSnapshot } from 'firebase/firestore'
 import { auth, db } from '../../src/lib/firebase'
@@ -23,7 +24,6 @@ import type { User as UserType, ProfileTab } from '../../src/types'
 import { useFollow } from '../../src/hooks/useFollow'
 import { useGoBack } from '../../src/hooks/useGoBack'
 import FollowButton from '../../src/components/FollowButton'
-import OrbitLoader from '../../src/components/OrbitLoader'
 import BottomSheet from '../../src/components/ui/BottomSheet'
 import { getOrCreateConversation } from '@/features/chat/services/chatService'
 import { useProfileTabs } from '@/hooks/useProfileTabs'
@@ -35,6 +35,7 @@ import { VerifiedBadge } from '@/components/VerifiedBadge'
 import { AvatarViewer } from '@/components/AvatarViewer'
 import { ContentActionsSheet } from '@/components/ContentActionsSheet'
 import { StatsCards } from '@/components/profile/StatsCards'
+import { ProfileSkeleton, FollowListSkeleton } from '../../src/features/news/components/Skeletons'
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 
@@ -209,8 +210,8 @@ export default function UserProfile() {
 
   if (!ready) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
-        <OrbitLoader size={80} />
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
+        <ProfileSkeleton />
       </SafeAreaView>
     )
   }
@@ -427,9 +428,7 @@ export default function UserProfile() {
               contentContainerStyle={{ padding: 16 }}
               ListEmptyComponent={
                 followListLoading ? (
-                  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 40 }}>
-                    <OrbitLoader size={80} />
-                  </View>
+                  <FollowListSkeleton count={8} />
                 ) : (
                   <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 40 }}>
                     <Ionicons name="people-outline" size={48} color="#333" />
@@ -471,9 +470,7 @@ export default function UserProfile() {
               contentContainerStyle={{ padding: 16 }}
               ListEmptyComponent={
                 followListLoading ? (
-                  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 40 }}>
-                    <OrbitLoader size={80} />
-                  </View>
+                  <FollowListSkeleton count={8} />
                 ) : (
                   <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 40 }}>
                     <Ionicons name="people-outline" size={48} color="#333" />

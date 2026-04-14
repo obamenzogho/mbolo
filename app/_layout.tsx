@@ -16,6 +16,7 @@ import { InteractionManager, Platform } from 'react-native'
 import { Stack, useRouter, usePathname } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import SafeGestureHandlerRootView from '../src/components/SafeGestureHandlerRootView'
+import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context'
 import * as Notifications from 'expo-notifications'
 import { auth } from '../src/lib/firebase'
 import ErrorBoundary from '../src/components/ErrorBoundary'
@@ -157,6 +158,11 @@ export default function RootLayout() {
       feedScale={feedScale}
     >
       <SafeGestureHandlerRootView style={{ flex: 1 }}>
+        {/* SafeAreaProvider avec initialWindowMetrics : fournit les insets DÈS la
+            première frame (synchrone). Sans ça, expo-router ne passe pas
+            initialMetrics sur natif → insets.bottom = 0 au 1er rendu, ce qui
+            place le bloc info du feed derrière la navbar jusqu'au premier scroll. */}
+        <SafeAreaProvider initialMetrics={initialWindowMetrics}>
         <I18nProvider>
           <DataSaverProvider>
           <ErrorBoundary>
@@ -167,6 +173,7 @@ export default function RootLayout() {
           </ErrorBoundary>
           </DataSaverProvider>
         </I18nProvider>
+        </SafeAreaProvider>
       </SafeGestureHandlerRootView>
     </StartupScreen>
   )
