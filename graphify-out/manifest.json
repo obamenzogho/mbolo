@@ -1,0 +1,292 @@
+{
+  "C:\\Users\\ashton\\Desktop\\mbolo\\app.json": {
+    "mtime": 1779012334.3738687,
+    "ast_hash": "8095f9b0ec4c88e5852ced31b3b04f1e",
+    "semantic_hash": "8095f9b0ec4c88e5852ced31b3b04f1e"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\babel.config.js": {
+    "mtime": 1778889526.3841946,
+    "ast_hash": "c1dbd24f019e76c4b5d47732ff85460a",
+    "semantic_hash": "c1dbd24f019e76c4b5d47732ff85460a"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\firebase.json": {
+    "mtime": 1778973385.2270906,
+    "ast_hash": "6a7e94c3124e3d2552ee4ec011ae7b1d",
+    "semantic_hash": "6a7e94c3124e3d2552ee4ec011ae7b1d"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\firestore.indexes.json": {
+    "mtime": 1779044196.6306171,
+    "ast_hash": "8dc8cdaf77fdde9c802925363117c275",
+    "semantic_hash": "8dc8cdaf77fdde9c802925363117c275"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\index.ts": {
+    "mtime": 1778847782.865193,
+    "ast_hash": "e56985cea8fab2d48d17ecdeeb21826b",
+    "semantic_hash": "e56985cea8fab2d48d17ecdeeb21826b"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\metro.config.js": {
+    "mtime": 1778847644.9827678,
+    "ast_hash": "ba0bc0d9ad12f9b0af79b11638e2f0ea",
+    "semantic_hash": "ba0bc0d9ad12f9b0af79b11638e2f0ea"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\nativewind-env.d.ts": {
+    "mtime": 1778847646.342239,
+    "ast_hash": "b02bcf4fde15f746f6e5248537d0b156",
+    "semantic_hash": "b02bcf4fde15f746f6e5248537d0b156"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\package.json": {
+    "mtime": 1779041817.723187,
+    "ast_hash": "0529fc646bf2689590ce65ab2243ea3e",
+    "semantic_hash": "0529fc646bf2689590ce65ab2243ea3e"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\tailwind.config.js": {
+    "mtime": 1778854148.9204388,
+    "ast_hash": "4ecd9e412248c83163a9991bb682632e",
+    "semantic_hash": "4ecd9e412248c83163a9991bb682632e"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\tsconfig.json": {
+    "mtime": 1778854376.2930775,
+    "ast_hash": "c7c1328ae707449636c77a72d4c742fc",
+    "semantic_hash": "c7c1328ae707449636c77a72d4c742fc"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\.expo\\devices.json": {
+    "mtime": 1778854177.4879024,
+    "ast_hash": "e5f6eb13c875f326cfd5915d3364614f",
+    "semantic_hash": "e5f6eb13c875f326cfd5915d3364614f"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\.expo\\settings.json": {
+    "mtime": 1778856748.0753193,
+    "ast_hash": "4a24967cbe7f467b0fe7fb514cc99cc0",
+    "semantic_hash": "4a24967cbe7f467b0fe7fb514cc99cc0"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\app\\index.tsx": {
+    "mtime": 1778847651.842147,
+    "ast_hash": "0c5fd4d2a65e7982dc3e2edadaeaa44e",
+    "semantic_hash": "0c5fd4d2a65e7982dc3e2edadaeaa44e"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\app\\_layout.tsx": {
+    "mtime": 1778968155.2020056,
+    "ast_hash": "cb61fb577eadb096060cebe95d6b4d5c",
+    "semantic_hash": "cb61fb577eadb096060cebe95d6b4d5c"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\app\\(auth)\\login.tsx": {
+    "mtime": 1778905486.3340394,
+    "ast_hash": "a4b03ec50571f22d8c5cf298ff9df484",
+    "semantic_hash": "a4b03ec50571f22d8c5cf298ff9df484"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\app\\(auth)\\register.tsx": {
+    "mtime": 1778905474.130996,
+    "ast_hash": "a54071a4405aa3d5223094285ace3e5d",
+    "semantic_hash": "a54071a4405aa3d5223094285ace3e5d"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\app\\(auth)\\_layout.tsx": {
+    "mtime": 1778847652.420279,
+    "ast_hash": "2daaf8f136dee00660595f6ab5798f58",
+    "semantic_hash": "2daaf8f136dee00660595f6ab5798f58"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\app\\(tabs)\\edit-profile.tsx": {
+    "mtime": 1779023106.0002239,
+    "ast_hash": "9666e6f5b16ff3aa72946c6ae8de25b7",
+    "semantic_hash": "9666e6f5b16ff3aa72946c6ae8de25b7"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\app\\(tabs)\\explore.tsx": {
+    "mtime": 1778847688.8109038,
+    "ast_hash": "31ac1596e1cda60267f25499a44850dd",
+    "semantic_hash": "31ac1596e1cda60267f25499a44850dd"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\app\\(tabs)\\feed.tsx": {
+    "mtime": 1779021767.3267212,
+    "ast_hash": "c4b82a50a6d885873a22135d0d0c8bf7",
+    "semantic_hash": "c4b82a50a6d885873a22135d0d0c8bf7"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\app\\(tabs)\\messages.tsx": {
+    "mtime": 1778896831.5217948,
+    "ast_hash": "9e10a50dc57c281dc9aca7defe05e491",
+    "semantic_hash": "9e10a50dc57c281dc9aca7defe05e491"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\app\\(tabs)\\notifications.tsx": {
+    "mtime": 1778906814.864345,
+    "ast_hash": "23ea122271e92cbadaac622ecc89be8b",
+    "semantic_hash": "23ea122271e92cbadaac622ecc89be8b"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\app\\(tabs)\\profile.tsx": {
+    "mtime": 1779047281.386792,
+    "ast_hash": "7ef35b8f9686b8e82a2274ab56b442de",
+    "semantic_hash": "7ef35b8f9686b8e82a2274ab56b442de"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\app\\(tabs)\\stories.tsx": {
+    "mtime": 1778847720.5452824,
+    "ast_hash": "417ae605d7045364f59ae1b482493f67",
+    "semantic_hash": "417ae605d7045364f59ae1b482493f67"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\app\\(tabs)\\story-upload.tsx": {
+    "mtime": 1779043372.5490868,
+    "ast_hash": "3543fac453067545d7fb437ea6fd92bf",
+    "semantic_hash": "3543fac453067545d7fb437ea6fd92bf"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\app\\(tabs)\\upload.tsx": {
+    "mtime": 1778894891.8981783,
+    "ast_hash": "b226fe9c659617814ff00919fe4b70db",
+    "semantic_hash": "b226fe9c659617814ff00919fe4b70db"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\app\\(tabs)\\_layout.tsx": {
+    "mtime": 1779043695.7040608,
+    "ast_hash": "cf5995d8d6352231a32e8ccd74b42fcc",
+    "semantic_hash": "cf5995d8d6352231a32e8ccd74b42fcc"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\app\\(tabs)\\highlight\\[highlightId].tsx": {
+    "mtime": 1779042059.4192064,
+    "ast_hash": "e0954bb09622bb40eb7827fca272802e",
+    "semantic_hash": "e0954bb09622bb40eb7827fca272802e"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\app\\(tabs)\\user\\[userId].tsx": {
+    "mtime": 1779022192.545099,
+    "ast_hash": "207f027bbe201394119d1a2bbdd21256",
+    "semantic_hash": "207f027bbe201394119d1a2bbdd21256"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\app\\settings\\about.tsx": {
+    "mtime": 1779024684.7182877,
+    "ast_hash": "6cc2365847535375a574083a7eec2d0e",
+    "semantic_hash": "6cc2365847535375a574083a7eec2d0e"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\app\\settings\\index.tsx": {
+    "mtime": 1779024711.7495358,
+    "ast_hash": "edce58b16d18af01a1b052974631e82e",
+    "semantic_hash": "edce58b16d18af01a1b052974631e82e"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\dist-ios\\metadata.json": {
+    "mtime": 1778891728.5967317,
+    "ast_hash": "8c3f37a790aae74a098a141fa663c2ec",
+    "semantic_hash": "8c3f37a790aae74a098a141fa663c2ec"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\src\\components\\CommentModal.tsx": {
+    "mtime": 1779021826.6545062,
+    "ast_hash": "57c6e4b0f6a372e16425119dc2e7ba9e",
+    "semantic_hash": "57c6e4b0f6a372e16425119dc2e7ba9e"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\src\\components\\CommentSheet.tsx": {
+    "mtime": 1778958279.035864,
+    "ast_hash": "93ff689095c0b40ec020b0d55d31567e",
+    "semantic_hash": "93ff689095c0b40ec020b0d55d31567e"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\src\\components\\DatePicker.tsx": {
+    "mtime": 1778904695.2125998,
+    "ast_hash": "482e353babf035461f83c15469271753",
+    "semantic_hash": "482e353babf035461f83c15469271753"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\src\\components\\HighlightPickerModal.tsx": {
+    "mtime": 1779043449.201479,
+    "ast_hash": "e396dca6ee86dc7270d0b6d5dfa18f28",
+    "semantic_hash": "e396dca6ee86dc7270d0b6d5dfa18f28"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\src\\components\\Icons.tsx": {
+    "mtime": 1778897961.646814,
+    "ast_hash": "75a8be8263b738891d14ef094e9c6cf4",
+    "semantic_hash": "75a8be8263b738891d14ef094e9c6cf4"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\src\\components\\MboloLoader.tsx": {
+    "mtime": 1778968766.8854532,
+    "ast_hash": "3a52195be03cc5ad2b60a942c13f93b8",
+    "semantic_hash": "3a52195be03cc5ad2b60a942c13f93b8"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\src\\components\\SplashScreen.tsx": {
+    "mtime": 1778968246.4043984,
+    "ast_hash": "dbf3da71d4b1ea00fe62274a0bb6d8a9",
+    "semantic_hash": "dbf3da71d4b1ea00fe62274a0bb6d8a9"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\src\\components\\VideoLoadingOverlay.tsx": {
+    "mtime": 1778968635.2012367,
+    "ast_hash": "2a9f2444ec956f1a0f35a69b235dff7e",
+    "semantic_hash": "2a9f2444ec956f1a0f35a69b235dff7e"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\src\\hooks\\useComments.ts": {
+    "mtime": 1778964316.4696212,
+    "ast_hash": "57c38e5bd3765548fcdcaca6fd801afb",
+    "semantic_hash": "57c38e5bd3765548fcdcaca6fd801afb"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\src\\hooks\\useFollow.ts": {
+    "mtime": 1779021506.73297,
+    "ast_hash": "5e1886c1ae143bda8bc4ff9d65deeb4f",
+    "semantic_hash": "5e1886c1ae143bda8bc4ff9d65deeb4f"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\src\\hooks\\useHighlights.ts": {
+    "mtime": 1779043620.3946867,
+    "ast_hash": "43067b86edd936f63b69b089d9cee6a9",
+    "semantic_hash": "43067b86edd936f63b69b089d9cee6a9"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\src\\hooks\\useStories.ts": {
+    "mtime": 1779043511.2951422,
+    "ast_hash": "c6f2ccc45ac28a4a13e4f747541f1319",
+    "semantic_hash": "c6f2ccc45ac28a4a13e4f747541f1319"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\src\\hooks\\useVideoFeed.ts": {
+    "mtime": 1779005253.6159244,
+    "ast_hash": "49ff2fcc48e6d82f48425e3aac8cf412",
+    "semantic_hash": "49ff2fcc48e6d82f48425e3aac8cf412"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\src\\hooks\\useVideoPreloader.ts": {
+    "mtime": 1778965507.3839388,
+    "ast_hash": "d916e288bf1c9ca983f51d2c0fc69d70",
+    "semantic_hash": "d916e288bf1c9ca983f51d2c0fc69d70"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\src\\i18n\\translations.ts": {
+    "mtime": 1778847761.6390252,
+    "ast_hash": "8470b60cc379ec6efd15f8fc54af5104",
+    "semantic_hash": "8470b60cc379ec6efd15f8fc54af5104"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\src\\lib\\cloudinary.ts": {
+    "mtime": 1778924275.3141506,
+    "ast_hash": "6381e48b37ed65a0cced8047bcd22623",
+    "semantic_hash": "6381e48b37ed65a0cced8047bcd22623"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\src\\lib\\firebase.ts": {
+    "mtime": 1778922662.4462051,
+    "ast_hash": "dda9f3039762ba5800a8f9f323e398dc",
+    "semantic_hash": "dda9f3039762ba5800a8f9f323e398dc"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\src\\lib\\storage.ts": {
+    "mtime": 1778924284.4211285,
+    "ast_hash": "28935e7d5ba4e835b5ef0f61b24fc371",
+    "semantic_hash": "28935e7d5ba4e835b5ef0f61b24fc371"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\src\\lib\\theme.ts": {
+    "mtime": 1778847639.201518,
+    "ast_hash": "1050c0eddf57cd439d71cc5eaf2ce708",
+    "semantic_hash": "1050c0eddf57cd439d71cc5eaf2ce708"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\src\\types\\index.ts": {
+    "mtime": 1779023021.843976,
+    "ast_hash": "a8581c3006a5fcfb36437cf332360542",
+    "semantic_hash": "a8581c3006a5fcfb36437cf332360542"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\.expo\\README.md": {
+    "mtime": 1778854177.2066557,
+    "ast_hash": "2d3a37a405a8f9ffb72ff12bdd3b0adf",
+    "semantic_hash": "2d3a37a405a8f9ffb72ff12bdd3b0adf"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\.expo\\web\\cache\\production\\images\\favicon\\favicon-24272cdaeff82cc5facdaccd982a6f05b60c4504704bbf94c19a6388659880bb-contain-transparent\\favicon-48.png": {
+    "mtime": 1778890813.5662618,
+    "ast_hash": "affc53a4024a0f3d0867c5231b535a63",
+    "semantic_hash": "affc53a4024a0f3d0867c5231b535a63"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\assets\\adaptive-icon.png": {
+    "mtime": 499162500.0,
+    "ast_hash": "97dae5a0e62ad8551d8a31897b425e63",
+    "semantic_hash": "97dae5a0e62ad8551d8a31897b425e63"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\assets\\favicon.png": {
+    "mtime": 499162500.0,
+    "ast_hash": "4f1cb2cac2370cd5050681232e8575a8",
+    "semantic_hash": "4f1cb2cac2370cd5050681232e8575a8"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\assets\\icon.png": {
+    "mtime": 499162500.0,
+    "ast_hash": "4e3f888fc8475f69fd5fa32f1ad5216a",
+    "semantic_hash": "4e3f888fc8475f69fd5fa32f1ad5216a"
+  },
+  "C:\\Users\\ashton\\Desktop\\mbolo\\assets\\splash-icon.png": {
+    "mtime": 499162500.0,
+    "ast_hash": "97dae5a0e62ad8551d8a31897b425e63",
+    "semantic_hash": "97dae5a0e62ad8551d8a31897b425e63"
+  }
+}

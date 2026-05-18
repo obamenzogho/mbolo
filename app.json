@@ -1,0 +1,112 @@
+{
+  "expo": {
+    "name": "Mbolo",
+    "slug": "mbolo",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "scheme": "mbolo",
+    "newArchEnabled": true,
+    "developmentClient": {
+      "silentLaunch": false
+    },
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mbolo.app",
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": [
+          "whatsapp",
+          "instagram",
+          "fb",
+          "twitter",
+          "tg",
+          "sms"
+        ],
+        "NSCameraUsageDescription": "Mbolo a besoin de ta caméra pour enregistrer des vidéos et prendre des photos.",
+        "NSMicrophoneUsageDescription": "Mbolo a besoin de ton micro pour enregistrer le son des vidéos.",
+        "NSPhotoLibraryUsageDescription": "Mbolo accède à ta galerie pour sélectionner des photos et vidéos.",
+        "NSPhotoLibraryAddUsageDescription": "Mbolo sauvegarde tes vidéos et photos dans ta galerie."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#000000"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.mbolo.app",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.ACCESS_MEDIA_LOCATION",
+        "android.permission.READ_MEDIA_AUDIO"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-dev-client",
+      "expo-router",
+      "expo-av",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Mbolo a besoin de ta caméra pour enregistrer des vidéos et prendre des photos.",
+          "microphonePermission": "Mbolo a besoin de ton micro pour enregistrer le son des vidéos.",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Mbolo a besoin d'accéder à vos photos pour uploader des vidéos.",
+          "cameraPermission": "Mbolo a besoin d'accéder à votre caméra pour enregistrer des vidéos."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Mbolo utilise votre position pour afficher votre ville sur votre profil."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#00A86B",
+          "sounds": []
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Mbolo accède à ta galerie pour sélectionner des photos et vidéos.",
+          "savePhotosPermission": "Mbolo sauvegarde tes vidéos et photos dans ta galerie.",
+          "isAccessMediaLocationEnabled": true
+        }
+      ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "e30761e7-767d-4ec8-9983-f1362d71c575"
+      }
+    },
+    "owner": "justebruneel"
+  }
+}
