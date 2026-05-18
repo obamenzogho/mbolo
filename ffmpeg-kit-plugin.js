@@ -30,6 +30,47 @@ function patchFfmpegPodspec(projectRoot) {
   }
 }
 
+function addSwiftConcurrencyFix(podfileContent) {
+  const marker = '# [ffmpeg-kit-plugin] Swift concurrency fix';
+  if (podfileContent.includes(marker)) return podfileContent;
+
+  const lines = podfileContent.split('\n');
+  let postInstallIndex = -1;
+  let postInstallIndent = '';
+
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].includes('post_install do |installer|')) {
+      postInstallIndex = i;
+      postInstallIndent = lines[i].match(/^(\s*)/)[1];
+      break;
+    }
+  }
+
+  if (postInstallIndex === -1) return podfileContent;
+
+  let endIndex = -1;
+  for (let i = postInstallIndex + 1; i < lines.length; i++) {
+    if (lines[i].trim() === 'end' && lines[i].startsWith(postInstallIndent)) {
+      endIndex = i;
+      break;
+    }
+  }
+
+  if (endIndex === -1) return podfileContent;
+
+  const fix = [
+    `${postInstallIndent}  ${marker}`,
+    `${postInstallIndent}  installer.pods_project.targets.each do |target|`,
+    `${postInstallIndent}    target.build_configurations.each do |config|`,
+    `${postInstallIndent}      config.build_settings['SWIFT_STRICT_CONCURRENCY'] = 'minimal'`,
+    `${postInstallIndent}    end`,
+    `${postInstallIndent}  end`,
+  ];
+
+  lines.splice(endIndex, 0, ...fix);
+  return lines.join('\n');
+}
+
 function addFfmpegHooks(podfileContent) {
   const marker = '# [ffmpeg-kit-plugin] hooks';
   if (podfileContent.includes(marker)) {
@@ -51,17 +92,7 @@ pod 'ffmpeg-kit-react-native', :path => '../node_modules/ffmpeg-kit-react-native
   );
 
   // Add Swift concurrency fix inside the existing post_install hook
-  podfileContent = podfileContent.replace(
-    /(\n\s+\)\n)(\s+end\n\s+end\n)/,
-    `$1
-    # [ffmpeg-kit-plugin] Disable Swift 6 strict concurrency warnings (Xcode 26+)
-    installer.pods_project.targets.each do |target|
-      target.build_configurations.each do |config|
-        config.build_settings['SWIFT_STRICT_CONCURRENCY'] = 'minimal'
-      end
-    end
-$2`,
-  );
+  podfileContent = addSwiftConcurrencyFix(podfileContent);
 
   return podfileContent;
 }
