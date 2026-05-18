@@ -26,12 +26,19 @@
           "fb",
           "twitter",
           "tg",
+          "sms",
+          "whatsapp",
+          "instagram",
+          "fb",
+          "twitter",
+          "tg",
           "sms"
         ],
         "NSCameraUsageDescription": "Mbolo a besoin de ta caméra pour enregistrer des vidéos et prendre des photos.",
         "NSMicrophoneUsageDescription": "Mbolo a besoin de ton micro pour enregistrer le son des vidéos.",
         "NSPhotoLibraryUsageDescription": "Mbolo accède à ta galerie pour sélectionner des photos et vidéos.",
-        "NSPhotoLibraryAddUsageDescription": "Mbolo sauvegarde tes vidéos et photos dans ta galerie."
+        "NSPhotoLibraryAddUsageDescription": "Mbolo sauvegarde tes vidéos et photos dans ta galerie.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -98,6 +105,13 @@
           "photosPermission": "Mbolo accède à ta galerie pour sélectionner des photos et vidéos.",
           "savePhotosPermission": "Mbolo sauvegarde tes vidéos et photos dans ta galerie.",
           "isAccessMediaLocationEnabled": true
+        }
+      ],
+      [
+        "./ffmpeg-kit-plugin.js",
+        {
+          "iosUrl": "https://github.com/NooruddinLakhani/ffmpeg-kit-ios-full-gpl/archive/refs/tags/latest.zip",
+          "androidUrl": "https://github.com/NooruddinLakhani/ffmpeg-kit-full-gpl/releases/download/v1.0.0/ffmpeg-kit-full-gpl.aar"
         }
       ]
     ],
