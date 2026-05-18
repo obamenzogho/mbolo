@@ -5,6 +5,7 @@ const {
   withDangerousMod,
   withAppBuildGradle,
   withProjectBuildGradle,
+  withXcodeProject,
 } = require('@expo/config-plugins');
 const {
   mergeContents,
@@ -96,6 +97,22 @@ pod 'ffmpeg-kit-react-native', :path => '../node_modules/ffmpeg-kit-react-native
 
   return podfileContent;
 }
+
+const withSwiftConcurrency = (config) => {
+  return withXcodeProject(config, (cfg) => {
+    const xcodeProject = cfg.modResults;
+    const configurations = xcodeProject.hash.project.objects.XCBuildConfiguration;
+
+    for (const key of Object.keys(configurations)) {
+      const configEntry = configurations[key];
+      if (configEntry.buildSettings) {
+        configEntry.buildSettings.SWIFT_STRICT_CONCURRENCY = 'minimal';
+      }
+    }
+
+    return cfg;
+  });
+};
 
 function ensureDir(dir) {
   if (!fs.existsSync(dir)) {
@@ -308,5 +325,6 @@ module.exports = (config, options = {}) => {
   return withPlugins(config, [
     (config) => withFfmpegKitIos(config, { iosUrl }),
     (config) => withFfmpegKitAndroid(config, { androidUrl }),
+    withSwiftConcurrency,
   ]);
 };
