@@ -35,26 +35,35 @@ function addFfmpegHooks(podfileContent) {
   if (podfileContent.includes(marker)) {
     return podfileContent;
   }
-  const hooks = `
 
+  const podDeclarations = `
 ${marker}
-
 # Override ffmpeg-kit-ios-full-gpl with custom podspec (community-hosted binaries)
 pod 'ffmpeg-kit-ios-full-gpl', :podspec => './ffmpeg-kit-ios-full-gpl.podspec'
-
 # Explicitly select the full-gpl subspec, overriding the default 'https' subspec
 pod 'ffmpeg-kit-react-native', :path => '../node_modules/ffmpeg-kit-react-native', :subspecs => ['full-gpl']
-
-# Disable Swift 6 strict concurrency warnings (Xcode 26+)
-post_install do |installer|
-  installer.pods_project.targets.each do |target|
-    target.build_configurations.each do |config|
-      config.build_settings['SWIFT_STRICT_CONCURRENCY'] = 'minimal'
-    end
-  end
-end
 `;
-  return podfileContent + hooks;
+
+  // Insert pod declarations BEFORE post_install (inside the target block)
+  podfileContent = podfileContent.replace(
+    /\n(\s+post_install do \|installer\|)/,
+    podDeclarations + '$1',
+  );
+
+  // Add Swift concurrency fix inside the existing post_install hook
+  podfileContent = podfileContent.replace(
+    /(\n\s+\)\n)(\s+end\n\s+end\n)/,
+    `$1
+    # [ffmpeg-kit-plugin] Disable Swift 6 strict concurrency warnings (Xcode 26+)
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['SWIFT_STRICT_CONCURRENCY'] = 'minimal'
+      end
+    end
+$2`,
+  );
+
+  return podfileContent;
 }
 
 function ensureDir(dir) {
