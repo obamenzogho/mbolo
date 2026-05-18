@@ -66,6 +66,14 @@ function addSwiftConcurrencyFix(podfileContent) {
     `${postInstallIndent}      config.build_settings['SWIFT_STRICT_CONCURRENCY'] = 'minimal'`,
     `${postInstallIndent}    end`,
     `${postInstallIndent}  end`,
+    `${postInstallIndent}  # Also fix the main project targets`,
+    `${postInstallIndent}  installer.generated_projects.each do |project|`,
+    `${postInstallIndent}    project.targets.each do |target|`,
+    `${postInstallIndent}      target.build_configurations.each do |config|`,
+    `${postInstallIndent}        config.build_settings['SWIFT_STRICT_CONCURRENCY'] = 'minimal'`,
+    `${postInstallIndent}      end`,
+    `${postInstallIndent}    end`,
+    `${postInstallIndent}  end`,
   ];
 
   lines.splice(endIndex, 0, ...fix);
