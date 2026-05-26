@@ -7,10 +7,13 @@ import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
+import { collection, addDoc, doc, increment, updateDoc, serverTimestamp } from 'firebase/firestore'
 import { auth, db } from '../../src/lib/firebase'
 import { uploadToCloudinary } from '../../src/lib/cloudinary'
+import OrbitLoader from '../../src/components/OrbitLoader'
 import { colors } from '../../src/lib/theme'
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window')
 
 export default function ReelUploadScreen() {
   const router = useRouter()
@@ -80,8 +83,11 @@ export default function ReelUploadScreen() {
         likes: 0,
         comments: 0,
         shares: 0,
+        saves: 0,
+        savedBy: [],
         createdAt: serverTimestamp(),
       })
+      updateDoc(doc(db, 'users', user.uid), { postsCount: increment(1) }).catch(() => {})
 
       Alert.alert('Succès', 'Reel publié ! 🇬🇦', [
         { text: 'OK', onPress: () => router.back() },
@@ -182,7 +188,7 @@ export default function ReelUploadScreen() {
   if (step === 'uploading') {
     return (
       <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <OrbitLoader size={80} />
         <Text style={{ color: '#fff', fontSize: 16, marginTop: 16, fontWeight: '600' }}>Publication du reel...</Text>
       </View>
     )

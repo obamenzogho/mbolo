@@ -2,5 +2,22 @@
   "firestore": {
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "emulators": {
+    "auth": {
+      "enabled": true
+    },
+    "firestore": {
+      "enabled": true
+    },
+    "storage": {
+      "enabled": true
+    },
+    "ui": {
+      "enabled": true
+    }
   }
 }

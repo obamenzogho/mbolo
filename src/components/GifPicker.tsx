@@ -5,6 +5,7 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { gifService, KlipyGifResult } from '../services/gifService'
+import OrbitLoader from './OrbitLoader'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
 const GIF_ITEM_SIZE = (SCREEN_WIDTH - 48) / 2
@@ -219,7 +220,7 @@ export default function GifPicker({ onSelect, onClose }: GifPickerProps) {
 
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#00A86B" />
+          <OrbitLoader size={80} />
           <Text style={styles.loadingText}>
             Chargement des {viewMode === 'gif' ? 'GIFs' : 'stickers'}...
           </Text>

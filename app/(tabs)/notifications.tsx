@@ -1,35 +1,82 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { View, Text, FlatList, TouchableOpacity } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore'
+import { router } from 'expo-router'
+import { collection, query, where, orderBy, onSnapshot, doc, getDoc } from 'firebase/firestore'
 import { auth, db } from '../../src/lib/firebase'
 import { colors } from '../../src/lib/theme'
-import type { Notification } from '../../src/types'
+import QueryErrorMessage, { getIndexErrorMessage } from '../../src/components/ui/QueryErrorMessage'
+import OrbitLoader from '../../src/components/OrbitLoader'
+import type { Notification as NotificationType } from '../../src/types'
 
 export default function Notifications() {
-  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [notifications, setNotifications] = useState<NotificationType[]>([])
+  const [fromUserNames, setFromUserNames] = useState<Record<string, string>>({})
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [retryCount, setRetryCount] = useState(0)
+  const [ready, setReady] = useState(false)
   const userId = auth.currentUser?.uid
 
-  useEffect(() => {
-    if (!userId) return
+  const subscribe = useCallback(() => {
+    if (!userId) return undefined
+    setErrorMessage(null)
     const q = query(
       collection(db, 'notifications'),
       where('userId', '==', userId),
       orderBy('createdAt', 'desc')
     )
-    const unsub = onSnapshot(q, (snap) => {
-      const items = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Notification[]
-      setNotifications(items)
-    })
+    const unsub = onSnapshot(q,
+      (snap: any) => {
+        setErrorMessage(null)
+        setReady(true)
+        const items = snap.docs.map((d: any) => ({ id: d.id, ...d.data() })) as NotificationType[]
+        setNotifications(items)
+        items.forEach((n) => {
+          if (n.fromUserId && !fromUserNames[n.fromUserId]) {
+            getDoc(doc(db, 'users', n.fromUserId)).then((s: any) => {
+              if (s.exists()) {
+                setFromUserNames((prev) => ({ ...prev, [n.fromUserId]: s.data().nom || s.data().pseudo || 'Quelqu\'un' }))
+              }
+            }).catch(() => {})
+          }
+        })
+      },
+      (error: any) => {
+        const msg = error?.code === 'failed-precondition'
+          ? getIndexErrorMessage('failed-precondition')
+          : 'Impossible de charger les notifications.'
+        console.warn('[Firestore] notifications onError:', error?.code, error?.message)
+        setErrorMessage(msg)
+      },
+    )
     return unsub
-  }, [userId])
+  }, [userId, fromUserNames])
+
+  useEffect(() => {
+    const unsub = subscribe()
+    return () => { if (unsub) unsub() }
+  }, [subscribe, retryCount])
+
+  const handleRetry = useCallback(() => {
+    setRetryCount((c) => c + 1)
+  }, [])
 
   const iconMap: Record<string, any> = {
     like: 'heart',
     comment: 'chatbubble',
     follow: 'person-add',
+    follow_request: 'person-add',
+    follow_accept: 'checkmark-circle',
     message: 'chatbubble-ellipses',
+  }
+
+  if (!ready) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
+        <OrbitLoader size={80} />
+      </SafeAreaView>
+    )
   }
 
   return (
@@ -38,6 +85,9 @@ export default function Notifications() {
         <Text style={{ fontSize: 28, fontWeight: '800', color: colors.white }}>Notifications</Text>
       </View>
 
+      {errorMessage && (
+        <QueryErrorMessage message={errorMessage} onRetry={handleRetry} />
+      )}
       <FlatList
         data={notifications}
         keyExtractor={(item) => item.id}
@@ -50,30 +100,49 @@ export default function Notifications() {
             </Text>
           </View>
         }
-        renderItem={({ item }) => (
-          <View
-            style={{
-              backgroundColor: item.read ? colors.surface : colors.surfaceLight,
-              padding: 14, borderRadius: 12, marginBottom: 8,
-              borderWidth: 1, borderColor: colors.border,
-              flexDirection: 'row', alignItems: 'center', gap: 12,
-            }}
-          >
-            <Ionicons
-              name={iconMap[item.type] || 'notifications'}
-              size={24}
-              color={colors.primary}
-            />
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: colors.text, fontSize: 14 }}>
-                {item.type === 'like' && "Quelqu'un a aimé ta vidéo"}
-                {item.type === 'comment' && "Quelqu'un a commenté ta vidéo"}
-                {item.type === 'follow' && "Quelqu'un a commencé à te suivre"}
-                {item.type === 'message' && 'Tu as reçu un message'}
-              </Text>
+        renderItem={({ item }) => {
+          const name = fromUserNames[item.fromUserId] || 'Quelqu\'un'
+
+          const content = (
+            <View
+              style={{
+                backgroundColor: item.read ? colors.surface : colors.surfaceLight,
+                padding: 14, borderRadius: 12, marginBottom: 8,
+                borderWidth: 1, borderColor: colors.border,
+                flexDirection: 'row', alignItems: 'center', gap: 12,
+              }}
+            >
+              <Ionicons
+                name={iconMap[item.type] || 'notifications'}
+                size={24}
+                color={colors.primary}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.text, fontSize: 14 }}>
+                  {item.type === 'like' && `${name} a aimé ta vidéo`}
+                  {item.type === 'comment' && `${name} a commenté ta vidéo`}
+                  {item.type === 'follow' && `${name} a commencé à te suivre`}
+                  {item.type === 'follow_request' && `${name} veut te suivre`}
+                  {item.type === 'follow_accept' && `${name} a accepté ta demande`}
+                  {item.type === 'message' && `${name} t'a envoyé un message`}
+                </Text>
+              </View>
             </View>
-          </View>
-        )}
+          )
+
+          if (item.type === 'follow_request') {
+            return (
+              <TouchableOpacity
+                onPress={() => router.push('/(tabs)/notifications/follow-requests')}
+                activeOpacity={0.7}
+              >
+                {content}
+              </TouchableOpacity>
+            )
+          }
+
+          return content
+        }}
       />
     </SafeAreaView>
   )

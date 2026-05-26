@@ -43,7 +43,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   }
 
-  const t = translations[language] || translations.fr
+  const t = getTranslation(language)
 
   return (
     <I18nContext.Provider value={{ t, language, setLanguage, availableLanguages: defaultContext.availableLanguages }}>

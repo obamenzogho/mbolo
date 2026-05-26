@@ -1,64 +1,37 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
-  View, Text, TouchableOpacity, Image, FlatList, Alert,
-  Dimensions, RefreshControl, ScrollView, Modal, ActivityIndicator, Share,
+  View, Text, TouchableOpacity, Image, FlatList, ScrollView,
+  Dimensions, Modal, Share, Alert,
 } from 'react-native'
+
+import {
+  useSharedValue,
+  useDerivedValue,
+  withSpring,
+  runOnJS,
+} from 'react-native-reanimated'
+import { GestureDetector, Gesture } from 'react-native-gesture-handler'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { doc, getDoc, collection, query, where, orderBy, limit, getDocs, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore'
+import { doc, getDoc } from 'firebase/firestore'
 import { auth, db } from '../../../src/lib/firebase'
+import { Avatar } from '../../../src/components/ui/Avatar'
 import { colors } from '../../../src/lib/theme'
-import type { User as UserType, Video as VideoType } from '../../../src/types'
-import { useLocalSearchParams, router } from 'expo-router'
+import { captureException } from '../../../src/lib/sentry'
+import type { User as UserType, ProfileTab } from '../../../src/types'
+import { useLocalSearchParams, router, Redirect } from 'expo-router'
 import { useFollow } from '../../../src/hooks/useFollow'
+import { useGoBack } from '../../../src/hooks/useGoBack'
+import FollowButton from '../../../src/components/FollowButton'
+import OrbitLoader from '../../../src/components/OrbitLoader'
+import BottomSheet from '../../../src/components/ui/BottomSheet'
+import { getOrCreateConversation } from '@/features/chat/services/chatService'
+import { useProfileTabs } from '@/hooks/useProfileTabs'
+import { ProfileTabBar } from '@/components/ProfileTabBar'
+import { VideoGrid } from '@/components/VideoGrid'
+import { ProfileVideoViewer } from '@/features/profile/components/ProfileVideoViewer'
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window')
-const GRID_COLS = 3
-const ITEM_SIZE = SCREEN_WIDTH / GRID_COLS
-
-function VideoThumbnailCell({ item }: { item: VideoType }) {
-  const [thumb, setThumb] = useState<string | null>(null)
-  const [loading, setLoading] = useState(!item.thumbnailURL)
-  useEffect(() => {
-    if (item.thumbnailURL) { setThumb(item.thumbnailURL); setLoading(false); return }
-    let cancelled = false
-    const gen = async () => {
-      try {
-        const { uri } = await require('expo-video-thumbnails').getThumbnailAsync(item.videoURL, { time: 1000, quality: 0.5 })
-        if (!cancelled) { setThumb(uri); setLoading(false) }
-      } catch { if (!cancelled) setLoading(false) }
-    }
-    gen()
-    return () => { cancelled = true }
-  }, [item.videoURL, item.thumbnailURL])
-  return (
-    <TouchableOpacity activeOpacity={0.8} onPress={() => router.push({ pathname: '/(tabs)/feed', params: { videoId: item.id } })} style={{ width: ITEM_SIZE, height: ITEM_SIZE }}>
-      {thumb ? (
-        <Image source={{ uri: thumb }} style={{ width: '100%', height: '100%' }} />
-      ) : loading ? (
-        <View style={{ flex: 1, backgroundColor: '#111', justifyContent: 'center', alignItems: 'center' }}>
-          <Ionicons name="ellipsis-horizontal-outline" size={18} color="#444" />
-        </View>
-      ) : (
-        <View style={{ flex: 1, backgroundColor: '#111', justifyContent: 'center', alignItems: 'center' }}>
-          <Ionicons name="play-circle" size={32} color="rgba(255,255,255,0.4)" />
-          {item.description ? <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 10, marginTop: 6, paddingHorizontal: 6, textAlign: 'center', lineHeight: 13 }} numberOfLines={2}>{item.description}</Text> : null}
-        </View>
-      )}
-      {item.type === 'reel' && (
-        <View style={{ position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 4, paddingHorizontal: 4, paddingVertical: 2 }}>
-          <Ionicons name="film-outline" size={12} color="#fff" />
-        </View>
-      )}
-      {item.views !== undefined && item.views > 0 && (
-        <View style={{ position: 'absolute', bottom: 4, left: 4, flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-          <Ionicons name="play" size={10} color="#fff" />
-          <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>{item.views >= 1000 ? `${(item.views / 1000).toFixed(1)}K` : item.views}</Text>
-        </View>
-      )}
-    </TouchableOpacity>
-  )
-}
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 
 function calcAge(dob: string): number | null {
   if (!dob) return null
@@ -72,16 +45,38 @@ function calcAge(dob: string): number | null {
 
 export default function UserProfile() {
   const { userId } = useLocalSearchParams<{ userId: string }>()
+  const { goBack } = useGoBack()
   const [profile, setProfile] = useState<UserType | null>(null)
-  const [videos, setVideos] = useState<VideoType[]>([])
-  const [refreshing, setRefreshing] = useState(false)
-  const [activeTab, setActiveTab] = useState<'grid' | 'reels'>('grid')
+  const [profileLoaded, setProfileLoaded] = useState(false)
+  const [ready, setReady] = useState(false)
+  const tabsHook = useProfileTabs({ userId: userId || '', tabs: ['grid', 'reels'] })
+  const { activeTab, setActiveTab, currentVideos, loading, refreshing, onRefresh: tabsRefresh, loadMore, hasMore } = tabsHook
   const [followersModal, setFollowersModal] = useState(false)
-  const [followListType, setFollowListType] = useState<'followers' | 'following'>('followers')
+  const scrollRef = useRef<ScrollView>(null)
+  const [tabLayouts, setTabLayouts] = useState<{ x: number; width: number }[]>([
+    { x: 0, width: 0 }, { x: 0, width: 0 },
+  ])
+  const [page, setPage] = useState(0)
+  const [scrollOffsetX, setScrollOffsetX] = useState(0)
+  const indicatorLeft = useMemo(() => {
+    const pageFloat = Math.max(0, Math.min(scrollOffsetX / SCREEN_WIDTH, 1))
+    const lower = Math.floor(pageFloat)
+    const upper = Math.min(lower + 1, 1)
+    const t = pageFloat - lower
+    const l = tabLayouts[lower]
+    const u = tabLayouts[upper]
+    if (!l) return 0
+    const lCenter = l.x + l.width / 2
+    if (!u || upper === lower) return lCenter - 14
+    const uCenter = u.x + u.width / 2
+    return lCenter + t * (uCenter - lCenter) - 14
+  }, [scrollOffsetX, tabLayouts])
   const [followListUsers, setFollowListUsers] = useState<any[]>([])
   const [followListLoading, setFollowListLoading] = useState(false)
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null)
+  const [menuVisible, setMenuVisible] = useState(false)
 
-  const { isFollowing, followerCount, followingCount, loading: followLoading, toggleFollow } = useFollow(userId || '')
+  const { isFollowing, isFriend, followerCount, followingCount, loading: followLoading, toggleFollow } = useFollow(userId || '')
 
   const loadProfile = useCallback(async () => {
     if (!userId) return
@@ -90,294 +85,411 @@ export default function UserProfile() {
       if (snap.exists()) {
         setProfile(snap.data() as UserType)
       }
-    } catch {}
+    } catch (e) { captureException(e instanceof Error ? e : new Error(String(e)), { context: 'loadProfile' }) }
+    setProfileLoaded(true)
   }, [userId])
 
-  const loadVideos = useCallback(async () => {
-    if (!userId) return
-    try {
-      const q = query(collection(db, 'videos'), where('userId', '==', userId), orderBy('createdAt', 'desc'), limit(50))
-      const snap = await getDocs(q)
-      setVideos(snap.docs.map(d => ({ id: d.id, ...d.data() })) as VideoType[])
-    } catch { setVideos([]) }
-  }, [userId])
 
-  useEffect(() => { loadProfile(); loadVideos() }, [loadProfile, loadVideos])
+
+  useEffect(() => { loadProfile() }, [loadProfile])
+  useEffect(() => { if (profileLoaded && !loading) setReady(true) }, [profileLoaded, loading])
 
   const onRefresh = useCallback(async () => {
-    setRefreshing(true)
-    await Promise.all([loadProfile(), loadVideos()])
-    setRefreshing(false)
-  }, [loadProfile, loadVideos])
+    await Promise.all([tabsRefresh(), loadProfile()])
+  }, [tabsRefresh, loadProfile])
 
-  const openFollowList = async (type: 'followers' | 'following') => {
+  const handleThumbnailPress = useCallback((videoId: string) => {
+    const idx = currentVideos.findIndex(v => v.id === videoId)
+    if (idx !== -1) setViewerIndex(idx)
+  }, [currentVideos])
+
+  const handleMessage = useCallback(async () => {
+    if (!userId || !auth.currentUser?.uid) return
+    const isSpam = isFollowing && !isFriend
+    const conv = await getOrCreateConversation(auth.currentUser.uid, userId, isSpam)
+    router.push({
+      pathname: '/(tabs)/messages/conversation/[id]',
+      params: { id: conv.id },
+    })
+  }, [userId, isFollowing, isFriend])
+
+  const tabConfig: ProfileTab[] = ['grid', 'reels']
+
+  const translateX = useSharedValue(0)
+  const swipeOffsetPx = useDerivedValue(() => {
+    'worklet'
+    return -translateX.value / tabConfig.length
+  })
+
+  const handleTabChange = useCallback((tab: ProfileTab) => {
+    setActiveTab(tab)
+    translateX.value = 0
+  }, [setActiveTab])
+
+  const swipeGesture = Gesture.Pan()
+    .minDistance(10)
+    .activeOffsetX([-10, 10])
+    .failOffsetY([-5, 5])
+    .onUpdate((e) => {
+      translateX.value = e.translationX
+    })
+    .onEnd((e) => {
+      const idx = tabConfig.indexOf(activeTab)
+      const threshold = SCREEN_WIDTH * 0.2
+      if (e.translationX < -threshold && idx < tabConfig.length - 1) {
+        runOnJS(handleTabChange)(tabConfig[idx + 1])
+      } else if (e.translationX > threshold && idx > 0) {
+        runOnJS(handleTabChange)(tabConfig[idx - 1])
+      } else {
+        translateX.value = withSpring(0, { damping: 20, stiffness: 250 })
+      }
+    })
+
+  const openFollowList = async (initialType: 'followers' | 'following') => {
     if (!profile) return
-    setFollowListType(type)
+    const targetPage = initialType === 'followers' ? 0 : 1
+    setPage(targetPage)
+    setScrollOffsetX(targetPage * SCREEN_WIDTH)
     setFollowListLoading(true)
     setFollowersModal(true)
     try {
-      const ids = type === 'followers' ? (profile.followers || []) : (profile.following || [])
+      const followerIds = profile.followers || []
+      const followingIds = profile.following || []
+      const allIds = [...new Set([...followerIds, ...followingIds])].slice(0, 50)
       const users: any[] = []
-      for (const id of ids.slice(0, 50)) {
+      for (const id of allIds) {
         const snap = await getDoc(doc(db, 'users', id))
         if (snap.exists()) {
           users.push({ id: snap.id, ...snap.data() })
         }
       }
       setFollowListUsers(users)
-    } catch {}
+    } catch (e) { captureException(e instanceof Error ? e : new Error(String(e)), { context: 'openFollowList-userFetch' }) }
     setFollowListLoading(false)
   }
 
-  const handleFollowUser = async (targetId: string) => {
-    const currentUid = auth.currentUser?.uid
-    if (!currentUid || !targetId) return
-    const userRef = doc(db, 'users', currentUid)
-    const targetRef = doc(db, 'users', targetId)
-    const isCurrentlyFollowing = profile?.followers?.includes(currentUid) || false
-    if (isCurrentlyFollowing) {
-      try {
-        await Promise.all([
-          updateDoc(userRef, { following: arrayRemove(targetId) }),
-          updateDoc(targetRef, { followers: arrayRemove(currentUid) }),
-        ])
-      } catch {}
-    } else {
-      try {
-        await Promise.all([
-          updateDoc(userRef, { following: arrayUnion(targetId) }),
-          updateDoc(targetRef, { followers: arrayUnion(currentUid) }),
-        ])
-      } catch {}
-    }
-    await loadProfile()
-    setFollowListUsers(prev => prev.map(u => {
-      if (u.id === targetId) {
-        const followers = u.followers || []
-        return { ...u, followers: isCurrentlyFollowing ? followers.filter((id: string) => id !== currentUid) : [...followers, currentUid] }
-      }
-      return u
-    }))
-  }
+  const closeFollowModal = useCallback(() => setFollowersModal(false), [])
 
-  const currentVideos = activeTab === 'grid' ? videos : []
+  useEffect(() => {
+    if (followersModal) {
+      setTimeout(() => { scrollRef.current?.scrollTo({ x: page * SCREEN_WIDTH, animated: false }) }, 0)
+    }
+  }, [followersModal, page])
 
   const isOwnProfile = userId === auth.currentUser?.uid
 
   if (isOwnProfile) {
-    router.replace('/(tabs)/profile')
-    return null
+    return <Redirect href="/(tabs)/profile" />
+  }
+
+  if (!userId) return null
+
+  if (!ready) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
+        <OrbitLoader size={80} />
+      </SafeAreaView>
+    )
   }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
-      <FlatList
-        data={currentVideos}
-        numColumns={GRID_COLS}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <VideoThumbnailCell item={item} />}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-        ListHeaderComponent={
-          <View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10 }}>
-              <TouchableOpacity onPress={() => router.back()} style={{ width: 36, height: 36, justifyContent: 'center' }}>
-                <Ionicons name="chevron-back" size={26} color={colors.white} />
-              </TouchableOpacity>
-              <View style={{ flex: 1, alignItems: 'center' }}>
-                <Text style={{ color: colors.white, fontSize: 17, fontWeight: '700' }}>{profile?.pseudo || 'Utilisateur'}</Text>
-              </View>
-              <TouchableOpacity onPress={() => {}} style={{ width: 36, height: 36, justifyContent: 'center', alignItems: 'flex-end' }}>
-                <Ionicons name="ellipsis-vertical" size={22} color={colors.white} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingTop: 8 }}>
-              <View style={{ width: 90, height: 90, borderRadius: 45, justifyContent: 'center', alignItems: 'center' }}>
-                {profile?.photoURL ? <Image source={{ uri: profile.photoURL }} style={{ width: 84, height: 84, borderRadius: 42 }} /> : <Ionicons name="person" size={40} color="#555" />}
-              </View>
-              <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'center' }}>
-                <TouchableOpacity style={{ alignItems: 'center' }}>
-                  <Text style={{ color: colors.white, fontSize: 18, fontWeight: '700' }}>{videos.length}</Text>
-                  <Text style={{ color: '#888', fontSize: 12 }}>Vidéos</Text>
+      <GestureDetector gesture={swipeGesture}>
+        <VideoGrid
+          videos={currentVideos}
+          tab={activeTab}
+          loading={loading}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          loadMore={loadMore}
+          hasMore={hasMore}
+          onThumbnailPress={handleThumbnailPress}
+          ListHeaderComponent={
+            <View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10 }}>
+                <TouchableOpacity onPress={goBack} style={{ width: 36, height: 36, justifyContent: 'center' }}>
+                  <Ionicons name="chevron-back" size={26} color={colors.white} />
                 </TouchableOpacity>
-                <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => openFollowList('followers')}>
-                  <Text style={{ color: colors.white, fontSize: 18, fontWeight: '700' }}>{followerCount}</Text>
-                  <Text style={{ color: '#888', fontSize: 12 }}>Abonnés</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => openFollowList('following')}>
-                  <Text style={{ color: colors.white, fontSize: 18, fontWeight: '700' }}>{followingCount}</Text>
-                  <Text style={{ color: '#888', fontSize: 12 }}>Abonnements</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingTop: 12 }}>
-              <View style={{ flex: 1 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Text style={{ color: colors.white, fontSize: 14, fontWeight: '700' }}>{profile?.nom || ''}</Text>
-                  {profile?.verified && <Ionicons name="checkmark-circle" size={14} color={colors.secondary} />}
+                <View style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={{ color: colors.white, fontSize: 17, fontWeight: '700' }}>{profile?.pseudo || ''}</Text>
                 </View>
-                <Text style={{ color: '#888', fontSize: 13, marginTop: 1 }}>@{profile?.pseudo || 'utilisateur'}</Text>
-                {profile?.category && <Text style={{ color: '#aaa', fontSize: 12, marginTop: 4 }}>{profile.category}</Text>}
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-                  {profile?.city && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                      <Ionicons name="location-outline" size={13} color="#888" />
-                      <Text style={{ color: '#888', fontSize: 12 }}>{profile.city}</Text>
+                <TouchableOpacity onPress={() => setMenuVisible(true)} style={{ width: 36, height: 36, justifyContent: 'center', alignItems: 'flex-end' }}>
+                  <Ionicons name="ellipsis-vertical" size={22} color={colors.white} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingTop: 8 }}>
+                <View style={{ width: 90, height: 90, borderRadius: 45, justifyContent: 'center', alignItems: 'center' }}>
+                  {profile?.photoURL ? <Image source={{ uri: profile.photoURL }} style={{ width: 84, height: 84, borderRadius: 42 }} /> : <Ionicons name="person" size={40} color="#555" />}
+                </View>
+                <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'center' }}>
+                  <TouchableOpacity style={{ alignItems: 'center' }}>
+                    <Text style={{ color: colors.white, fontSize: 18, fontWeight: '700' }}>{currentVideos.length}</Text>
+                    <Text style={{ color: '#888', fontSize: 12 }}>Vidéos</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => openFollowList('followers')}>
+                    <Text style={{ color: colors.white, fontSize: 18, fontWeight: '700' }}>{followerCount}</Text>
+                    <Text style={{ color: '#888', fontSize: 12 }}>Abonnés</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => openFollowList('following')}>
+                    <Text style={{ color: colors.white, fontSize: 18, fontWeight: '700' }}>{followingCount}</Text>
+                    <Text style={{ color: '#888', fontSize: 12 }}>Abonnements</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingTop: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Text style={{ color: colors.white, fontSize: 14, fontWeight: '700' }}>{profile?.nom || ''}</Text>
+                    {profile?.verified && <Ionicons name="checkmark-circle" size={14} color={colors.secondary} />}
+                    {isFriend && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginLeft: 4, backgroundColor: colors.success + '20', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                        <Ionicons name="people" size={12} color={colors.success} />
+                        <Text style={{ color: colors.success, fontSize: 11, fontWeight: '700' }}>
+                          {profile?.genre === 'femme' ? 'Amie' : 'Ami'}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={{ color: '#888', fontSize: 13, marginTop: 1 }}>@{profile?.pseudo || ''}</Text>
+                  {profile?.category && <Text style={{ color: '#aaa', fontSize: 12, marginTop: 4 }}>{profile.category}</Text>}
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                    {profile?.city && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                        <Ionicons name="location-outline" size={13} color="#888" />
+                        <Text style={{ color: '#888', fontSize: 12 }}>{profile.city}</Text>
+                      </View>
+                    )}
+                    {(() => { const age = calcAge(profile?.dateOfBirth || ''); return age && profile?.showAge !== false ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}><Ionicons name="calendar-outline" size={13} color="#888" /><Text style={{ color: '#888', fontSize: 12 }}>{age} ans</Text></View> : null })()}
+                  </View>
+                  {profile?.bio ? <Text style={{ color: colors.white, fontSize: 13, marginTop: 4, lineHeight: 18 }}>{profile.bio}</Text> : null}
+                  {profile?.externalLinks && profile.externalLinks.length > 0 && (
+                    <View style={{ marginTop: 6 }}>
+                      {profile.externalLinks.map((link, i) => (
+                        <TouchableOpacity key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                          <Ionicons name="link-outline" size={12} color={colors.secondary} />
+                          <Text style={{ color: colors.secondary, fontSize: 12 }}>{link.url}</Text>
+                        </TouchableOpacity>
+                      ))}
                     </View>
                   )}
-                  {(() => { const age = calcAge(profile?.dateOfBirth || ''); return age && profile?.showAge !== false ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}><Ionicons name="calendar-outline" size={13} color="#888" /><Text style={{ color: '#888', fontSize: 12 }}>{age} ans</Text></View> : null })()}
                 </View>
-                {profile?.bio ? <Text style={{ color: colors.white, fontSize: 13, marginTop: 4, lineHeight: 18 }}>{profile.bio}</Text> : null}
-                {profile?.externalLinks && profile.externalLinks.length > 0 && (
-                  <View style={{ marginTop: 6 }}>
-                    {profile.externalLinks.map((link, i) => (
-                      <TouchableOpacity key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                        <Ionicons name="link-outline" size={12} color={colors.secondary} />
-                        <Text style={{ color: colors.secondary, fontSize: 12 }}>{link.url}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 16 }}>
+                <FollowButton targetUserId={userId || ''} size="lg" style={{ flex: 1 }} />
+                {(isFriend || isFollowing) && (
+                  <TouchableOpacity
+                    onPress={handleMessage}
+                    style={{
+                      paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8,
+                      backgroundColor: '#222', borderWidth: 1, borderColor: '#444',
+                      flexDirection: 'row', alignItems: 'center', gap: 6,
+                    }}
+                  >
+                    <Ionicons name="chatbubble-ellipses" size={18} color={colors.white} />
+                    <Text style={{ color: colors.white, fontSize: 13, fontWeight: '600' }}>Message</Text>
+                  </TouchableOpacity>
                 )}
               </View>
-            </View>
 
-            <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 16 }}>
-              <TouchableOpacity
-                onPress={toggleFollow}
-                disabled={followLoading}
-                style={{
-                  flex: 1, paddingVertical: 10, borderRadius: 8,
-                  backgroundColor: isFollowing ? '#222' : colors.primary,
-                  borderWidth: isFollowing ? 1 : 0,
-                  borderColor: isFollowing ? '#444' : 'transparent',
-                  alignItems: 'center',
-                  opacity: followLoading ? 0.6 : 1,
-                }}
-              >
-                {followLoading ? (
-                  <ActivityIndicator size="small" color={colors.white} />
-                ) : (
-                  <Text style={{ color: colors.white, fontSize: 14, fontWeight: '700' }}>
-                    {isFollowing ? 'Abonné' : 'Suivre'}
-                  </Text>
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={{
-                  paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8,
-                  backgroundColor: '#222', borderWidth: 1, borderColor: '#444',
-                }}
-                onPress={async () => {
-                  try {
-                    await Share.share({ message: `Découvre @${profile?.pseudo || 'utilisateur'} sur Mbolo ! 🇬🇦` })
-                  } catch {}
-                }}
-              >
-                <Ionicons name="person-add-outline" size={18} color={colors.white} />
-              </TouchableOpacity>
+              <ProfileTabBar
+                activeTab={activeTab}
+                onTabChange={handleTabChange}
+                tabs={tabConfig}
+                swipeOffsetPx={swipeOffsetPx}
+              />
             </View>
+          }
+          />
+      </GestureDetector>
 
-            <View style={{ flexDirection: 'row', borderTopWidth: 0.5, borderTopColor: '#222' }}>
-              <TouchableOpacity onPress={() => setActiveTab('grid')} style={{ flex: 1, alignItems: 'center', paddingVertical: 10 }}>
-                <Ionicons name="grid-outline" size={22} color={activeTab === 'grid' ? colors.white : '#555'} />
-                {activeTab === 'grid' && <View style={{ position: 'absolute', bottom: 0, height: 2, width: 50, backgroundColor: colors.white, borderRadius: 1 }} />}
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setActiveTab('reels')} style={{ flex: 1, alignItems: 'center', paddingVertical: 10 }}>
-                <Ionicons name="film-outline" size={22} color={activeTab === 'reels' ? colors.white : '#555'} />
-                {activeTab === 'reels' && <View style={{ position: 'absolute', bottom: 0, height: 2, width: 50, backgroundColor: colors.white, borderRadius: 1 }} />}
-              </TouchableOpacity>
-            </View>
-
-            {currentVideos.length === 0 && (
-              <View style={{ alignItems: 'center', paddingTop: 60, paddingHorizontal: 40 }}>
-                <Ionicons name="grid-outline" size={48} color="#333" />
-                <Text style={{ color: '#555', fontSize: 16, fontWeight: '600', marginTop: 12 }}>Aucune vidéo</Text>
-                <Text style={{ color: '#555', fontSize: 13, marginTop: 4, textAlign: 'center' }}>Les vidéos de @{profile?.pseudo || 'utilisateur'} apparaîtront ici</Text>
-              </View>
-            )}
+      {/* MENU MODAL */}
+      <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
+          activeOpacity={1}
+          onPress={() => setMenuVisible(false)}
+        >
+          <View
+            style={{
+              backgroundColor: '#111',
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
+              paddingTop: 16,
+              paddingBottom: 40,
+              paddingHorizontal: 20,
+            }}
+          >
+            <View style={{ width: 40, height: 4, backgroundColor: '#444', borderRadius: 2, alignSelf: 'center', marginBottom: 16 }} />
+            <TouchableOpacity
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14 }}
+              onPress={() => {
+                setMenuVisible(false)
+                Share.share({ message: `Découvre @${profile?.pseudo || ''} sur Mbolo !` }).catch(() => {})
+              }}
+            >
+              <Ionicons name="share-outline" size={22} color="#fff" />
+              <Text style={{ color: '#fff', fontSize: 16 }}>Partager le profil</Text>
+            </TouchableOpacity>
+            <View style={{ height: 1, backgroundColor: '#222' }} />
+            <TouchableOpacity
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14 }}
+              onPress={() => {
+                setMenuVisible(false)
+                Alert.alert(
+                  'Signaler',
+                  'Signaler ce profil ?',
+                  [
+                    { text: 'Annuler', style: 'cancel' },
+                    {
+                      text: 'Signaler',
+                      style: 'destructive',
+                      onPress: () => Alert.alert('Merci', 'Nous avons bien reçu ton signalement.'),
+                    },
+                  ],
+                )
+              }}
+            >
+              <Ionicons name="flag-outline" size={22} color="#ff4444" />
+              <Text style={{ color: '#ff4444', fontSize: 16 }}>Signaler</Text>
+            </TouchableOpacity>
           </View>
-        }
-        ListEmptyComponent={null}
-      />
+        </TouchableOpacity>
+      </Modal>
 
       {/* FOLLOWERS/FOLLOWING MODAL */}
-      <Modal visible={followersModal} transparent animationType="slide">
-        <View style={{ flex: 1, backgroundColor: '#000' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: '#222' }}>
-            <TouchableOpacity onPress={() => setFollowersModal(false)} style={{ width: 36, height: 36, justifyContent: 'center' }}>
-              <Ionicons name="close" size={26} color={colors.white} />
+      <BottomSheet visible={followersModal} onClose={closeFollowModal} height={SCREEN_HEIGHT * 0.85}>
+        {/* Tab bar */}
+        <View style={{ paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: '#222' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 24 }}>
+            <TouchableOpacity onLayout={(e) => { const { x, width } = e.nativeEvent.layout; setTabLayouts(prev => { const n = [...prev]; n[0] = { x, width }; return n }) }} onPress={() => { setPage(0); scrollRef.current?.scrollTo({ x: 0, animated: true }) }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: page === 0 ? colors.white : '#666' }}>Abonnés</Text>
             </TouchableOpacity>
-            <View style={{ flex: 1, alignItems: 'center' }}>
-              <Text style={{ color: colors.white, fontSize: 17, fontWeight: '700' }}>
-                {followListType === 'followers' ? 'Abonnés' : 'Abonnements'}
-              </Text>
-            </View>
-            <View style={{ width: 36 }} />
+            <TouchableOpacity onLayout={(e) => { const { x, width } = e.nativeEvent.layout; setTabLayouts(prev => { const n = [...prev]; n[1] = { x, width }; return n }) }} onPress={() => { setPage(1); scrollRef.current?.scrollTo({ x: SCREEN_WIDTH, animated: true }) }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: page === 1 ? colors.white : '#666' }}>Abonnements</Text>
+            </TouchableOpacity>
+            <View style={{
+              position: 'absolute', bottom: -10, height: 3, width: 28,
+              backgroundColor: colors.primary, borderRadius: 1.5,
+              left: indicatorLeft,
+            }} />
           </View>
-          {followListLoading ? (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-              <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-          ) : followListUsers.length === 0 ? (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-              <Ionicons name="people-outline" size={48} color="#333" />
-              <Text style={{ color: '#555', fontSize: 14, marginTop: 12 }}>Aucun {followListType === 'followers' ? 'abonné' : 'abonnement'}</Text>
-            </View>
-          ) : (
+        </View>
+        <ScrollView
+          ref={scrollRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          scrollEventThrottle={16}
+          onScroll={(e) => { setScrollOffsetX(e.nativeEvent.contentOffset.x) }}
+          onMomentumScrollEnd={(e) => {
+            const x = e.nativeEvent.contentOffset.x
+            setScrollOffsetX(x)
+            setPage(Math.round(x / SCREEN_WIDTH))
+          }}
+          style={{ flex: 1 }}
+        >
+          {/* Abonnés */}
+          <View key="followers" style={{ width: SCREEN_WIDTH }}>
             <FlatList
-              data={followListUsers}
+              data={followListLoading ? [] : followListUsers.filter(u => profile?.followers?.includes(u.id))}
               keyExtractor={(item) => item.id}
               contentContainerStyle={{ padding: 16 }}
+              ListEmptyComponent={
+                followListLoading ? (
+                  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 40 }}>
+                    <OrbitLoader size={80} />
+                  </View>
+                ) : (
+                  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 40 }}>
+                    <Ionicons name="people-outline" size={48} color="#333" />
+                    <Text style={{ color: '#555', fontSize: 14, marginTop: 12 }}>Aucun abonné</Text>
+                  </View>
+                )
+              }
               renderItem={({ item }) => {
                 const isMe = item.id === auth.currentUser?.uid
-                const isUserFollowing = item.followers?.includes(auth.currentUser?.uid) ?? false
                 return (
                   <TouchableOpacity
                     onPress={() => {
                       if (!isMe) {
-                        setFollowersModal(false)
-                        router.push({ pathname: '/(tabs)/user/[userId]', params: { userId: item.id } })
+                        closeFollowModal()
+                        setTimeout(() => router.push({ pathname: '/(tabs)/user/[userId]', params: { userId: item.id } }), 300)
                       }
                     }}
                     style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 12 }}
                   >
-                    {item.photoURL ? (
-                      <Image source={{ uri: item.photoURL }} style={{ width: 44, height: 44, borderRadius: 22 }} />
-                    ) : (
-                      <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#222', justifyContent: 'center', alignItems: 'center' }}>
-                        <Ionicons name="person" size={24} color="#555" />
-                      </View>
-                    )}
+                    <Avatar uri={item.photoURL} name={item.nom || item.pseudo} size={44} />
                     <View style={{ flex: 1 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                        <Text style={{ color: colors.white, fontSize: 15, fontWeight: '600' }}>{item.nom || 'Utilisateur'}</Text>
+                        <Text style={{ color: colors.white, fontSize: 15, fontWeight: '600', height: 20, lineHeight: 20 }}>{item.nom || ''}</Text>
                         {item.verified && <Ionicons name="checkmark-circle" size={14} color={colors.secondary} />}
                       </View>
-                      <Text style={{ color: '#888', fontSize: 13 }}>@{item.pseudo || 'utilisateur'}</Text>
+                      <Text style={{ color: '#888', fontSize: 13, height: 18, lineHeight: 18 }}>@{item.pseudo || ''}</Text>
                     </View>
-                    {!isMe && (
-                      <TouchableOpacity
-                        onPress={() => handleFollowUser(item.id)}
-                        style={{
-                          paddingHorizontal: 16, paddingVertical: 6, borderRadius: 6,
-                          backgroundColor: isUserFollowing ? '#222' : colors.primary,
-                          borderWidth: isUserFollowing ? 1 : 0,
-                          borderColor: isUserFollowing ? '#444' : 'transparent',
-                        }}
-                      >
-                        <Text style={{ color: colors.white, fontSize: 13, fontWeight: '600' }}>
-                          {isUserFollowing ? 'Abonné' : 'Suivre'}
-                        </Text>
-                      </TouchableOpacity>
-                    )}
+                    {!isMe && <FollowButton targetUserId={item.id} size="sm" />}
                   </TouchableOpacity>
                 )
               }}
             />
-          )}
-        </View>
-      </Modal>
+          </View>
+          {/* Abonnements */}
+          <View key="following" style={{ width: SCREEN_WIDTH }}>
+            <FlatList
+              data={followListLoading ? [] : followListUsers.filter(u => profile?.following?.includes(u.id))}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={{ padding: 16 }}
+              ListEmptyComponent={
+                followListLoading ? (
+                  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 40 }}>
+                    <OrbitLoader size={80} />
+                  </View>
+                ) : (
+                  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 40 }}>
+                    <Ionicons name="people-outline" size={48} color="#333" />
+                    <Text style={{ color: '#555', fontSize: 14, marginTop: 12 }}>Aucun abonnement</Text>
+                  </View>
+                )
+              }
+              renderItem={({ item }) => {
+                const isMe = item.id === auth.currentUser?.uid
+                return (
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (!isMe) {
+                        closeFollowModal()
+                        setTimeout(() => router.push({ pathname: '/(tabs)/user/[userId]', params: { userId: item.id } }), 300)
+                      }
+                    }}
+                    style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 12 }}
+                  >
+                    <Avatar uri={item.photoURL} name={item.nom || item.pseudo} size={44} />
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Text style={{ color: colors.white, fontSize: 15, fontWeight: '600', height: 20, lineHeight: 20 }}>{item.nom || ''}</Text>
+                        {item.verified && <Ionicons name="checkmark-circle" size={14} color={colors.secondary} />}
+                      </View>
+                      <Text style={{ color: '#888', fontSize: 13, height: 18, lineHeight: 18 }}>@{item.pseudo || ''}</Text>
+                    </View>
+                    {!isMe && <FollowButton targetUserId={item.id} size="sm" />}
+                  </TouchableOpacity>
+                )
+              }}
+            />
+          </View>
+        </ScrollView>
+      </BottomSheet>
+      {viewerIndex !== null && (
+        <ProfileVideoViewer
+          videos={currentVideos}
+          initialIndex={viewerIndex}
+          onClose={() => setViewerIndex(null)}
+          userId={userId || ''}
+          profileUser={{ nom: profile?.nom, photoURL: profile?.photoURL }}
+        />
+      )}
     </SafeAreaView>
   )
 }

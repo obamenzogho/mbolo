@@ -60,6 +60,7 @@ export default function Register() {
   const [emailStatus, setEmailStatus] = useState<'idle' | 'checking' | 'available' | 'unavailable'>('idle')
   const [dateModalVisible, setDateModalVisible] = useState(false)
   const [dateOfBirth, setDateOfBirth] = useState<{ jour: number; mois: number; annee: number } | null>(null)
+  const [genre, setGenre] = useState<string | null>(null)
 
   const inputBase = {
     backgroundColor: colors.surface,
@@ -228,8 +229,12 @@ export default function Register() {
         dateOfBirth: dateStr,
         photoURL: '',
         bio: '',
+        genre: genre || '',
         followers: [],
         following: [],
+        followerCount: 0,
+        followingCount: 0,
+        postsCount: 0,
         createdAt: serverTimestamp(),
       })
 
@@ -411,6 +416,35 @@ export default function Register() {
                     : '✕ Tu dois avoir au moins 15 ans'}
                 </Text>
               )}
+            </View>
+
+            {/* Genre */}
+            <View style={{ marginBottom: 16 }}>
+              <Text style={{ color: colors.textSecondary, marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Genre</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {[
+                  { key: 'homme', label: 'Homme', icon: 'man-outline' },
+                  { key: 'femme', label: 'Femme', icon: 'woman-outline' },
+                  { key: 'non-binaire', label: 'Non-binaire', icon: 'people-outline' },
+                  { key: 'prefere-ne-pas-dire', label: 'Préfère ne pas dire', icon: 'help-outline' },
+                ].map((option) => (
+                  <TouchableOpacity
+                    key={option.key}
+                    onPress={() => setGenre(genre === option.key ? null : option.key)}
+                    activeOpacity={0.8}
+                    style={{
+                      flexDirection: 'row', alignItems: 'center', gap: 6,
+                      paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10,
+                      backgroundColor: genre === option.key ? colors.primary : colors.surface,
+                      borderWidth: 1,
+                      borderColor: genre === option.key ? colors.primary : colors.border,
+                    }}
+                  >
+                    <Ionicons name={option.icon as any} size={18} color={genre === option.key ? colors.white : colors.textSecondary} />
+                    <Text style={{ color: genre === option.key ? colors.white : colors.text, fontSize: 13, fontWeight: '600' }}>{option.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
 
             {/* Mot de passe */}

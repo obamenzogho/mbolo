@@ -1,6 +1,12 @@
-import { FFmpegKit, FFmpegSession, FFprobeKit, FFprobeSession, FFmpeg } from 'ffmpeg-kit-react-native'
-import * as FileSystem from 'expo-file-system'
-import { Platform } from 'react-native'
+import * as FileSystem from 'expo-file-system/legacy'
+import { IS_DEV_MODE } from '../config/devMode'
+
+const {
+  FFmpegKit,
+  FFprobeKit,
+} = IS_DEV_MODE
+  ? require('../mocks/FFmpegMock')
+  : require('ffmpeg-kit-react-native')
 
 const CACHE_DIR = FileSystem.cacheDirectory || ''
 const TEMP_DIR = `${CACHE_DIR}ffmpeg/`

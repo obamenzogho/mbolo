@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   collection, addDoc, doc, updateDoc, deleteDoc, getDocs,
-  query, where, serverTimestamp, increment,
+  query, where, serverTimestamp, increment, arrayUnion,
 } from 'firebase/firestore'
 import { db, auth } from '../lib/firebase'
 import { uploadToCloudinary } from '../lib/cloudinary'
+import { captureException } from '../lib/sentry'
 
 export interface Story {
   id: string
@@ -99,6 +100,7 @@ export function useStories() {
       }
       await deleteDoc(storyRef)
     } catch (e) {
+      captureException(e instanceof Error ? e : new Error(String(e)), { context: 'deleteStory' })
       console.error('deleteStory error:', e)
     }
   }, [])
@@ -115,14 +117,15 @@ export function useStories() {
       const snap = await getDocs(q)
       const now = new Date()
       return snap.docs
-        .map(d => ({ id: d.id, ...d.data() } as Story))
-        .filter(s => s.expiresAt && new Date(s.expiresAt) > now)
-        .sort((a, b) => {
-          const aTime = a.createdAt?.seconds || 0
-          const bTime = b.createdAt?.seconds || 0
+        .map((d: any) => ({ id: d.id, ...d.data() } as Story))
+        .filter((s: Story) => s.expiresAt && new Date(s.expiresAt) > now)
+        .sort((a: Story, b: Story) => {
+          const aTime = (a.createdAt as any)?.seconds || 0
+          const bTime = (b.createdAt as any)?.seconds || 0
           return bTime - aTime
         })
     } catch (e) {
+      captureException(e instanceof Error ? e : new Error(String(e)), { context: 'getUserStories' })
       console.error('getUserStories error:', e)
       return []
     }
@@ -144,9 +147,10 @@ export function useStories() {
       const storyRef = doc(db, 'stories', storyId)
       await updateDoc(storyRef, {
         views: increment(1),
-        viewedBy: increment(1),
+        viewedBy: arrayUnion(viewerId),
       })
     } catch (e) {
+      captureException(e instanceof Error ? e : new Error(String(e)), { context: 'markAsViewed' })
       console.error('markAsViewed error:', e)
     }
   }, [])
@@ -163,13 +167,14 @@ export function useStories() {
       )
       const snap = await getDocs(q)
       const now = new Date()
-      for (const d of snap.docs) {
+      for (const d of snap.docs as any[]) {
         const data = d.data() as Story
         if (new Date(data.expiresAt) < now && !data.savedToHighlight) {
           await deleteDoc(doc(db, 'stories', d.id))
         }
       }
     } catch (e) {
+      captureException(e instanceof Error ? e : new Error(String(e)), { context: 'cleanExpiredStories' })
       console.error('cleanExpiredStories error:', e)
     }
   }, [user])

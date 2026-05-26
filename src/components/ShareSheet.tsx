@@ -1,5 +1,5 @@
 import { useCallback, useRef, useMemo, useEffect } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, Alert, Share, Linking, Platform, Clipboard } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Share, Linking } from 'react-native'
 import BottomSheet, { BottomSheetBackdrop } from '@gorhom/bottom-sheet'
 import { Ionicons } from '@expo/vector-icons'
 import * as FileSystem from 'expo-file-system'
@@ -70,7 +70,7 @@ export default function ShareSheet({ visible, onClose, mediaUri, postUrl, postId
         message: `Regarde cette vidéo sur Mbolo ! ${url}`,
         title: 'Partager sur Mbolo',
       })
-      if (result.action === Share.shared) {
+      if (result.action === Share.sharedAction) {
         sheetRef.current?.close()
       }
     } catch {}
@@ -114,7 +114,8 @@ export default function ShareSheet({ visible, onClose, mediaUri, postUrl, postId
             onPress: async () => {
               try {
                 const filename = `mbolo_${Date.now()}.${mediaUri.includes('.mp4') ? 'mp4' : 'jpg'}`
-                const fileUri = `${FileSystem.documentDirectory}${filename}`
+                const documentDirectory = (FileSystem as any).documentDirectory || ''
+                const fileUri = `${documentDirectory}${filename}`
                 await FileSystem.copyAsync({ from: mediaUri, to: fileUri })
                 const asset = await MediaLibrary.createAssetAsync(fileUri)
                 await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
@@ -128,9 +129,7 @@ export default function ShareSheet({ visible, onClose, mediaUri, postUrl, postId
           },
         ]
       )
-    } catch {
-      Alert.alert('Erreur', 'Impossible d\'accéder à la galerie.')
-    }
+    } catch (e) { console.warn('saveMedia error:', e); Alert.alert('Erreur', 'Impossible d\'accéder à la galerie.') }
   }, [mediaUri])
 
   const handleReport = useCallback(() => {

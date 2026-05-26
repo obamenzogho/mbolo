@@ -1,114 +1,52 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { router, useFocusEffect, useRouter } from 'expo-router'
 import {
   View, Text, TouchableOpacity, Image, FlatList, Alert, TextInput,
   Dimensions, RefreshControl, ScrollView, Modal, Animated, Share,
-  ActivityIndicator, Easing,
+  ActivityIndicator, StyleSheet,
 } from 'react-native'
+import { GestureDetector, Gesture } from 'react-native-gesture-handler'
+import {
+  useSharedValue,
+  withSpring,
+  runOnJS,
+  useDerivedValue,
+} from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import {
   doc, getDoc, collection, query, where, orderBy, limit, getDocs, updateDoc, deleteDoc, setDoc,
-  arrayUnion, arrayRemove,
 } from 'firebase/firestore'
 import { signOut } from 'firebase/auth'
 import * as Location from 'expo-location'
 import * as ImagePicker from 'expo-image-picker'
-import { LinearGradient } from 'expo-linear-gradient'
-import { Video as AVVideo } from 'expo-av'
+
 import { auth, db } from '../../src/lib/firebase'
 import { uploadToCloudinary } from '../../src/lib/cloudinary'
+import FollowButton from '../../src/components/FollowButton'
+import OrbitLoader from '../../src/components/OrbitLoader'
+import BottomSheet from '../../src/components/ui/BottomSheet'
+import { Avatar } from '../../src/components/ui/Avatar'
 import { colors } from '../../src/lib/theme'
+import { captureException } from '../../src/lib/sentry'
+import { withFirestoreRetry } from '../../src/lib/firestoreRetry'
+import QueryErrorMessage, { getIndexErrorMessage } from '../../src/components/ui/QueryErrorMessage'
 import QRCodeView from '../../src/components/QRCodeView'
-import type { User as UserType, Video as VideoType } from '../../src/types'
+import type { User as UserType, Video as VideoType }
+from '../../src/types'
+import type { ProfileTab } from '@/types'
+import PageWrapper from '../../src/components/PageWrapper'
+import { useCreateModal } from '../../src/contexts/CreateModalContext'
+import { useFollow } from '../../src/hooks/useFollow'
+import { HighlightRow } from '@/features/highlights/components/HighlightRow'
+import { HighlightViewer } from '@/features/highlights/components/HighlightViewer'
+import HighlightEditSheet from '@/features/highlights/components/HighlightEditSheet'
+import { useProfileTabs } from '@/hooks/useProfileTabs'
+import { ProfileTabBar } from '@/components/ProfileTabBar'
+import { VideoGrid } from '@/components/VideoGrid'
+import { ProfileVideoViewer } from '@/features/profile/components/ProfileVideoViewer'
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window')
-const GRID_COLS = 3
-const ITEM_SIZE = SCREEN_WIDTH / GRID_COLS
-
-const DEMO_VIDEOS: VideoType[] = [
-  { id: 'demo-1', userId: 'demo', videoURL: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4', description: 'Bienvenue sur Mbolo ! 🇬🇦', hashtags: ['Gabon', 'Mbolo'], likes: 42, comments: 7, shares: 3, saves: 0, createdAt: null as any },
-  { id: 'demo-2', userId: 'demo', videoURL: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4', description: 'Le Gabon est magnifique ✨', hashtags: ['Gabon', 'Nature'], likes: 88, comments: 12, shares: 5, saves: 0, createdAt: null as any },
-  { id: 'demo-3', userId: 'demo', videoURL: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4', description: 'Danse traditionnelle 🎵', hashtags: ['Culture', 'Danse'], likes: 156, comments: 23, shares: 15, saves: 0, createdAt: null as any },
-]
-
-type Tab = 'grid' | 'reels' | 'saved' | 'liked'
-
-function VideoThumbnailCell({ item, isOwn }: { item: VideoType; isOwn?: boolean }) {
-  const [thumb, setThumb] = useState<string | null>(null)
-  const [loading, setLoading] = useState(!item.thumbnailURL)
-  useEffect(() => {
-    if (item.thumbnailURL) { setThumb(item.thumbnailURL); setLoading(false); return }
-    let cancelled = false
-    const gen = async () => {
-      try {
-        const { uri } = await require('expo-video-thumbnails').getThumbnailAsync(item.videoURL, { time: 1000, quality: 0.5 })
-        if (!cancelled) { setThumb(uri); setLoading(false) }
-      } catch { if (!cancelled) setLoading(false) }
-    }
-    gen()
-    return () => { cancelled = true }
-  }, [item.videoURL, item.thumbnailURL])
-
-  const handleLongPress = () => {
-    if (!isOwn) return
-    Alert.alert(
-      'Options vidéo',
-      item.description || 'Aucune description',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Modifier description',
-          onPress: async () => {
-            const newDesc = prompt('Nouvelle description :', item.description)
-            if (newDesc !== null) {
-              try {
-                await updateDoc(doc(db, 'videos', item.id), { description: newDesc })
-              } catch {}
-            }
-          },
-        },
-        {
-          text: 'Supprimer',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteDoc(doc(db, 'videos', item.id))
-            } catch {}
-          },
-        },
-      ]
-    )
-  }
-
-  return (
-    <TouchableOpacity activeOpacity={0.8} onPress={() => router.push({ pathname: '/(tabs)/feed', params: { videoId: item.id } })} onLongPress={handleLongPress} delayLongPress={500} style={{ width: ITEM_SIZE, height: ITEM_SIZE }}>
-      {thumb ? (
-        <Image source={{ uri: thumb }} style={{ width: '100%', height: '100%' }} />
-      ) : loading ? (
-        <View style={{ flex: 1, backgroundColor: '#111', justifyContent: 'center', alignItems: 'center' }}>
-          <Ionicons name="ellipsis-horizontal-outline" size={18} color="#444" />
-        </View>
-      ) : (
-        <View style={{ flex: 1, backgroundColor: '#111', justifyContent: 'center', alignItems: 'center' }}>
-          <Ionicons name="play-circle" size={32} color="rgba(255,255,255,0.4)" />
-          {item.description ? <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 10, marginTop: 6, paddingHorizontal: 6, textAlign: 'center', lineHeight: 13 }} numberOfLines={2}>{item.description}</Text> : null}
-        </View>
-      )}
-      {item.type === 'reel' && (
-        <View style={{ position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 4, paddingHorizontal: 4, paddingVertical: 2 }}>
-          <Ionicons name="film-outline" size={12} color="#fff" />
-        </View>
-      )}
-      {item.views !== undefined && item.views > 0 && (
-        <View style={{ position: 'absolute', bottom: 4, left: 4, flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-          <Ionicons name="play" size={10} color="#fff" />
-          <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>{item.views >= 1000 ? `${(item.views / 1000).toFixed(1)}K` : item.views}</Text>
-        </View>
-      )}
-    </TouchableOpacity>
-  )
-}
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 
 function calcAge(dob: string): number | null {
   if (!dob) return null
@@ -122,12 +60,18 @@ function calcAge(dob: string): number | null {
 
 export default function Profile() {
   const router = useRouter()
+  const { openCreateModal } = useCreateModal()
   const [profile, setProfile] = useState<UserType | null>(null)
-  const [videos, setVideos] = useState<VideoType[]>([])
-  const [savedVideos, setSavedVideos] = useState<VideoType[]>([])
-  const [likedVideos, setLikedVideos] = useState<VideoType[]>([])
-  const [activeTab, setActiveTab] = useState<Tab>('grid')
-  const [refreshing, setRefreshing] = useState(false)
+  const user = auth.currentUser
+  const { acceptFollowRequest, rejectFollowRequest } = useFollow(user?.uid || '')
+  const tabsHook = useProfileTabs({ userId: user?.uid || '' })
+  const { activeTab, setActiveTab, currentVideos, loading, refreshing, onRefresh: tabsRefresh, loadMore, hasMore, gridVideos } = tabsHook
+  const [profileErrors, setProfileErrors] = useState<{ stories?: string }>({})
+  const [profileLoaded, setProfileLoaded] = useState(false)
+  const [storiesCheckDone, setStoriesCheckDone] = useState(false)
+  const [highlightsLoaded, setHighlightsLoaded] = useState(false)
+  const [ready, setReady] = useState(false)
+
   const [menuVisible, setMenuVisible] = useState(false)
   const [shareVisible, setShareVisible] = useState(false)
   const [showQR, setShowQR] = useState(false)
@@ -143,59 +87,45 @@ export default function Profile() {
   const [followListType, setFollowListType] = useState<'followers' | 'following'>('followers')
   const [followListUsers, setFollowListUsers] = useState<any[]>([])
   const [followListLoading, setFollowListLoading] = useState(false)
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null)
   const menuAnim = useState(new Animated.Value(0))[0]
   const shareAnim = useState(new Animated.Value(0))[0]
-  const progressAnim = useState(new Animated.Value(0))[0]
-  const mediaOpacity = useState(new Animated.Value(0))[0]
-  const mediaTranslateX = useState(new Animated.Value(0))[0]
-  const prevHighlightId = useRef<string | null>(null)
-  const viewerTranslateY = useState(new Animated.Value(0))[0]
-  const viewerOpacity = useState(new Animated.Value(1))[0]
-  const touchStartY = useRef(0)
-  const handlePressIn = (e: any) => { clearTimeout(timerRef.current); animRef.current?.stop(); touchStartY.current = e?.nativeEvent?.pageY || 0 }
-  const handlePressOut = (e: any) => {
-    const dy = (e?.nativeEvent?.pageY || 0) - touchStartY.current
-    if (dy > 120) {
-      Animated.parallel([
-        Animated.timing(viewerTranslateY, { toValue: Dimensions.get('window').height, duration: 250, easing: Easing.out(Easing.ease), useNativeDriver: true }),
-        Animated.timing(viewerOpacity, { toValue: 0, duration: 250, useNativeDriver: true }),
-      ]).start(() => {
-        setViewerHighlight(null)
-        setViewerMediaIdx(0)
-      })
-      return
-    }
-    if (dy > 10) {
-      Animated.parallel([
-        Animated.spring(viewerTranslateY, { toValue: 0, friction: 6, tension: 40, useNativeDriver: true }),
-        Animated.spring(viewerOpacity, { toValue: 1, friction: 6, tension: 40, useNativeDriver: true }),
-      ]).start()
-    }
-    if (viewerHighlight === null || viewerOptionsVisible) return
-    progressAnim.stopAnimation((val) => {
-      const remaining = (1 - val) * 5000
-      if (remaining <= 100) {
-        const media = viewerHighlight.mediaUrls || [viewerHighlight.coverUrl]
-        if (viewerMediaIdx < media.length - 1) {
-          progressAnim.setValue(0)
-          setViewerMediaIdx(prev => prev + 1)
-        } else { closeViewer() }
-        return
+  const [page, setPage] = useState(0)
+  const [scrollOffsetX, setScrollOffsetX] = useState(0)
+  const scrollRef = useRef<ScrollView>(null)
+  const [tabLayouts, setTabLayouts] = useState<{ x: number; width: number }[]>([
+    { x: 0, width: 0 }, { x: 0, width: 0 },
+  ])
+  const indicatorLeft = useMemo(() => {
+    const pageFloat = Math.max(0, Math.min(scrollOffsetX / SCREEN_WIDTH, 1))
+    const lower = Math.floor(pageFloat)
+    const upper = Math.min(lower + 1, 1)
+    const t = pageFloat - lower
+    const l = tabLayouts[lower]
+    const u = tabLayouts[upper]
+    if (!l) return 0
+    const lCenter = l.x + l.width / 2
+    if (!u || upper === lower) return lCenter - 14
+    const uCenter = u.x + u.width / 2
+    return lCenter + t * (uCenter - lCenter) - 14
+  }, [scrollOffsetX, tabLayouts])
+  const [editingHighlight, setEditingHighlight] = useState<any | undefined>(undefined)
+  const editSheetVisible = editingHighlight !== undefined
+  const [pendingRequestsLoading, setPendingRequestsLoading] = useState(false)
+  const [pendingRequestsUsers, setPendingRequestsUsers] = useState<any[]>([])
+  const [showRequestsTab, setShowRequestsTab] = useState(false)
+  const setStringAsync = () => Promise.resolve()
+
+  const loadProfile = useCallback(async () => {
+    if (!user) { setProfileLoaded(true); return }
+    try {
+      const snap = await getDoc(doc(db, 'users', user.uid))
+      if (snap.exists()) {
+        setProfile(snap.data() as UserType)
       }
-      animRef.current = Animated.timing(progressAnim, { toValue: 1, duration: remaining, easing: Easing.linear, useNativeDriver: false })
-      animRef.current.start()
-      timerRef.current = setTimeout(() => {
-        const media = viewerHighlight.mediaUrls || [viewerHighlight.coverUrl]
-        if (viewerMediaIdx < media.length - 1) setViewerMediaIdx(prev => prev + 1)
-        else { closeViewer() }
-      }, remaining)
-    })
-  }
-  const viewerOptionsAnim = useState(new Animated.Value(0))[0]
-  const timerRef = useRef<ReturnType<typeof setTimeout>>()
-  const animRef = useRef<Animated.CompositeAnimation>()
-  const progressTimerStarted = useRef(false)
-  const user = auth.currentUser
+    } catch { captureException(new Error('loadProfile')) }
+    setProfileLoaded(true)
+  }, [user])
 
   const detectCity = useCallback(async (): Promise<string | null> => {
     if (!user) return null
@@ -212,89 +142,56 @@ export default function Profile() {
     return null
   }, [user])
 
-  const loadProfile = useCallback(async () => {
-    if (!user) return
-    try {
-      const snap = await getDoc(doc(db, 'users', user.uid))
-      if (snap.exists()) {
-        const data = snap.data() as UserType
-        if (!data.city) {
-          const cityName = await detectCity()
-          if (cityName) {
-            await updateDoc(doc(db, 'users', user.uid), { city: cityName })
-            data.city = cityName
-          }
-        }
-        setProfile(data)
-      }
-    } catch {}
-  }, [user, detectCity])
-
-  const loadVideos = useCallback(async () => {
-    if (!user) return
-    try {
-      const q = query(collection(db, 'videos'), where('userId', '==', user.uid), orderBy('createdAt', 'desc'), limit(50))
-      const snap = await getDocs(q)
-      setVideos(snap.docs.map(d => ({ id: d.id, ...d.data() })) as VideoType[])
-    } catch { setVideos([]) }
-  }, [user])
-
-  const totalLikes = videos.reduce((sum, v) => sum + (v.likes || 0), 0)
-  const totalViews = videos.reduce((sum, v) => sum + (v.views || 0), 0)
-  const totalShares = videos.reduce((sum, v) => sum + (v.shares || 0), 0)
-
-  const loadSaved = useCallback(async () => {
-    if (!user) return
-    try {
-      const q = query(collection(db, 'videos'), where('savedBy', 'array-contains', user.uid), orderBy('createdAt', 'desc'), limit(50))
-      const snap = await getDocs(q)
-      setSavedVideos(snap.docs.map(d => ({ id: d.id, ...d.data() })) as VideoType[])
-    } catch { setSavedVideos([]) }
-  }, [user])
-
-  const loadLiked = useCallback(async () => {
-    if (!user) return
-    try {
-      const q = query(collection(db, 'videos'), where('likedBy', 'array-contains', user.uid), orderBy('createdAt', 'desc'), limit(50))
-      const snap = await getDocs(q)
-      setLikedVideos(snap.docs.map(d => ({ id: d.id, ...d.data() })) as VideoType[])
-    } catch { setLikedVideos([]) }
-  }, [user])
-
   const checkStories = useCallback(async () => {
-    if (!user) return
+    if (!user) { setStoriesCheckDone(true); return }
     try {
       const q = query(collection(db, 'stories'), where('userId', '==', user.uid), where('expiresAt', '>', new Date()), limit(1))
-      const snap = await getDocs(q)
-      setHasStory(!snap.empty)
+      const result = await withFirestoreRetry(
+        () => getDocs(q),
+        { context: 'profile/checkStories' },
+      )
+      if (result.error) {
+        setProfileErrors((prev) => ({ ...prev, stories: getIndexErrorMessage(result.error!.code) }))
+        setHasStory(false)
+        setStoriesCheckDone(true)
+        return
+      }
+      setProfileErrors((prev) => ({ ...prev, stories: undefined }))
+      if (result.data) setHasStory(!(result.data as any).empty)
+      else setHasStory(false)
     } catch { setHasStory(false) }
+    setStoriesCheckDone(true)
   }, [user])
 
   const loadHighlights = useCallback(async () => {
-    if (!user) return
+    if (!user) { setHighlightsLoaded(true); return }
     try {
       const q = query(collection(db, 'highlights'), where('userId', '==', user.uid))
       const snap = await getDocs(q)
-      const items = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
+      const items = snap.docs.map((d: any) => ({ id: d.id, ...d.data() })) as any[]
       items.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
       setHighlights(items)
     } catch { setHighlights([]) }
+    setHighlightsLoaded(true)
   }, [user])
 
   useEffect(() => { loadProfile() }, [loadProfile])
-  useEffect(() => { loadVideos() }, [loadVideos])
-  useEffect(() => { loadSaved() }, [loadSaved])
-  useEffect(() => { loadLiked() }, [loadLiked])
+  useEffect(() => {
+    if (profileLoaded && !loading && storiesCheckDone && highlightsLoaded) setReady(true)
+  }, [profileLoaded, loading, storiesCheckDone, highlightsLoaded])
   useEffect(() => { checkStories() }, [checkStories])
   useEffect(() => { loadHighlights() }, [loadHighlights])
   useFocusEffect(useCallback(() => { loadHighlights() }, [loadHighlights]))
   useFocusEffect(useCallback(() => { loadProfile(); checkStories() }, [loadProfile, checkStories]))
 
   const onRefresh = useCallback(async () => {
-    setRefreshing(true)
-    await Promise.all([loadProfile(), loadVideos(), loadSaved(), loadLiked(), checkStories(), loadHighlights()])
-    setRefreshing(false)
-  }, [loadProfile, loadVideos, loadSaved, loadLiked, checkStories, loadHighlights])
+    await Promise.all([tabsRefresh(), loadProfile(), checkStories(), loadHighlights()])
+  }, [tabsRefresh, loadProfile, checkStories, loadHighlights])
+
+  const handleThumbnailPress = useCallback((videoId: string) => {
+    const idx = currentVideos.findIndex(v => v.id === videoId)
+    if (idx !== -1) setViewerIndex(idx)
+  }, [currentVideos])
 
   const openMenu = () => { setMenuVisible(true); Animated.timing(menuAnim, { toValue: 1, duration: 250, useNativeDriver: true }).start() }
   const closeMenu = () => { Animated.timing(menuAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => setMenuVisible(false)) }
@@ -308,20 +205,10 @@ export default function Profile() {
     ])
   }
 
-  const currentVideos = activeTab === 'grid'
-    ? (videos.filter(v => v.type !== 'reel').length > 0 ? videos.filter(v => v.type !== 'reel') : DEMO_VIDEOS)
-    : activeTab === 'reels'
-      ? videos.filter(v => v.type === 'reel')
-      : activeTab === 'saved'
-        ? savedVideos
-        : activeTab === 'liked'
-          ? likedVideos
-          : []
 
-  const renderGridItem = ({ item }: { item: VideoType }) => <VideoThumbnailCell item={item} isOwn />
 
-  const openNewHighlight = () => { router.push('/highlight/new') }
-  const openEditHighlight = (hl: any) => { router.push(`/highlight/${hl.id}`) }
+  const openNewHighlight = () => { setEditingHighlight(null) }
+  const openEditHighlight = (hl: any) => { setEditingHighlight(hl) }
   const uploadMediaToCloudinary = async (uri: string): Promise<string | null> => {
     try {
       return await uploadToCloudinary(uri, undefined, { folder: 'highlights', timeout: 120000 })
@@ -333,256 +220,215 @@ export default function Profile() {
       { text: 'Supprimer', style: 'destructive', onPress: async () => { try { await deleteDoc(doc(db, 'highlights', id)); await loadHighlights() } catch {} } },
     ])
   }
-  const getOptimizedUrl = (url: string) => {
-    if (!url || url.includes('.mp4') || url.includes('.mov')) return url
-    return url.replace('/upload/', '/upload/w_600,h_1000,c_fill,q_auto,f_auto/')
-  }
 
   const closeViewer = () => {
     setViewerHighlight(null)
-    setViewerMediaIdx(0)
   }
-  const openHighlight = (hl: any) => { viewerTranslateY.setValue(0); viewerOpacity.setValue(1); setViewerHighlight(hl); setViewerMediaIdx(0); setViewerOptionsVisible(false) }
+  const openHighlight = (hl: any) => { setViewerHighlight(hl) }
+  const closeEditSheet = () => { setEditingHighlight(undefined) }
+  const onHighlightSaved = () => { loadHighlights() }
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const animRef = useRef<Animated.CompositeAnimation | null>(null)
 
-  const openFollowList = async (type: 'followers' | 'following') => {
+  const openFollowList = async (initialType: 'followers' | 'following') => {
     if (!profile) return
-    setFollowListType(type)
+    const targetPage = initialType === 'followers' ? 0 : 1
+    setPage(targetPage)
+    setScrollOffsetX(targetPage * SCREEN_WIDTH)
     setFollowListLoading(true)
     setFollowersModal(true)
     try {
-      const ids = type === 'followers' ? (profile.followers || []) : (profile.following || [])
+      const followerIds = profile.followers || []
+      const followingIds = profile.following || []
+      const allIds = [...new Set([...followerIds, ...followingIds])].slice(0, 50)
       const users: any[] = []
-      for (const id of ids.slice(0, 50)) {
+      for (const id of allIds) {
         const snap = await getDoc(doc(db, 'users', id))
         if (snap.exists()) {
           users.push({ id: snap.id, ...snap.data() })
         }
       }
       setFollowListUsers(users)
-    } catch {}
+    } catch (e) { captureException(e instanceof Error ? e : new Error(String(e)), { context: 'openFollowList-fetchUsers' }) }
     setFollowListLoading(false)
+    setPendingRequestsLoading(true)
+    const pending: any[] = []
+    try {
+      const pendingIds = profile.pendingFollowers || []
+      for (const id of pendingIds.slice(0, 50)) {
+        const snap = await getDoc(doc(db, 'users', id))
+        if (snap.exists()) {
+          pending.push({ id: snap.id, ...snap.data() })
+        }
+      }
+      setPendingRequestsUsers(pending)
+    } catch (e) { captureException(e instanceof Error ? e : new Error(String(e)), { context: 'openFollowList-fetchPending' }) }
+    setPendingRequestsLoading(false)
+    setShowRequestsTab(!!(profile?.privateAccount && pending.length > 0))
   }
 
-  const handleFollowUser = async (targetId: string) => {
-    if (!user || !targetId) return
-    const userRef = doc(db, 'users', user.uid)
-    const targetRef = doc(db, 'users', targetId)
-    const isCurrentlyFollowing = profile?.followers?.includes(targetId) ?? false
-    if (isCurrentlyFollowing) {
-      try {
-        await Promise.all([
-          updateDoc(userRef, { following: arrayRemove(targetId) }),
-          updateDoc(targetRef, { followers: arrayRemove(user.uid) }),
-        ])
-        setProfile(prev => prev ? { ...prev, followers: (prev.followers || []).filter(id => id !== targetId) } : prev)
-      } catch {}
-    } else {
-      try {
-        await Promise.all([
-          updateDoc(userRef, { following: arrayUnion(targetId) }),
-          updateDoc(targetRef, { followers: arrayUnion(user.uid) }),
-        ])
-        setProfile(prev => prev ? { ...prev, followers: [...(prev.followers || []), targetId] } : prev)
-      } catch {}
-    }
-    await loadProfile()
-    setFollowListUsers(prev => prev.map(u => {
-      if (u.id === targetId) {
-        const followers = u.followers || []
-        return { ...u, followers: isCurrentlyFollowing ? followers.filter((id: string) => id !== user.uid) : [...followers, user.uid] }
-      }
-      return u
-    }))
-  }
+  const closeFollowModal = useCallback(() => setFollowersModal(false), [])
 
   useEffect(() => {
-    if (viewerHighlight === null) {
-      prevHighlightId.current = null
-      clearTimeout(timerRef.current)
-      animRef.current?.stop()
-      return
+    if (followersModal) {
+      setTimeout(() => { scrollRef.current?.scrollTo({ x: page * SCREEN_WIDTH, animated: false }) }, 0)
     }
-    if (viewerOptionsVisible) {
-      clearTimeout(timerRef.current)
-      animRef.current?.stop()
-      return
-    }
-    setMediaLoading(true)
-    animRef.current?.stop()
-    clearTimeout(timerRef.current)
-    progressTimerStarted.current = false
-    progressAnim.setValue(0)
-    const isNewHighlight = prevHighlightId.current !== viewerHighlight.id
-    prevHighlightId.current = viewerHighlight.id
-    if (isNewHighlight) {
-      mediaOpacity.setValue(0)
-      mediaTranslateX.setValue(0)
-      Animated.timing(mediaOpacity, { toValue: 1, duration: 400, easing: Easing.out(Easing.ease), useNativeDriver: true }).start(() => startProgressTimer())
-    } else {
-      mediaTranslateX.setValue(Dimensions.get('window').width)
-      mediaOpacity.setValue(1)
-      Animated.spring(mediaTranslateX, { toValue: 0, friction: 8, tension: 40, useNativeDriver: true }).start(() => startProgressTimer())
-    }
-    const media = viewerHighlight.mediaUrls || [viewerHighlight.coverUrl]
-    media.forEach((url: string) => { if (url && !url.includes('.mp4') && !url.includes('.mov')) Image.prefetch(getOptimizedUrl(url)) })
-    return () => { clearTimeout(timerRef.current); animRef.current?.stop() }
-  }, [viewerHighlight, viewerMediaIdx, viewerOptionsVisible])
+  }, [followersModal, page])
 
-  const startProgressTimer = () => {
-    if (viewerHighlight === null || viewerOptionsVisible || progressTimerStarted.current) return
-    progressTimerStarted.current = true
-    progressAnim.setValue(0)
-    animRef.current = Animated.timing(progressAnim, { toValue: 1, duration: 5000, easing: Easing.linear, useNativeDriver: false })
-    animRef.current.start()
-    timerRef.current = setTimeout(() => {
-      progressTimerStarted.current = false
-      const media = viewerHighlight.mediaUrls || [viewerHighlight.coverUrl]
-      if (viewerMediaIdx < media.length - 1) {
-        progressAnim.setValue(0)
-        setViewerMediaIdx(prev => prev + 1)
-      } else { closeViewer() }
-    }, 5000)
+  const tabConfig: ProfileTab[] = ['grid', 'reels', 'saved', 'liked']
+
+  const translateX = useSharedValue(0)
+  const swipeOffsetPx = useDerivedValue(() => {
+    'worklet'
+    return -translateX.value / tabConfig.length
+  })
+
+  const handleTabChange = useCallback((tab: ProfileTab) => {
+    setActiveTab(tab)
+    translateX.value = 0
+  }, [setActiveTab])
+
+  const swipeGesture = Gesture.Pan()
+    .minDistance(10)
+    .activeOffsetX([-10, 10])
+    .failOffsetY([-5, 5])
+    .onUpdate((e) => {
+      translateX.value = e.translationX
+    })
+    .onEnd((e) => {
+      const idx = tabConfig.indexOf(activeTab)
+      const threshold = SCREEN_WIDTH * 0.2
+      if (e.translationX < -threshold && idx < tabConfig.length - 1) {
+        runOnJS(handleTabChange)(tabConfig[idx + 1])
+      } else if (e.translationX > threshold && idx > 0) {
+        runOnJS(handleTabChange)(tabConfig[idx - 1])
+      } else {
+        translateX.value = withSpring(0, { damping: 20, stiffness: 250 })
+      }
+    })
+
+  if (!ready) {
+    return (
+      <PageWrapper type="fadeSlide" style={{ backgroundColor: '#000' }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
+          <OrbitLoader size={80} />
+        </SafeAreaView>
+      </PageWrapper>
+    )
   }
 
-  const tabs: { key: Tab; icon: string; label: string }[] = [
-    { key: 'grid', icon: 'grid-outline', label: 'Vidéos' },
-    { key: 'reels', icon: 'film-outline', label: 'Reels' },
-  ]
-  tabs.push({ key: 'saved', icon: 'bookmark-outline', label: 'Sauvés' })
-  tabs.push({ key: 'liked', icon: 'heart-outline', label: 'Aimés' })
-
   return (
-    <>
+    <PageWrapper type="fadeSlide" style={{ backgroundColor: '#000' }}>
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
-      <FlatList
-        data={currentVideos}
-        numColumns={GRID_COLS}
-        keyExtractor={(item) => item.id}
-        renderItem={renderGridItem}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-        ListHeaderComponent={
-          <View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10 }}>
-              <TouchableOpacity onPress={() => router.push('/(tabs)/camera')} style={{ width: 36, height: 36, justifyContent: 'center' }}>
-                <Ionicons name="add-circle" size={28} color={colors.primary} />
-              </TouchableOpacity>
-              <View style={{ flex: 1, alignItems: 'center' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Text style={{ color: colors.white, fontSize: 17, fontWeight: '700' }}>{profile?.pseudo || user?.displayName || 'Utilisateur'}</Text>
-                  {profile?.verified && <Ionicons name="checkmark-circle" size={16} color={colors.secondary} />}
-                </View>
-              </View>
-              <TouchableOpacity onPress={openMenu} style={{ width: 36, height: 36, justifyContent: 'center', alignItems: 'flex-end' }}>
-                <Ionicons name="menu-outline" size={28} color={colors.white} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingTop: 8 }}>
-              <TouchableOpacity activeOpacity={0.8} onPress={() => profile?.photoURL && setPhotoViewerVisible(true)} style={{ width: 90, height: 90, borderRadius: 45, borderWidth: hasStory ? 3 : 0, borderColor: hasStory ? '#3A75C4' : 'transparent', justifyContent: 'center', alignItems: 'center' }}>
-                {profile?.photoURL ? <Image source={{ uri: profile.photoURL }} style={{ width: 84, height: 84, borderRadius: 42 }} /> : <Ionicons name="person" size={40} color="#555" />}
-              </TouchableOpacity>
-              <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'center' }}>
-                <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => setActiveTab('grid')}>
-                  <Text style={{ color: colors.white, fontSize: 18, fontWeight: '700' }}>{videos.length}</Text>
-                  <Text style={{ color: '#888', fontSize: 12 }}>Vidéos</Text>
+      <GestureDetector gesture={swipeGesture}>
+        <VideoGrid
+          videos={currentVideos}
+          tab={activeTab}
+          loading={loading}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          loadMore={loadMore}
+          hasMore={hasMore}
+          isOwn
+          onThumbnailPress={handleThumbnailPress}
+          ListHeaderComponent={
+            <View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10 }}>
+                <TouchableOpacity onPress={openCreateModal} style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.primary }}>
+                  <Ionicons name="add" size={24} color={colors.white} />
                 </TouchableOpacity>
-                <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => openFollowList('followers')}>
-                  <Text style={{ color: colors.white, fontSize: 18, fontWeight: '700' }}>{profile?.followers?.length || 0}</Text>
-                  <Text style={{ color: '#888', fontSize: 12 }}>Abonnés</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => openFollowList('following')}>
-                  <Text style={{ color: colors.white, fontSize: 18, fontWeight: '700' }}>{profile?.following?.length || 0}</Text>
-                  <Text style={{ color: '#888', fontSize: 12 }}>Abonnements</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingTop: 12 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: colors.white, fontSize: 14, fontWeight: '700' }}>{profile?.nom || ''}</Text>
-                <Text style={{ color: '#888', fontSize: 13, marginTop: 1 }}>@{profile?.pseudo || user?.displayName || 'utilisateur'}</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-                  {profile?.city ? (
-                    <TouchableOpacity onPress={async () => { const cityName = await detectCity(); if (cityName) { await updateDoc(doc(db, 'users', user!.uid), { city: cityName }); setProfile(prev => prev ? { ...prev, city: cityName } : prev) } }} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                      <Ionicons name="location-outline" size={13} color="#888" />
-                      <Text style={{ color: '#888', fontSize: 12 }}>{profile.city}</Text>
-                      <Ionicons name="refresh-outline" size={12} color="#555" />
-                    </TouchableOpacity>
-                  ) : (
-                    <TouchableOpacity onPress={async () => { const cityName = await detectCity(); if (cityName) { await updateDoc(doc(db, 'users', user!.uid), { city: cityName }); setProfile(prev => prev ? { ...prev, city: cityName } : prev) } }} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                      <Ionicons name="location-outline" size={13} color="#555" />
-                      <Text style={{ color: '#555', fontSize: 12 }}>Détection...</Text>
-                    </TouchableOpacity>
-                  )}
-                  {(() => { const age = calcAge(profile?.dateOfBirth || ''); return age && profile?.showAge !== false ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}><Ionicons name="calendar-outline" size={13} color="#888" /><Text style={{ color: '#888', fontSize: 12 }}>{age} ans</Text></View> : null })()}
-                </View>
-                {profile?.bio ? <Text style={{ color: colors.white, fontSize: 13, marginTop: 4, lineHeight: 18 }}>{profile.bio}</Text> : null}
-                {(profile as any)?.externalLink ? (
-                  <TouchableOpacity onPress={async () => { try { await require('expo-linking').openURLAsync((profile as any).externalLink) } catch {} }} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                    <Ionicons name="link-outline" size={13} color={colors.secondary} />
-                    <Text style={{ color: colors.secondary, fontSize: 12 }}>{(profile as any).externalLink}</Text>
-                  </TouchableOpacity>
-                ) : null}
-                <TouchableOpacity onPress={() => setStatsModal(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, backgroundColor: '#111', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: '#222', alignSelf: 'flex-start' }}>
-                  <Ionicons name="stats-chart-outline" size={14} color={colors.accent} />
-                  <Text style={{ color: colors.accent, fontSize: 12, fontWeight: '600' }}>Statistiques</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={{ flexDirection: 'column', gap: 8, justifyContent: 'center', marginLeft: 12 }}>
-                <TouchableOpacity onPress={() => router.push('/(tabs)/edit-profile')} style={{ width: 34, height: 34, borderRadius: 8, backgroundColor: '#222', borderWidth: 1, borderColor: '#444', justifyContent: 'center', alignItems: 'center' }}>
-                  <Ionicons name="pencil-outline" size={18} color={colors.white} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={shareProfile} style={{ width: 34, height: 34, borderRadius: 8, backgroundColor: '#222', borderWidth: 1, borderColor: '#444', justifyContent: 'center', alignItems: 'center' }}>
-                  <Ionicons name="share-outline" size={18} color={colors.white} />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingVertical: 16, paddingLeft: 16 }} contentContainerStyle={{ gap: 14 }}>
-              <TouchableOpacity onPress={openNewHighlight} style={{ alignItems: 'center' }}>
-                <View style={{ width: 64, height: 64, borderRadius: 32, borderWidth: 1.5, borderColor: '#444', borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' }}>
-                  <Ionicons name="add" size={28} color="#888" />
-                </View>
-                <Text style={{ color: '#888', fontSize: 11, marginTop: 4 }}>Nouveau</Text>
-              </TouchableOpacity>
-              {highlights.map((hl) => (
-                <TouchableOpacity key={hl.id} onPress={() => openHighlight(hl)} onLongPress={() => Alert.alert(hl.title, 'Que veux-tu faire ?', [
-                  { text: 'Annuler', style: 'cancel' },
-                  { text: 'Modifier', onPress: () => openEditHighlight(hl) },
-                  { text: 'Supprimer', style: 'destructive', onPress: () => deleteHighlight(hl.id) },
-                ])} activeOpacity={0.7} style={{ alignItems: 'center' }}>
-                  <View style={{ width: 64, height: 64, borderRadius: 32, borderWidth: 2, borderColor: '#3A75C4', overflow: 'hidden', justifyContent: 'center', alignItems: 'center', backgroundColor: '#111' }}>
-                    {hl.coverUrl ? <Image source={{ uri: hl.coverUrl }} style={{ width: 60, height: 60, borderRadius: 30 }} /> : <Ionicons name="star-outline" size={28} color="#3A75C4" />}
+                <View style={{ flex: 1, alignItems: 'center' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Text style={{ color: colors.white, fontSize: 17, fontWeight: '700' }}>{profile?.pseudo || user?.displayName || ''}</Text>
+                    {profile?.verified && <Ionicons name="checkmark-circle" size={16} color={colors.secondary} />}
                   </View>
-                  <Text style={{ color: '#ccc', fontSize: 11, marginTop: 4, maxWidth: 64 }} numberOfLines={1}>{hl.title}</Text>
+                </View>
+                <TouchableOpacity onPress={openMenu} style={{ width: 36, height: 36, justifyContent: 'center', alignItems: 'flex-end' }}>
+                  <Ionicons name="menu-outline" size={28} color={colors.white} />
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            <View style={{ flexDirection: 'row', borderTopWidth: 0.5, borderTopColor: '#222' }}>
-              {tabs.map((tab) => (
-                <TouchableOpacity key={tab.key} onPress={() => setActiveTab(tab.key)} style={{ flex: 1, alignItems: 'center', paddingVertical: 10 }}>
-                  <Ionicons name={tab.icon as any} size={22} color={activeTab === tab.key ? colors.white : '#555'} />
-                  {activeTab === tab.key && <View style={{ position: 'absolute', bottom: 0, height: 2, width: 50, backgroundColor: colors.white, borderRadius: 1 }} />}
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {currentVideos.length === 0 && (
-              <View style={{ alignItems: 'center', paddingTop: 60, paddingHorizontal: 40 }}>
-                <Ionicons name={activeTab === 'grid' ? 'grid-outline' : activeTab === 'reels' ? 'film-outline' : activeTab === 'saved' ? 'bookmark-outline' : 'heart-outline'} size={48} color="#333" />
-                <Text style={{ color: '#555', fontSize: 16, fontWeight: '600', marginTop: 12 }}>{activeTab === 'grid' ? 'Aucune vidéo' : activeTab === 'reels' ? 'Aucun reel' : activeTab === 'saved' ? 'Aucune sauvegarde' : 'Aucun like'}</Text>
-                <Text style={{ color: '#555', fontSize: 13, marginTop: 4, textAlign: 'center' }}>{activeTab === 'grid' ? 'Les vidéos que tu publies apparaîtront ici' : activeTab === 'reels' ? 'Les reels que tu publies apparaîtront ici' : activeTab === 'saved' ? 'Les vidéos que tu sauvegardes apparaîtront ici' : 'Les vidéos que tu aimes apparaîtront ici'}</Text>
               </View>
-            )}
-          </View>
-        }
-        ListEmptyComponent={null}
-      />
+
+              <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingTop: 8 }}>
+                <TouchableOpacity activeOpacity={0.8} onPress={() => profile?.photoURL && setPhotoViewerVisible(true)} style={{ width: 90, height: 90, borderRadius: 45, borderWidth: hasStory ? 3 : 0, borderColor: hasStory ? '#3A75C4' : 'transparent', justifyContent: 'center', alignItems: 'center' }}>
+                  {profile?.photoURL ? <Image source={{ uri: profile.photoURL }} style={{ width: 84, height: 84, borderRadius: 42 }} /> : <Ionicons name="person" size={40} color="#555" />}
+                </TouchableOpacity>
+                <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'center' }}>
+                  <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => setActiveTab('grid')}>
+                    <Text style={{ color: colors.white, fontSize: 18, fontWeight: '700' }}>{gridVideos.length}</Text>
+                    <Text style={{ color: '#888', fontSize: 12 }}>Vidéos</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => openFollowList('followers')}>
+                    <Text style={{ color: colors.white, fontSize: 18, fontWeight: '700' }}>{profile?.followerCount ?? profile?.followers?.length ?? 0}</Text>
+                    <Text style={{ color: '#888', fontSize: 12 }}>Abonnés</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => openFollowList('following')}>
+                    <Text style={{ color: colors.white, fontSize: 18, fontWeight: '700' }}>{profile?.followingCount ?? profile?.following?.length ?? 0}</Text>
+                    <Text style={{ color: '#888', fontSize: 12 }}>Abonnements</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingTop: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: colors.white, fontSize: 14, fontWeight: '700' }}>{profile?.nom || ''}</Text>
+                  <Text style={{ color: '#888', fontSize: 13, marginTop: 1 }}>@{profile?.pseudo || user?.displayName || ''}</Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                    {profile?.city ? (
+                      <TouchableOpacity onPress={async () => { const cityName = await detectCity(); if (cityName) { await updateDoc(doc(db, 'users', user!.uid), { city: cityName }); setProfile(prev => prev ? { ...prev, city: cityName } : prev) } }} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                        <Ionicons name="location-outline" size={13} color="#888" />
+                        <Text style={{ color: '#888', fontSize: 12 }}>{profile.city}</Text>
+                        <Ionicons name="refresh-outline" size={12} color="#555" />
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity onPress={async () => { const cityName = await detectCity(); if (cityName) { await updateDoc(doc(db, 'users', user!.uid), { city: cityName }); setProfile(prev => prev ? { ...prev, city: cityName } : prev) } }} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                        <Ionicons name="location-outline" size={13} color="#555" />
+                        <Text style={{ color: '#555', fontSize: 12 }}>Détection...</Text>
+                      </TouchableOpacity>
+                    )}
+                    {(() => { const age = calcAge(profile?.dateOfBirth || ''); return age && profile?.showAge !== false ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}><Ionicons name="calendar-outline" size={13} color="#888" /><Text style={{ color: '#888', fontSize: 12 }}>{age} ans</Text></View> : null })()}
+                  </View>
+                  {profile?.bio ? <Text style={{ color: colors.white, fontSize: 13, marginTop: 4, lineHeight: 18 }}>{profile.bio}</Text> : null}
+                  {(profile as any)?.externalLink ? (
+                    <TouchableOpacity onPress={async () => { try { await require('expo-linking').openURLAsync((profile as any).externalLink) } catch {} }} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                      <Ionicons name="link-outline" size={13} color={colors.secondary} />
+                      <Text style={{ color: colors.secondary, fontSize: 12 }}>{(profile as any).externalLink}</Text>
+                    </TouchableOpacity>
+                  ) : null}
+
+                </View>
+                <View style={{ flexDirection: 'column', gap: 8, justifyContent: 'center', marginLeft: 12 }}>
+                  <TouchableOpacity onPress={() => router.push('/(tabs)/edit-profile')} style={{ width: 34, height: 34, borderRadius: 8, backgroundColor: '#222', borderWidth: 1, borderColor: '#444', justifyContent: 'center', alignItems: 'center' }}>
+                    <Ionicons name="pencil-outline" size={18} color={colors.white} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={shareProfile} style={{ width: 34, height: 34, borderRadius: 8, backgroundColor: '#222', borderWidth: 1, borderColor: '#444', justifyContent: 'center', alignItems: 'center' }}>
+                    <Ionicons name="share-outline" size={18} color={colors.white} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <HighlightRow
+                highlights={highlights}
+                onAdd={openNewHighlight}
+                onPress={openHighlight}
+                onEdit={openEditHighlight}
+                onDelete={(hl) => deleteHighlight(hl.id)}
+              />
+
+              {Object.values(profileErrors).some(Boolean) && (
+                <View style={{ paddingHorizontal: 16, paddingTop: 8, gap: 6 }}>
+                  {profileErrors.stories && <QueryErrorMessage message={profileErrors.stories} />}
+                </View>
+              )}
+
+              <ProfileTabBar tabs={tabConfig} activeTab={activeTab} onTabChange={handleTabChange} swipeOffsetPx={swipeOffsetPx} />
+            </View>
+          }
+          />
+      </GestureDetector>
     </SafeAreaView>
 
     {/* MENU */}
-    <Modal transparent visible={menuVisible} animationTransparent onRequestClose={closeMenu}>
+    <Modal transparent visible={menuVisible} animationType="slide" onRequestClose={closeMenu}>
       <View style={{ flex: 1, justifyContent: 'flex-end' }}>
         <TouchableOpacity activeOpacity={1} onPress={closeMenu} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} />
         <Animated.View style={{ backgroundColor: '#1a1a1a', borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingBottom: 34, transform: [{ translateY: menuAnim.interpolate({ inputRange: [0, 1], outputRange: [300, 0] }) }] }}>
@@ -612,7 +458,7 @@ export default function Profile() {
     </Modal>
 
     {/* SHARE */}
-    <Modal transparent visible={shareVisible} animationTransparent onRequestClose={closeShare}>
+    <Modal transparent visible={shareVisible} animationType="slide" onRequestClose={closeShare}>
       <View style={{ flex: 1, justifyContent: 'flex-end' }}>
         <TouchableOpacity activeOpacity={1} onPress={closeShare} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} />
         <Animated.View style={{ backgroundColor: '#1a1a1a', borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingBottom: 34, transform: [{ translateY: shareAnim.interpolate({ inputRange: [0, 1], outputRange: [400, 0] }) }] }}>
@@ -621,8 +467,8 @@ export default function Profile() {
           <View style={{ marginHorizontal: 16, marginBottom: 16 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#111', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: '#333' }}>
               <Ionicons name="link-outline" size={18} color="#888" style={{ marginRight: 8 }} />
-              <Text style={{ flex: 1, color: '#ccc', fontSize: 14 }} numberOfLines={1}>https://mbolo.app/@{profile?.pseudo || 'utilisateur'}</Text>
-              <TouchableOpacity onPress={async () => { try { await require('expo-clipboard').setStringAsync(`https://mbolo.app/@${profile?.pseudo || 'utilisateur'}`); Alert.alert('Lien copié', 'Le lien a été copié dans le presse-papiers') } catch {} }} style={{ marginLeft: 8, padding: 4 }}>
+              <Text style={{ flex: 1, color: '#ccc', fontSize: 14 }} numberOfLines={1}>https://mbolo.app/@{profile?.pseudo || ''}</Text>
+              <TouchableOpacity onPress={async () => { try { await require('expo-clipboard').setStringAsync(`https://mbolo.app/@${profile?.pseudo || ''}`); Alert.alert('Lien copié', 'Le lien a été copié dans le presse-papiers') } catch {} }} style={{ marginLeft: 8, padding: 4 }}>
                 <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>Copier</Text>
               </TouchableOpacity>
             </View>
@@ -631,7 +477,7 @@ export default function Profile() {
             <Ionicons name="qr-code-outline" size={20} color={colors.white} />
             <Text style={{ color: colors.white, fontSize: 15, fontWeight: '600' }}>Code QR</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={async () => { try { await Share.share({ message: `Découvre @${profile?.pseudo || 'utilisateur'} sur Mbolo ! 🇬🇦\nhttps://mbolo.app/@${profile?.pseudo || 'utilisateur'}` }) } catch {} }} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 14, marginHorizontal: 16, backgroundColor: '#2a2a2a', borderRadius: 12 }}>
+          <TouchableOpacity onPress={async () => { try { await Share.share({ message: `Découvre @${profile?.pseudo || ''} sur Mbolo ! 🇬🇦\nhttps://mbolo.app/@${profile?.pseudo || ''}` }) } catch {} }} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 14, marginHorizontal: 16, backgroundColor: '#2a2a2a', borderRadius: 12 }}>
             <Ionicons name="ellipsis-horizontal" size={20} color={colors.white} />
             <Text style={{ color: colors.white, fontSize: 15, fontWeight: '600' }}>Plus d'options</Text>
           </TouchableOpacity>
@@ -647,18 +493,18 @@ export default function Profile() {
         </TouchableOpacity>
         <View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 24, alignItems: 'center', width: '80%' }}>
           <QRCodeView
-            data={`https://mbolo.app/@${profile?.pseudo || 'utilisateur'}`}
+            data={`https://mbolo.app/@${profile?.pseudo || ''}`}
             size={200}
             foreground={colors.black}
             background={colors.white}
           />
-          <Text style={{ color: '#000', fontSize: 18, fontWeight: '700', marginTop: 16 }}>@{profile?.pseudo || 'utilisateur'}</Text>
+          <Text style={{ color: '#000', fontSize: 18, fontWeight: '700', marginTop: 16 }}>@{profile?.pseudo || ''}</Text>
           <Text style={{ color: '#666', fontSize: 13, marginTop: 4, textAlign: 'center' }}>Scanne pour voir mon profil Mbolo 🇬🇦</Text>
           <TouchableOpacity
             onPress={async () => {
               try {
                 const clip = require('expo-clipboard')
-                await clip.setStringAsync(`https://mbolo.app/@${profile?.pseudo || 'utilisateur'}`)
+                await clip.setStringAsync(`https://mbolo.app/@${profile?.pseudo || ''}`)
                 Alert.alert('Lien copié', 'Le lien du profil a été copié')
               } catch {}
             }}
@@ -680,242 +526,237 @@ export default function Profile() {
       </View>
     </Modal>
 
-    {/* HIGHLIGHT VIEWER */}
-    <Modal visible={viewerHighlight !== null} transparent animationType="fade">
-      {viewerHighlight && (
-        <Animated.View style={{ flex: 1, backgroundColor: '#000', transform: [{ translateY: viewerTranslateY }], opacity: viewerOpacity }}>
-          <View pointerEvents={viewerOptionsVisible ? 'none' : 'auto'} style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', gap: 3, paddingHorizontal: 12, paddingTop: 50, paddingBottom: 10 }}>
-            {(viewerHighlight.mediaUrls || [viewerHighlight.coverUrl]).map((_: any, i: number) => (
-              <View key={i} style={{ flex: 1, height: 3, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 2, overflow: 'hidden' }}>
-                <Animated.View style={{ height: '100%', backgroundColor: '#fff', borderRadius: 2, width: progressAnim.interpolate({ inputRange: [0, 1], outputRange: i < viewerMediaIdx ? ['100%', '100%'] : i === viewerMediaIdx ? ['0%', '100%'] : ['0%', '0%'] }) }} />
-              </View>
-            ))}
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 12 }}>
-            <View style={{ width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: '#3A75C4', overflow: 'hidden' }}>
-              {profile?.photoURL ? <Image source={{ uri: profile.photoURL }} style={{ width: 28, height: 28, borderRadius: 14 }} /> : <Ionicons name="person" size={20} color="#555" />}
-            </View>
-            <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600', marginLeft: 8 }}>{profile?.pseudo || 'Utilisateur'}</Text>
-            <Text style={{ color: '#888', fontSize: 12, marginLeft: 6 }}>• {viewerHighlight.title}</Text>
-            <View style={{ flex: 1 }} />
-            <TouchableOpacity
-              onPress={() => setViewerOptionsVisible(true)}
-              style={{ padding: 8 }}
-            >
-              <Ionicons name="ellipsis-vertical" size={22} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={closeViewer} style={{ padding: 8 }}><Ionicons name="close" size={24} color="#fff" /></TouchableOpacity>
-          </View>
-          <TouchableOpacity activeOpacity={1} onPressIn={handlePressIn} onPressOut={handlePressOut} style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <Animated.View style={{ width: '100%', height: '100%', opacity: mediaOpacity, transform: [{ translateX: mediaTranslateX }] }}>
-            {(() => {
-              const media = viewerHighlight.mediaUrls || [viewerHighlight.coverUrl]
-              const current = media[viewerMediaIdx]
-              if (!current) return <Ionicons name="image-outline" size={64} color="#333" />
-              const isVideo = current.includes('.mp4') || current.includes('.mov')
-              const displayUrl = getOptimizedUrl(current)
-              if (isVideo) return (
-                <AVVideo source={{ uri: displayUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" shouldPlay isLooping onReadyForDisplay={() => setMediaLoading(false)} />
-              )
-              return (
-                <Image source={{ uri: displayUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" onLoadEnd={() => setMediaLoading(false)} />
-              )
-            })()}
-            </Animated.View>
-            {mediaLoading && <ActivityIndicator size="large" color="#fff" style={{ position: 'absolute' }} />}
-          </TouchableOpacity>
-          {viewerMediaIdx > 0 && <TouchableOpacity onPress={() => { setViewerMediaIdx(prev => prev - 1); progressAnim.setValue(0) }} onPressIn={handlePressIn} onPressOut={handlePressOut} style={{ position: 'absolute', left: 0, top: 100, bottom: 0, width: '30%' }} activeOpacity={0.3} />}
-          <TouchableOpacity onPress={() => { const media = viewerHighlight.mediaUrls || [viewerHighlight.coverUrl]; if (viewerMediaIdx < media.length - 1) { setViewerMediaIdx(prev => prev + 1); progressAnim.setValue(0) } else { closeViewer() } }} onPressIn={handlePressIn} onPressOut={handlePressOut} style={{ position: 'absolute', right: 0, top: 100, bottom: 0, width: '30%' }} activeOpacity={0.3} />
-          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.7)']} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingVertical: 20, alignItems: 'center' }}>
-            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>{viewerHighlight.title}</Text>
-          </LinearGradient>
-          </View>
+    <HighlightViewer
+    highlight={viewerHighlight}
+    visible={viewerHighlight !== null}
+    onClose={closeViewer}
+    onDelete={(id) => deleteHighlight(id)}
+              onEdit={(hl) => {
+                closeViewer()
+                setTimeout(() => setEditingHighlight(hl), 400)
+              }}
+    onAddMedia={async (highlightId, currentMediaUrls) => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    animRef.current?.stop()
+    try {
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images', 'videos'], allowsMultipleSelection: true, quality: 0.8, selectionLimit: 10 })
+    if (!result.canceled && result.assets.length > 0) {
+    const urls: string[] = []
+    for (const asset of result.assets) {
+    const url = await uploadMediaToCloudinary(asset.uri)
+    if (url) urls.push(url)
+    }
+    if (urls.length > 0) {
+    const snap = await getDoc(doc(db, 'highlights', highlightId))
+    const latest = snap.data()
+    const existing = latest?.mediaUrls || currentMediaUrls
+    const allUrls = [...existing, ...urls]
+    await updateDoc(doc(db, 'highlights', highlightId), { mediaUrls: allUrls, coverUrl: allUrls[0] })
+    setViewerHighlight((prev: any) => prev ? { ...prev, mediaUrls: allUrls } : prev)
+    return urls
+    }
+    }
+    } catch (e) { console.error('Ajouter média error:', e) }
+    return []
+    }}
+    profileAvatar={profile?.photoURL}
+    profilePseudo={profile?.pseudo}
+    />
 
-          {/* OPTIONS OVERLAY */}
-          {viewerOptionsVisible && viewerHighlight && (
-            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)' }}>
-              <TouchableOpacity activeOpacity={1} onPress={() => setViewerOptionsVisible(false)} style={{ flex: 1 }} />
-              <View style={{ backgroundColor: '#1a1a1a', borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingBottom: 34 }}>
-                <View style={{ paddingVertical: 12, alignItems: 'center' }}><View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: '#444' }} /></View>
-                <Text style={{ color: colors.white, fontSize: 16, fontWeight: '700', textAlign: 'center', marginBottom: 12 }}>{viewerHighlight.title}</Text>
-                {[
-                  {
-                    icon: 'pencil-outline' as const,
-                    label: 'Modifier le titre',
-                    action: () => {
-                      setViewerOptionsVisible(false)
-                      closeViewer()
-                      setTimeout(() => {
-                        router.push(`/highlight/${id}`)
-                      }, 350)
-                    },
-                  },
-                  {
-                    icon: 'images-outline' as const,
-                    label: 'Ajouter des médias',
-                    action: () => {
-                      setViewerOptionsVisible(false)
-                      setTimeout(async () => {
-                        clearTimeout(timerRef.current)
-                        animRef.current?.stop()
-                        try {
-                          const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images', 'videos'], allowsMultipleSelection: true, quality: 0.8, selectionLimit: 10 })
-                          if (!result.canceled && result.assets.length > 0 && viewerHighlight) {
-                            const urls: string[] = []
-                            for (const asset of result.assets) {
-                              const url = await uploadMediaToCloudinary(asset.uri)
-                              if (url) urls.push(url)
-                            }
-                            if (urls.length > 0) {
-                              const snap = await getDoc(doc(db, 'highlights', viewerHighlight.id))
-                              const latest = snap.data()
-                              const existing = latest?.mediaUrls || viewerHighlight.mediaUrls || []
-                              const allUrls = [...existing, ...urls]
-                              await updateDoc(doc(db, 'highlights', viewerHighlight.id), { mediaUrls: allUrls, coverUrl: allUrls[0] })
-                              setViewerHighlight({ ...viewerHighlight, mediaUrls: allUrls })
-                              return
-                            }
-                          }
-                        } catch (e) { console.error('Ajouter média error:', e) }
-                        if (viewerHighlight) {
-                          progressTimerStarted.current = false
-                          progressAnim.setValue(0)
-                          startProgressTimer()
-                        }
-                      }, 150)
-                    },
-                  },
-                  {
-                    icon: 'trash-outline' as const,
-                    label: 'Supprimer la mise en avant',
-                    color: colors.error,
-                    action: () => {
-                      setViewerOptionsVisible(false)
-                      deleteHighlight(viewerHighlight.id)
-                      closeViewer()
-                    },
-                  },
-                ].map((item, i) => (
-                  <TouchableOpacity key={i} onPress={item.action} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 20 }}>
-                    <Ionicons name={item.icon} size={22} color={item.color || colors.white} />
-                    <Text style={{ color: item.color || colors.white, fontSize: 15 }}>{item.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          )}
-        </Animated.View>
-      )}
-    </Modal>
-
-    {/* STATS MODAL */}
-    <Modal visible={statsModal} transparent animationType="slide">
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' }}>
-        <View style={{ width: '85%', backgroundColor: '#1a1a1a', borderRadius: 16, padding: 20 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <Text style={{ color: colors.white, fontSize: 18, fontWeight: '700' }}>Statistiques</Text>
-            <TouchableOpacity onPress={() => setStatsModal(false)}>
-              <Ionicons name="close" size={24} color="#888" />
-            </TouchableOpacity>
-          </View>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-            {[
-              { icon: 'videocam-outline', label: 'Vidéos', value: videos.length, color: colors.primary },
-              { icon: 'heart-outline', label: 'Likes reçus', value: totalLikes, color: colors.accent },
-              { icon: 'eye-outline', label: 'Vues totales', value: totalViews, color: colors.secondary },
-              { icon: 'share-social-outline', label: 'Partages', value: totalShares, color: '#9C27B0' },
-              { icon: 'people-outline', label: 'Abonnés', value: profile?.followers?.length || 0, color: '#FF5722' },
-              { icon: 'person-add-outline', label: 'Abonnements', value: profile?.following?.length || 0, color: '#00BCD4' },
-            ].map((stat, i) => (
-              <View key={i} style={{ width: '47%', backgroundColor: '#111', borderRadius: 12, padding: 14, alignItems: 'center' }}>
-                <Ionicons name={stat.icon as any} size={24} color={stat.color} />
-                <Text style={{ color: colors.white, fontSize: 22, fontWeight: '700', marginTop: 6 }}>{stat.value >= 1000 ? `${(stat.value / 1000).toFixed(1)}K` : stat.value}</Text>
-                <Text style={{ color: '#888', fontSize: 12, marginTop: 2 }}>{stat.label}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      </View>
-    </Modal>
+    <HighlightEditSheet
+      visible={editSheetVisible}
+      onClose={closeEditSheet}
+      onSaved={onHighlightSaved}
+      highlight={editingHighlight}
+    />
 
     {/* FOLLOWERS/FOLLOWING MODAL */}
-    <Modal visible={followersModal} transparent animationType="slide">
-      <View style={{ flex: 1, backgroundColor: '#000' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: '#222' }}>
-          <TouchableOpacity onPress={() => setFollowersModal(false)} style={{ width: 36, height: 36, justifyContent: 'center' }}>
-            <Ionicons name="close" size={26} color={colors.white} />
+    <BottomSheet visible={followersModal} onClose={closeFollowModal} height={SCREEN_HEIGHT * 0.85}>
+      {/* Tab bar */}
+      <View style={{ paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: '#222' }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 24 }}>
+          <TouchableOpacity onLayout={(e) => { const { x, width } = e.nativeEvent.layout; setTabLayouts(prev => { const n = [...prev]; n[0] = { x, width }; return n }) }} onPress={() => { setPage(0); scrollRef.current?.scrollTo({ x: 0, animated: true }) }}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: page === 0 ? colors.white : '#666' }}>Abonnés</Text>
           </TouchableOpacity>
-          <View style={{ flex: 1, alignItems: 'center' }}>
-            <Text style={{ color: colors.white, fontSize: 17, fontWeight: '700' }}>
-              {followListType === 'followers' ? 'Abonnés' : 'Abonnements'}
-            </Text>
-          </View>
-          <View style={{ width: 36 }} />
-        </View>
-        {followListLoading ? (
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        ) : followListUsers.length === 0 ? (
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <Ionicons name="people-outline" size={48} color="#333" />
-            <Text style={{ color: '#555', fontSize: 14, marginTop: 12 }}>Aucun {followListType === 'followers' ? 'abonné' : 'abonnement'}</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={followListUsers}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={{ padding: 16 }}
-            renderItem={({ item }) => {
-              const isMe = item.id === user?.uid
-              const isUserFollowing = item.followers?.includes(user?.uid || '') ?? false
-              return (
-                <TouchableOpacity
-                  onPress={() => {
-                    if (!isMe) {
-                      setFollowersModal(false)
-                      router.push({ pathname: '/(tabs)/user/[userId]', params: { userId: item.id } })
-                    }
+          <TouchableOpacity onLayout={(e) => { const { x, width } = e.nativeEvent.layout; setTabLayouts(prev => { const n = [...prev]; n[1] = { x, width }; return n }) }} onPress={() => { setPage(1); scrollRef.current?.scrollTo({ x: SCREEN_WIDTH, animated: true }) }}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: page === 1 ? colors.white : '#666' }}>Abonnements</Text>
+          </TouchableOpacity>
+                {showRequestsTab && (
+                  <TouchableOpacity onLayout={(e) => { const { x, width } = e.nativeEvent.layout; setTabLayouts(prev => { const n = [...prev]; n[2] = { x, width }; return n }) }} onPress={() => { setPage(2); scrollRef.current?.scrollTo({ x: SCREEN_WIDTH * 2, animated: true }) }}>
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: page === 2 ? colors.white : '#666' }}>Demandes</Text>
+                  </TouchableOpacity>
+                )}
+                <View style={{
+                  position: 'absolute', bottom: -10, height: 3, width: 28,
+                  backgroundColor: colors.primary, borderRadius: 1.5,
+                  left: indicatorLeft,
+                }} />
+              </View>
+            </View>
+            <ScrollView
+              ref={scrollRef}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              scrollEventThrottle={16}
+              onScroll={(e) => { setScrollOffsetX(e.nativeEvent.contentOffset.x) }}
+              onMomentumScrollEnd={(e) => {
+                const x = e.nativeEvent.contentOffset.x
+                setScrollOffsetX(x)
+                setPage(Math.round(x / SCREEN_WIDTH))
+              }}
+              style={{ flex: 1 }}
+            >
+              {/* Abonnés */}
+              <View key="followers" style={{ width: SCREEN_WIDTH }}>
+                <FlatList
+                  data={followListLoading ? [] : followListUsers.filter(u => profile?.followers?.includes(u.id))}
+                  keyExtractor={(item) => item.id}
+                  contentContainerStyle={{ padding: 16 }}
+                  ListEmptyComponent={
+                    followListLoading ? (
+                      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 40 }}>
+                        <OrbitLoader size={80} />
+                      </View>
+                    ) : (
+                      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 40 }}>
+                        <Ionicons name="people-outline" size={48} color="#333" />
+                        <Text style={{ color: '#555', fontSize: 14, marginTop: 12 }}>Aucun abonné</Text>
+                      </View>
+                    )
+                  }
+                  renderItem={({ item }) => {
+                    const isMe = item.id === user?.uid
+                    return (
+                      <TouchableOpacity
+                        onPress={() => {
+                          if (!isMe) {
+                            closeFollowModal()
+                            setTimeout(() => router.push({ pathname: '/(tabs)/user/[userId]', params: { userId: item.id } }), 300)
+                          }
+                        }}
+                        style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 12 }}
+                      >
+                        <Avatar uri={item.photoURL} name={item.nom || item.pseudo} size={44} />
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <Text style={{ color: colors.white, fontSize: 15, fontWeight: '600', height: 20, lineHeight: 20 }}>{item.nom || ''}</Text>
+                            {item.verified && <Ionicons name="checkmark-circle" size={14} color={colors.secondary} />}
+                          </View>
+                          <Text style={{ color: '#888', fontSize: 13, height: 18, lineHeight: 18 }}>@{item.pseudo || ''}</Text>
+                        </View>
+                        {!isMe && <FollowButton targetUserId={item.id} size="sm" />}
+                      </TouchableOpacity>
+                    )
                   }}
-                  style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 12 }}
-                >
-                  {item.photoURL ? (
-                    <Image source={{ uri: item.photoURL }} style={{ width: 44, height: 44, borderRadius: 22 }} />
-                  ) : (
-                    <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#222', justifyContent: 'center', alignItems: 'center' }}>
-                      <Ionicons name="person" size={24} color="#555" />
+                />
+              </View>
+              {/* Abonnements */}
+              <View key="following" style={{ width: SCREEN_WIDTH }}>
+                <FlatList
+                  data={followListLoading ? [] : followListUsers.filter(u => profile?.following?.includes(u.id))}
+                  keyExtractor={(item) => item.id}
+                  contentContainerStyle={{ padding: 16 }}
+                  ListEmptyComponent={
+                    followListLoading ? (
+                      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 40 }}>
+                        <OrbitLoader size={80} />
+                      </View>
+                    ) : (
+                      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 40 }}>
+                        <Ionicons name="people-outline" size={48} color="#333" />
+                        <Text style={{ color: '#555', fontSize: 14, marginTop: 12 }}>Aucun abonnement</Text>
+                      </View>
+                    )
+                  }
+                  renderItem={({ item }) => {
+                    const isMe = item.id === user?.uid
+                    return (
+                      <TouchableOpacity
+                        onPress={() => {
+                          if (!isMe) {
+                            closeFollowModal()
+                            setTimeout(() => router.push({ pathname: '/(tabs)/user/[userId]', params: { userId: item.id } }), 300)
+                          }
+                        }}
+                        style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 12 }}
+                      >
+                        <Avatar uri={item.photoURL} name={item.nom || item.pseudo} size={44} />
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <Text style={{ color: colors.white, fontSize: 15, fontWeight: '600', height: 20, lineHeight: 20 }}>{item.nom || ''}</Text>
+                            {item.verified && <Ionicons name="checkmark-circle" size={14} color={colors.secondary} />}
+                          </View>
+                          <Text style={{ color: '#888', fontSize: 13, height: 18, lineHeight: 18 }}>@{item.pseudo || ''}</Text>
+                        </View>
+                        {!isMe && <FollowButton targetUserId={item.id} size="sm" />}
+                      </TouchableOpacity>
+                    )
+                  }}
+                />
+              </View>
+              {/* Demandes */}
+              <View key="requests" style={{ width: SCREEN_WIDTH, flex: 1 }}>
+                <FlatList
+                  data={pendingRequestsLoading ? [] : pendingRequestsUsers}
+                  keyExtractor={(item) => item.id}
+                  contentContainerStyle={{ padding: 16 }}
+                  ListEmptyComponent={
+                    pendingRequestsLoading ? (
+                      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 40 }}>
+                        <OrbitLoader size={80} />
+                      </View>
+                    ) : (
+                      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 40 }}>
+                        <Ionicons name="people-outline" size={48} color="#333" />
+                        <Text style={{ color: '#555', fontSize: 14, marginTop: 12 }}>Aucune demande</Text>
+                      </View>
+                    )
+                  }
+                  renderItem={({ item }) => (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 12 }}>
+                      <Avatar uri={item.photoURL} name={item.nom || item.pseudo} size={44} />
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Text style={{ color: colors.white, fontSize: 15, fontWeight: '600', height: 20, lineHeight: 20 }}>{item.nom || ''}</Text>
+                          {item.verified && <Ionicons name="checkmark-circle" size={14} color={colors.secondary} />}
+                        </View>
+                        <Text style={{ color: '#888', fontSize: 13, height: 18, lineHeight: 18 }}>@{item.pseudo || ''}</Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={async () => {
+                          await acceptFollowRequest(item.id)
+                          setPendingRequestsUsers((prev) => prev.filter((u) => u.id !== item.id))
+                        }}
+                        style={{ backgroundColor: colors.primary, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 6 }}
+                      >
+                        <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>Accepter</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={async () => {
+                          await rejectFollowRequest(item.id)
+                          setPendingRequestsUsers((prev) => prev.filter((u) => u.id !== item.id))
+                        }}
+                        style={{ paddingHorizontal: 10, paddingVertical: 6 }}
+                      >
+                        <Text style={{ color: '#888', fontSize: 13 }}>Refuser</Text>
+                      </TouchableOpacity>
                     </View>
                   )}
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <Text style={{ color: colors.white, fontSize: 15, fontWeight: '600' }}>{item.nom || 'Utilisateur'}</Text>
-                      {item.verified && <Ionicons name="checkmark-circle" size={14} color={colors.secondary} />}
-                    </View>
-                    <Text style={{ color: '#888', fontSize: 13 }}>@{item.pseudo || 'utilisateur'}</Text>
-                  </View>
-                  {!isMe && (
-                    <TouchableOpacity
-                      onPress={() => handleFollowUser(item.id)}
-                      style={{
-                        paddingHorizontal: 16, paddingVertical: 6, borderRadius: 6,
-                        backgroundColor: isUserFollowing ? '#222' : colors.primary,
-                        borderWidth: isUserFollowing ? 1 : 0,
-                        borderColor: isUserFollowing ? '#444' : 'transparent',
-                      }}
-                    >
-                      <Text style={{ color: colors.white, fontSize: 13, fontWeight: '600' }}>
-                        {isUserFollowing ? 'Abonné' : 'Suivre'}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </TouchableOpacity>
-              )
-            }}
-          />
-        )}
-      </View>
-    </Modal>
-    </>
+                />
+              </View>
+            </ScrollView>
+    </BottomSheet>
+      {viewerIndex !== null && (
+        <ProfileVideoViewer
+          videos={currentVideos}
+          initialIndex={viewerIndex}
+          onClose={() => setViewerIndex(null)}
+          userId={user?.uid || ''}
+          isOwn
+          profileUser={{ nom: profile?.nom, photoURL: profile?.photoURL }}
+        />
+      )}
+    </PageWrapper>
   )
 }

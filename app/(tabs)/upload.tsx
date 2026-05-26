@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, Alert, Image } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
+import { collection, addDoc, doc, increment, updateDoc, serverTimestamp } from 'firebase/firestore'
 import { auth, db } from '../../src/lib/firebase'
 import { uploadVideo as uploadToStorage } from '../../src/lib/storage'
 import { colors } from '../../src/lib/theme'
@@ -53,8 +53,11 @@ export default function Upload() {
         likes: 0,
         comments: 0,
         shares: 0,
+        saves: 0,
+        savedBy: [],
         createdAt: serverTimestamp(),
       })
+      updateDoc(doc(db, 'users', auth.currentUser.uid), { postsCount: increment(1) }).catch(() => {})
 
       Alert.alert('Succès', 'Vidéo publiée ! 🇬🇦')
       setVideo(null)

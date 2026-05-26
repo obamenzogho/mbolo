@@ -1,3 +1,5 @@
+import { captureException } from '../lib/sentry'
+
 const TENOR_API_KEY = process.env.EXPO_PUBLIC_TENOR_API_KEY || 'AIzaSyAyimkuYQYF_FXVALexPuGQctUWRURd5MQ'
 const BASE_URL = 'https://tenor.googleapis.com/v2'
 
@@ -33,6 +35,7 @@ export const tenorService = {
       const data = await res.json()
       return data.results || []
     } catch (e) {
+      captureException(e instanceof Error ? e : new Error(String(e)), { context: 'tenorTrending' })
       console.error('Tenor trending error:', e)
       return []
     }
@@ -46,6 +49,7 @@ export const tenorService = {
       const data = await res.json()
       return data.results || []
     } catch (e) {
+      captureException(e instanceof Error ? e : new Error(String(e)), { context: 'tenorSearch' })
       console.error('Tenor search error:', e)
       return []
     }

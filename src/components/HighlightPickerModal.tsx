@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import {
   View, Text, TouchableOpacity, Image, TextInput,
-  FlatList, Alert, Dimensions, StyleSheet,
+  FlatList, Alert, Dimensions, StyleSheet, Modal,
 } from 'react-native'
 import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../lib/theme'
-import { useHighlights } from '../hooks/useHighlights'
+import { useHighlights } from '@/features/highlights/hooks/useHighlights'
 import { auth } from '../lib/firebase'
+import { captureException } from '../lib/sentry'
 
 interface HighlightPickerModalProps {
   visible: boolean
@@ -59,9 +60,11 @@ export default function HighlightPickerModal({ visible, onClose, storyId, coverU
       return
     }
     try {
-      await createHighlight(newTitle.trim(), coverUri || '', storyId)
+      const highlightId = await createHighlight(newTitle.trim(), coverUri || '', [])
+      await addToHighlight(highlightId, storyId)
       sheetRef.current?.close()
-    } catch {
+    } catch (e) {
+      captureException(e instanceof Error ? e : new Error(String(e)), { context: 'createHighlight' })
       Alert.alert('Erreur', 'Impossible de créer la mise en avant')
     }
   }
@@ -71,7 +74,8 @@ export default function HighlightPickerModal({ visible, onClose, storyId, coverU
     try {
       await addToHighlight(highlightId, storyId)
       sheetRef.current?.close()
-    } catch {
+    } catch (e) {
+      captureException(e instanceof Error ? e : new Error(String(e)), { context: 'addToHighlight' })
       Alert.alert('Erreur', 'Impossible d\'ajouter à la mise en avant')
     }
   }
@@ -94,19 +98,18 @@ export default function HighlightPickerModal({ visible, onClose, storyId, coverU
     </TouchableOpacity>
   )
 
-  if (!visible) return null
-
   return (
-    <BottomSheet
-      ref={sheetRef}
-      index={0}
-      snapPoints={snapPoints}
-      enablePanDownToClose
-      backdropComponent={renderBackdrop}
-      backgroundStyle={styles.background}
-      handleIndicatorStyle={styles.handleIndicator}
-      onChange={handleSheetChanges}
-    >
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <BottomSheet
+        ref={sheetRef}
+        index={0}
+        snapPoints={snapPoints}
+        enablePanDownToClose
+        backdropComponent={renderBackdrop}
+        backgroundStyle={styles.background}
+        handleIndicatorStyle={styles.handleIndicator}
+        onChange={handleSheetChanges}
+      >
       <BottomSheetView style={styles.container}>
         <View style={styles.headerRow}>
           <Text style={styles.title}>Ajouter à la une</Text>
@@ -168,7 +171,8 @@ export default function HighlightPickerModal({ visible, onClose, storyId, coverU
           </>
         )}
       </BottomSheetView>
-    </BottomSheet>
+      </BottomSheet>
+    </Modal>
   )
 }
 

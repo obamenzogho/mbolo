@@ -10,6 +10,9 @@ export interface User {
   showAge?: boolean
   followers: string[]
   following: string[]
+  followerCount?: number
+  followingCount?: number
+  postsCount?: number
   createdAt: Date
   verified?: boolean
   externalLink?: string
@@ -18,8 +21,14 @@ export interface User {
   accountType?: 'personal' | 'creator' | 'business'
   category?: string
   privateAccount?: boolean
+  pendingFollowers?: string[]
+  pendingFollowings?: string[]
   notifications?: boolean
+  seenVideos?: string[]
+  genre?: 'homme' | 'femme' | 'non-binaire' | 'prefere-ne-pas-dire'
 }
+
+export type ProfileTab = 'grid' | 'reels' | 'saved' | 'liked'
 
 export interface Video {
   id: string
@@ -49,6 +58,16 @@ export interface Comment {
   likedBy: string[]
   createdAt: Date
 }
+
+export interface Message {
+  id: string
+  senderId: string
+  text: string
+  type: 'text' | 'image'
+  mediaUrl?: string
+  createdAt: Date
+}
+
 export interface Story {
   id: string
   userId: string
@@ -62,7 +81,7 @@ export interface Story {
 export interface Notification {
   id: string
   userId: string
-  type: 'like' | 'comment' | 'follow' | 'message'
+  type: 'like' | 'comment' | 'follow' | 'follow_request' | 'follow_accept' | 'message'
   fromUserId: string
   videoId?: string
   read: boolean
@@ -72,7 +91,18 @@ export interface Notification {
 export interface Conversation {
   id: string
   participants: string[]
-  lastMessage?: string
-  lastMessageAt?: Date
+  spamFor?: string[]
+  blockedBy?: string[]
+  pinnedBy?: string[]
+  mutedBy?: string[]
+  deletedBy?: string[]
+  lastMessage?: {
+    text: string
+    senderId: string
+    createdAt: Date
+  }
   updatedAt: Date
+  lastReadAt?: Record<string, Date>
+  lastDeliveredAt?: Record<string, Date>
+  typingBy?: Record<string, Date>
 }

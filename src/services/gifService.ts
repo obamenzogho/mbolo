@@ -1,3 +1,5 @@
+import { captureException } from '../lib/sentry'
+
 const KLIPY_API_KEY = process.env.EXPO_PUBLIC_KLIPY_API_KEY || 'YOUR_KLIPY_API_KEY'
 const BASE_URL = 'https://api.klipy.co/api/v1'
 
@@ -40,6 +42,7 @@ export const gifService = {
       const results = data?.data || data?.results || data?.gifs || data || []
       return Array.isArray(results) ? results : []
     } catch (e) {
+      captureException(e instanceof Error ? e : new Error(String(e)), { context: 'gifTrending' })
       console.error('gifService trending error:', e)
       return []
     }
@@ -53,6 +56,7 @@ export const gifService = {
       const results = data?.data || data?.results || data?.gifs || data || []
       return Array.isArray(results) ? results : []
     } catch (e) {
+      captureException(e instanceof Error ? e : new Error(String(e)), { context: 'gifSearch' })
       console.error('gifService search error:', e)
       return []
     }
@@ -66,6 +70,7 @@ export const gifService = {
       const results = data?.data || data?.results || data?.stickers || data || []
       return Array.isArray(results) ? results : []
     } catch (e) {
+      captureException(e instanceof Error ? e : new Error(String(e)), { context: 'gifStickersTrending' })
       console.error('gifService stickers trending error:', e)
       return []
     }
@@ -79,6 +84,7 @@ export const gifService = {
       const results = data?.data || data?.results || data?.stickers || data || []
       return Array.isArray(results) ? results : []
     } catch (e) {
+      captureException(e instanceof Error ? e : new Error(String(e)), { context: 'gifStickersSearch' })
       console.error('gifService stickers search error:', e)
       return []
     }

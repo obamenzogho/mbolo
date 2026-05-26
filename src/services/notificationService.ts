@@ -2,6 +2,7 @@ import * as Notifications from 'expo-notifications'
 import * as Device from 'expo-device'
 import { doc, updateDoc } from 'firebase/firestore'
 import { db } from '../lib/firebase'
+import { captureException } from '../lib/sentry'
 import Constants from 'expo-constants'
 
 Notifications.setNotificationHandler({
@@ -25,11 +26,11 @@ export const notificationService = {
       return null
     }
 
-    const { status: existingStatus } = await Notifications.getPermissionsAsync()
+    const { status: existingStatus } = await Notifications.getPermissionsAsync() as any
     let finalStatus = existingStatus
 
     if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync()
+      const { status } = await Notifications.requestPermissionsAsync() as any
       finalStatus = status
     }
 
@@ -45,6 +46,7 @@ export const notificationService = {
       })
       return tokenData.data
     } catch (e) {
+      captureException(e instanceof Error ? e : new Error(String(e)), { context: 'getPushToken' })
       console.error('Error getting push token:', e)
       return null
     }
@@ -58,6 +60,7 @@ export const notificationService = {
         pushTokenUpdatedAt: new Date().toISOString(),
       })
     } catch (e) {
+      captureException(e instanceof Error ? e : new Error(String(e)), { context: 'savePushToken' })
       console.error('Error saving push token:', e)
     }
   },
@@ -70,6 +73,7 @@ export const notificationService = {
         pushTokenUpdatedAt: null,
       })
     } catch (e) {
+      captureException(e instanceof Error ? e : new Error(String(e)), { context: 'deletePushToken' })
       console.error('Error deleting push token:', e)
     }
   },

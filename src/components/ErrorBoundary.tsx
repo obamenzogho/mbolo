@@ -2,6 +2,7 @@ import React, { Component, ReactNode } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../lib/theme'
+import { captureException } from '../lib/sentry'
 
 interface Props {
   children: ReactNode
@@ -23,6 +24,7 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: any) {
+    captureException(error, { componentStack: info?.componentStack })
     console.error('ErrorBoundary caught:', error, info)
   }
 

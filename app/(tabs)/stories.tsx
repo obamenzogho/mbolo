@@ -9,7 +9,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { auth } from '../../src/lib/firebase'
 import { colors } from '../../src/lib/theme'
 import { useStories } from '../../src/hooks/useStories'
-import { useHighlights } from '../../src/hooks/useHighlights'
+import { useHighlights } from '@/features/highlights/hooks/useHighlights'
+import OrbitLoader from '../../src/components/OrbitLoader'
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 
@@ -17,12 +18,13 @@ export default function StoriesScreen() {
   const router = useRouter()
   const user = auth.currentUser
   const { myStories, loading, cleanExpiredStories } = useStories()
-  const { highlights } = useHighlights(user?.uid || '')
+  const { highlights, loading: highlightsLoading } = useHighlights(user?.uid || '')
 
   const [groupedStories, setGroupedStories] = useState<{ userId: string; username: string; avatarUrl: string; stories: any[] }[]>([])
   const [viewingUserId, setViewingUserId] = useState<string | null>(null)
   const [viewingIndex, setViewingIndex] = useState(0)
   const [progress, setProgress] = useState(0)
+  const [ready, setReady] = useState(false)
 
   const progressAnim = useRef(new Animated.Value(0)).current
   const slideAnim = useRef(new Animated.Value(0)).current
@@ -49,6 +51,10 @@ export default function StoriesScreen() {
     }
     setGroupedStories(Array.from(groups.values()))
   }, [myStories])
+
+  useEffect(() => {
+    if (!loading && !highlightsLoading) setReady(true)
+  }, [loading, highlightsLoading])
 
   const startProgress = () => {
     progressAnim.setValue(0)
@@ -173,6 +179,14 @@ export default function StoriesScreen() {
   const currentGroup = groupedStories.find(g => g.userId === viewingUserId)
   const currentStory = currentGroup?.stories[viewingIndex]
 
+  if (!ready) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
+        <OrbitLoader size={80} />
+      </SafeAreaView>
+    )
+  }
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
       {/* HEADER */}
@@ -180,9 +194,9 @@ export default function StoriesScreen() {
         <Text style={{ color: '#fff', fontSize: 24, fontWeight: '800' }}>Stories</Text>
         <TouchableOpacity
           onPress={() => router.push('/story-upload')}
-          style={{ padding: 8 }}
+          style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.primary }}
         >
-          <Ionicons name="add-circle" size={28} color={colors.primary} />
+          <Ionicons name="add" size={24} color={colors.white} />
         </TouchableOpacity>
       </View>
 
@@ -222,7 +236,7 @@ export default function StoriesScreen() {
             contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16 }}
             renderItem={({ item }) => (
               <TouchableOpacity
-                onPress={() => router.push(`/highlight/${item.id}`)}
+                onPress={() => router.push('/(tabs)/profile')}
                 style={{ alignItems: 'center', marginRight: 16 }}
               >
                 <View style={{
@@ -310,7 +324,7 @@ export default function StoriesScreen() {
 
           {loading && (
             <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center' }}>
-              <ActivityIndicator size="large" color="#fff" />
+              <OrbitLoader size={80} />
             </View>
           )}
         </View>

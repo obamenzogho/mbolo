@@ -1,0 +1,143 @@
+---
+description: Règles Firestore pour Mbolo — requêtes, sécurité, performances
+globs:
+  - "src/**/*.ts"
+  - "src/**/*.tsx"
+  - "app/**/*.tsx"
+alwaysApply: true
+---
+
+# RÈGLE FIRESTORE — REQUÊTES & SÉCURITÉ
+
+## 1. Limiter toutes les queries
+
+Toute lecture Firestore DOIT avoir un `limit()`.
+
+```ts
+// ✅ CORRECT
+const q = query(collection(db, 'videos'), orderBy('createdAt', 'desc'), limit(20));
+
+// ❌ INCORRECT — va lire tous les documents
+const q = query(collection(db, 'videos'));
+```
+
+Exceptions : `getDoc(doc(...))` pour un seul document.
+
+## 2. Pagination cursor-based
+
+Toujours utiliser `startAfter(lastDoc)` pour la pagination, pas de `offset`.
+
+```ts
+// ✅ CORRECT
+const q = query(collection(db, 'videos'), orderBy('createdAt', 'desc'), startAfter(lastDoc), limit(20));
+
+// ❌ INCORRECT — offset facture tous les documents lus
+const q = query(collection(db, 'videos'), orderBy('createdAt', 'desc'), offset(page * 20), limit(20));
+```
+
+## 3. Index composites
+
+Quand tu utilises `where` + `orderBy` sur des champs différents, un index composite est NÉCESSAIRE.
+
+Avant d'écrire une telle query :
+1. Vérifie dans `firestore.indexes.json` si l'index existe
+2. Sinon, ajoute-le avec le bon ordre (généralement ASC pour le champ where, DESC pour createdAt)
+3. Déploie avec `npm run firebase:deploy:indexes`
+4. Entoure la query avec `withFirestoreRetry()` (le temps que l'index se propage)
+
+```ts
+// ✅ CORRECT — index userId ASC, createdAt DESC dans firestore.indexes.json
+const q = query(collection(db, 'videos'), where('userId', '==', uid), orderBy('createdAt', 'desc'), limit(20));
+
+// ❌ INCORRECT — pas d'index pour ce pattern, va planter
+const q = query(collection(db, 'videos'), where('category', '==', 'music'), orderBy('views', 'desc'), limit(20));
+```
+
+## 4. Transactions pour les opérations atomiques
+
+`runTransaction` pour toutes les opérations qui modifient plusieurs documents ou qui lisent puis écrivent.
+
+```ts
+// ✅ CORRECT — follow/unfollow, seenVideos
+await runTransaction(db, async (transaction) => {
+  const userDoc = await transaction.get(userRef);
+  const targetDoc = await transaction.get(targetRef);
+  transaction.update(userRef, { following: arrayUnion(targetId) });
+  transaction.update(targetRef, { followers: arrayUnion(userId) });
+});
+```
+
+## 5. Limite de 30 pour `in` queries
+
+Firestore limite `where('field', 'in', array)` à 30 éléments.
+
+```ts
+// ✅ CORRECT
+const batches = chunkArray(ids, 30);
+for (const batch of batches) {
+  const q = query(collection(db, 'videos'), where('userId', 'in', batch), orderBy('createdAt', 'desc'), limit(20));
+}
+```
+
+## 6. `onSnapshot` avec cleanup
+
+Tout écouteur en temps réel DOIT être nettoyé dans le retour du `useEffect`.
+
+```ts
+// ✅ CORRECT
+useEffect(() => {
+  const unsubscribe = onSnapshot(q, (snapshot) => { ... });
+  return unsubscribe;
+}, []);
+```
+
+## 7. Batch-fetch utilisateurs
+
+Ne jamais faire `getDoc` individuel par vidéo. Utiliser `where('__name__', 'in', batch)`.
+
+```ts
+// ✅ CORRECT — batch-fetch avec cache
+const q = query(collection(db, 'users'), where('__name__', 'in', batch));
+const snapshot = await getDocs(q);
+snapshot.docs.forEach(doc => cache.set(doc.id, doc.data()));
+
+// ❌ INCORRECT — N+1 reads
+for (const id of userIds) {
+  const doc = await getDoc(doc(db, 'users', id));
+}
+```
+
+## 8. Retry sur erreur d'index
+
+Utiliser `withFirestoreRetry()` pour les queries composites en environnement de dev.
+
+```ts
+import { withFirestoreRetry } from '@/lib/firestoreRetry';
+
+const result = await withFirestoreRetry(() => getDocs(q), {
+  maxRetries: 3,
+  context: 'fetchSuiviVideos'
+});
+```
+
+## 9. Sécurité — règles à vérifier avant chaque écriture
+
+Avant d'ajouter une nouvelle collection ou un nouveau champ :
+1. Vérifie que `firestore.rules` permet l'opération
+2. Vérifie que `storage.rules` permet l'opération (si fichiers)
+3. Vérifie qu'un index existe dans `firestore.indexes.json` (si query composite)
+
+## 10. Pas de boucles de lecture
+
+Évite les `forEach` ou `map` avec `getDoc` à l'intérieur. Préfère les `in` queries ou les transactions.
+
+```ts
+// ❌ INCORRECT — boucle de lecture
+items.forEach(item => {
+  const doc = await getDoc(doc(db, 'videos', item.videoId));
+});
+
+// ✅ CORRECT — lecture unique ou batch
+const q = query(collection(db, 'videos'), where('__name__', 'in', itemIds));
+const snapshot = await getDocs(q);
+```

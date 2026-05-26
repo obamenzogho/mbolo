@@ -6,10 +6,11 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
+import { collection, addDoc, doc, increment, updateDoc, serverTimestamp } from 'firebase/firestore'
 import { auth, db } from '../src/lib/firebase'
 import { uploadToCloudinary } from '../src/lib/cloudinary'
 import { colors } from '../src/lib/theme'
+import OrbitLoader from '../src/components/OrbitLoader'
 
 const SUGGESTED_HASHTAGS = ['#Gabon', '#Mbolo', '#Libreville', '#Afrique', '#241', '#GabonTikTok', '#PourToi', '#Viral']
 
@@ -91,8 +92,11 @@ export default function PostScreen() {
         likes: 0,
         comments: 0,
         shares: 0,
+        saves: 0,
+        savedBy: [],
         createdAt: serverTimestamp(),
       })
+      updateDoc(doc(db, 'users', auth.currentUser.uid), { postsCount: increment(1) }).catch(() => {})
       Alert.alert('Succès', 'Reel publié ! 🇬🇦', [
         { text: 'OK', onPress: () => router.replace('/(tabs)/feed') },
       ])
@@ -213,7 +217,7 @@ export default function PostScreen() {
         {uploading && (
           <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center' }}>
             <View style={{ width: 120, height: 120, borderRadius: 60, backgroundColor: '#1a1a1a', justifyContent: 'center', alignItems: 'center' }}>
-              <ActivityIndicator size="large" color="#00A86B" />
+              <OrbitLoader size={80} />
               <Text style={{ color: colors.accent, fontSize: 24, fontWeight: '800', marginTop: 12 }}>{uploadProgress}%</Text>
               <Text style={{ color: '#fff', fontSize: 12, marginTop: 4 }}>Publication...</Text>
             </View>

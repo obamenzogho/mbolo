@@ -1,0 +1,72 @@
+---
+description: Règle obligatoire pour toutes les pages Mbolo
+globs: 
+  - "app/**/*.tsx"
+  - "src/**/*.tsx"
+alwaysApply: true
+---
+
+# RÈGLE OBLIGATOIRE — ANIMATION DE PAGE
+
+Chaque nouvelle page créée dans Mbolo
+DOIT obligatoirement :
+
+1. Importer PageWrapper :
+import PageWrapper from '../../src/components/PageWrapper';
+
+2. Entourer son contenu avec PageWrapper :
+const MaPage = () => (
+  <PageWrapper type="fadeSlide">
+    {/* contenu */}
+  </PageWrapper>
+);
+
+3. Choisir le bon type d'animation :
+- "fadeSlide"  → pages normales (défaut)
+- "fade"       → auth, splash
+- "scale"      → modals, détails
+- "slideRight" → sous-pages, settings
+
+4. NE JAMAIS retourner un View 
+   directement à la racine d'une page —
+   toujours utiliser PageWrapper.
+
+EXEMPLE CORRECT :
+const ProfileScreen = () => (
+  <PageWrapper type="fadeSlide">
+    <View style={styles.container}>
+      ...
+    </View>
+  </PageWrapper>
+);
+
+EXEMPLE INCORRECT :
+const ProfileScreen = () => (
+  <View style={styles.container}>
+    ...
+  </View>
+);
+
+# RÈGLE — ORBIT LOADER
+
+Toute page avec un état de chargement (loading)
+DOIT utiliser OrbitLoader au lieu d'ActivityIndicator.
+
+1. Importer OrbitLoader :
+import OrbitLoader from '../../src/components/OrbitLoader';
+
+2. Utiliser dans l'état loading :
+{loading && (
+  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+    <OrbitLoader size={80} />
+  </View>
+)}
+
+3. OrbitLoader = 3 sphères 3D (vert, jaune, bleu) en orbite
+   avec traînée fantôme, rendu via Three.js / expo-gl.
+
+NE JAMAIS utiliser ActivityIndicator pour un état
+de chargement dans Mbolo — toujours OrbitLoader.
+
+Cette règle s'applique à TOUTES 
+les pages sans exception.

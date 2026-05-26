@@ -8,11 +8,13 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { Video as AVVideo } from 'expo-av'
+import AnimatedReanimated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
 import * as VideoThumbnails from 'expo-video-thumbnails'
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
 import { auth, db } from '../../src/lib/firebase'
 import { colors } from '../../src/lib/theme'
 import { uploadToCloudinary } from '../../src/lib/cloudinary'
+import OrbitLoader from '../../src/components/OrbitLoader'
 import {
   initFFmpeg,
   getTempPath,
@@ -38,6 +40,7 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 const PREVIEW_HEIGHT = SCREEN_HEIGHT * 0.48
 const TRIM_HEIGHT = 50
 const THUMB_WIDTH = 50
+const TAB_WIDTH = SCREEN_WIDTH / 5
 
 const SPEED_OPTIONS = [0.3, 0.5, 1, 2, 3]
 
@@ -325,7 +328,7 @@ export default function VideoEditorScreen() {
 
     const input = processedVideoUri || mediaUri!
     const outPath = getTempPath(`filter_${Date.now()}.mp4`)
-    const result = await applyVideoFilter(input, ffmpegFilter, outPath)
+    const result = await applyVideoFilter(input, ffmpegFilter as any, outPath)
     setProcessing(false)
     setProcessingStep('')
 
@@ -537,7 +540,7 @@ export default function VideoEditorScreen() {
       {/* PROCESSING OVERLAY */}
       {processing && (
         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 100, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <OrbitLoader size={80} />
           <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600', marginTop: 16 }}>{processingStep}</Text>
           <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 8 }}>Traitement en cours...</Text>
         </View>
@@ -845,7 +848,8 @@ export default function VideoEditorScreen() {
 
       {/* ONGLETS BAS */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ backgroundColor: '#000', borderTopWidth: 0.5, borderTopColor: '#222', paddingBottom: insets.bottom }} contentContainerStyle={{ paddingHorizontal: 8 }}>
-        {BOTTOM_TABS.map(tab => (
+            <AnimatedReanimated.View style={[{ position: 'absolute', left: 0, top: 0, width: TAB_WIDTH, height: 2, backgroundColor: '#00A86B' }, tabIndicatorStyle]} />
+            {BOTTOM_TABS.map(tab => (
           <TouchableOpacity key={tab.id} onPress={() => setActiveTab(tab.id)} style={{ paddingHorizontal: 14, paddingVertical: 10, alignItems: 'center' }}>
             <Text style={{ color: activeTab === tab.id ? '#fff' : '#888', fontSize: 13, fontWeight: activeTab === tab.id ? '700' : '400' }}>{tab.label}</Text>
             {activeTab === tab.id && <View style={{ width: 20, height: 2, backgroundColor: '#00A86B', borderRadius: 1, marginTop: 4 }} />}
@@ -873,7 +877,7 @@ export default function VideoEditorScreen() {
             <View style={{ flexDirection: 'row', gap: 4, borderLeftWidth: 1, borderLeftColor: '#333', marginLeft: 6, paddingLeft: 10, alignItems: 'center' }}>
               {(['left', 'center', 'right'] as TextAlignMode[]).map(a => (
                 <TouchableOpacity key={a} onPress={() => setTextAlign(a)} style={{ padding: 4 }}>
-                  <Ionicons name={a === 'left' ? 'align-outline' : a === 'center' ? 'align-center-outline' : 'align-right-outline'} size={16} color={textAlign === a ? '#fff' : '#888'} />
+                  <Ionicons name={a === 'left' ? 'reorder-three-outline' : a === 'center' ? 'reorder-two-outline' : 'menu-outline'} size={16} color={textAlign === a ? '#fff' : '#888'} />
                 </TouchableOpacity>
               ))}
             </View>

@@ -4,13 +4,6 @@ import {
   Dimensions, Alert, Modal, ScrollView,
 } from 'react-native'
 import { useRouter } from 'expo-router'
-import {
-  Camera,
-  useCameraDevice,
-  useCameraPermission,
-  useMicrophonePermission,
-  VideoFile,
-} from 'react-native-vision-camera'
 import { PinchGestureHandler, State } from 'react-native-gesture-handler'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle } from 'react-native-svg'
@@ -31,6 +24,20 @@ import Animated, {
 } from 'react-native-reanimated'
 import { colors } from '../../src/lib/theme'
 import { FILTERS, FilterName } from '../../src/hooks/useCamera'
+import { IS_DEV_MODE } from '../../config/devMode'
+import { getCameraModule } from '../../config/modules'
+import { MockCameraScreen } from '../../mocks/VisionCameraMock'
+
+const {
+  Camera: CameraModule,
+  useCameraDevice,
+  useCameraPermission,
+  useMicrophonePermission,
+} = getCameraModule()
+
+const Camera = CameraModule as any
+type VideoFile = { path: string }
+type CameraHandle = any
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 
@@ -40,6 +47,22 @@ const AnimatedCircle = Animated.createAnimatedComponent(Circle)
 
 export default function CameraScreen() {
   const router = useRouter()
+
+  if (IS_DEV_MODE) {
+    return (
+      <MockCameraScreen
+        navigation={{
+          navigate: (_screen: string, params: Record<string, string>) => {
+            router.push({
+              pathname: '/(tabs)/video-editor',
+              params,
+            })
+          },
+        }}
+      />
+    )
+  }
+
   const insets = useSafeAreaInsets()
 
   const { hasPermission: hasCameraPermission, requestPermission: requestCameraPermission } = useCameraPermission()
@@ -50,7 +73,7 @@ export default function CameraScreen() {
   const backDevice = useCameraDevice('back')
   const device = facing === 'back' ? backDevice : frontDevice
 
-  const cameraRef = useRef<Camera>(null)
+  const cameraRef = useRef<CameraHandle>(null)
   const flipAnim = useSharedValue(0)
   const focusAnim = useSharedValue(1)
   const countScale = useSharedValue(1)
@@ -166,7 +189,7 @@ export default function CameraScreen() {
     setIsRecording(true)
     setRecordingTime(0)
 
-    innerScale.value = withSpring(0.7, { friction: 6 })
+    innerScale.value = withSpring(0.7, { damping: 14, stiffness: 170 })
     progress.value = withTiming(1, { duration: maxDuration * 1000, easing: Easing.linear })
 
     timerRef.current = setInterval(() => {
@@ -206,7 +229,7 @@ export default function CameraScreen() {
     } catch {}
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
-    innerScale.value = withSpring(1, { friction: 6 })
+    innerScale.value = withSpring(1, { damping: 14, stiffness: 170 })
     progress.value = withTiming(0, { duration: 200 })
     setIsRecording(false)
     setRecordingTime(0)
@@ -218,7 +241,7 @@ export default function CameraScreen() {
     if (timerRef.current) clearInterval(timerRef.current)
     if (blinkRef.current) clearInterval(blinkRef.current)
     progress.value = withTiming(0, { duration: 200 })
-    innerScale.value = withSpring(1, { friction: 6 })
+    innerScale.value = withSpring(1, { damping: 14, stiffness: 170 })
     setIsRecording(false)
     setRecordingTime(0)
     setShowBlink(false)
@@ -369,7 +392,7 @@ export default function CameraScreen() {
             <Camera
               ref={cameraRef}
               style={StyleSheet.absoluteFill}
-              device={device}
+              device={device as any}
               isActive={true}
               video={activeTab !== 'Photo'}
               photo={true}

@@ -2,15 +2,15 @@ import { Platform } from 'react-native'
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app'
 import {
   initializeAuth,
-  getReactNativePersistence,
   getAuth,
   browserLocalPersistence,
   Auth,
 } from 'firebase/auth'
-import { getFirestore, Firestore } from 'firebase/firestore'
+import { type Firestore } from 'firebase/firestore'
 import { getStorage, FirebaseStorage } from 'firebase/storage'
 import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage'
 import { validateEnv, logEnvStatus } from './env'
+import { captureException } from './sentry'
 
 const env = validateEnv()
 if (!env.valid) {
@@ -32,20 +32,75 @@ const firebaseConfig = {
 const apps = getApps()
 const app: FirebaseApp = apps.length > 0 ? getApp() : initializeApp(firebaseConfig)
 
+function getAsyncStoragePersistence(storage: typeof ReactNativeAsyncStorage) {
+  return class AsyncStoragePersistence {
+    static type = 'LOCAL'
+    type = 'LOCAL'
+
+    async _isAvailable() {
+      try {
+        const key = '__mbolo_auth_storage_test__'
+        await storage.setItem(key, '1')
+        await storage.removeItem(key)
+        return true
+      } catch {
+        return false
+      }
+    }
+
+    _set(key: string, value: unknown) {
+      return storage.setItem(key, JSON.stringify(value))
+    }
+
+    async _get(key: string) {
+      const json = await storage.getItem(key)
+      return json ? JSON.parse(json) : null
+    }
+
+    _remove(key: string) {
+      return storage.removeItem(key)
+    }
+
+    _addListener() {}
+    _removeListener() {}
+  }
+}
+
 let auth: Auth
-if (apps.length === 0) {
+try {
   if (Platform.OS === 'web') {
     auth = initializeAuth(app, { persistence: browserLocalPersistence })
   } else {
     auth = initializeAuth(app, {
-      persistence: getReactNativePersistence(ReactNativeAsyncStorage),
+      persistence: getAsyncStoragePersistence(ReactNativeAsyncStorage) as any,
     })
   }
-} else {
+} catch (error: any) {
+  if (error?.code && error.code !== 'auth/already-initialized') {
+    console.warn('[Mbolo] Firebase Auth persistence init failed:', error.message || error)
+  }
   auth = getAuth(app)
 }
 
-const db: Firestore = getFirestore(app)
+function initFirestore(app: FirebaseApp): Firestore {
+  try {
+    const { initializeFirestore, memoryLocalCache } = require('firebase/firestore')
+    const localCache = memoryLocalCache()
+    return initializeFirestore(app, { localCache })
+  } catch {
+    try {
+      const { getFirestore } = require('firebase/firestore')
+      return getFirestore(app)
+    } catch (e2) {
+      captureException(e2 instanceof Error ? e2 : new Error(String(e2)), { context: 'initFirestore' })
+      console.warn('[Firestore] init fallback failed:', e2)
+      const firestore = require('firebase/firestore')
+      return firestore.getFirestore ? firestore.getFirestore(app) : firestore.initializeFirestore(app, {})
+    }
+  }
+}
+
+const db = initFirestore(app)
 const storage: FirebaseStorage = getStorage(app)
 
 export { auth, db, storage }

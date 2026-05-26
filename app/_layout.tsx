@@ -1,18 +1,30 @@
 import '../global.css'
+
+import { NavigationHistoryProvider } from '../src/providers/NavigationHistoryProvider'
+import { initSentry, setSentryUser, setSentryRoute } from '../src/lib/sentry'
+initSentry()
+
+const origWarn = console.warn
+console.warn = (...args: any[]) => {
+  const msg = args.join(' ')
+  if (msg.includes('THREE.Clock') || msg.includes('Reading from `value`')) return
+  origWarn(...args)
+}
 import { useEffect, useRef, useState } from 'react'
 import { Platform } from 'react-native'
-import { Stack, useRouter } from 'expo-router'
+import { Stack, useRouter, usePathname } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { onAuthStateChanged } from 'firebase/auth'
-import { GestureHandlerRootView } from 'react-native-gesture-handler'
+import SafeGestureHandlerRootView from '../src/components/SafeGestureHandlerRootView'
 import * as Notifications from 'expo-notifications'
 import { auth } from '../src/lib/firebase'
 import SplashScreen from '../src/components/SplashScreen'
 import ErrorBoundary from '../src/components/ErrorBoundary'
 import { I18nProvider } from '../src/i18n/index'
 import notificationService from '../src/services/notificationService'
+import { usePresence } from '../src/hooks/usePresence'
 
-const handleNotificationNavigation = (type: string, data: Record<string, any>) => {
+const handleNotificationNavigation = (router: ReturnType<typeof useRouter>, type: string, data: Record<string, any>) => {
   switch (type) {
     case 'follow':
     case 'follow_request':
@@ -40,9 +52,11 @@ export default function RootLayout() {
   const [authReady, setAuthReady] = useState(false)
   const [splashDone, setSplashDone] = useState(false)
   const [user, setUser] = useState<any>(null)
-  const splashPromise = useRef<Promise<void>>()
+  const splashPromise = useRef<Promise<void> | null>(null)
   const router = useRouter()
   const responseListenerRef = useRef<any>(null)
+  const pathname = usePathname()
+  usePresence()
 
   useEffect(() => {
     splashPromise.current = new Promise((resolve) => {
@@ -51,8 +65,9 @@ export default function RootLayout() {
   }, [])
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
+    const unsub = onAuthStateChanged(auth, (u: any) => {
       setUser(u)
+      setSentryUser(u)
       setAuthReady(true)
     })
     return () => unsub()
@@ -62,6 +77,10 @@ export default function RootLayout() {
     if (!authReady) return
     splashPromise.current?.then(() => setSplashDone(true))
   }, [authReady])
+
+  useEffect(() => {
+    setSentryRoute(pathname)
+  }, [pathname])
 
   useEffect(() => {
     if (!user) return
@@ -81,9 +100,9 @@ export default function RootLayout() {
       })
     }
 
-    responseListenerRef.current = notificationService.addNotificationResponseReceived((response) => {
+    responseListenerRef.current = notificationService.addNotificationResponseReceived((response: any) => {
       const { type, ...rest } = response.notification.request.content.data || {}
-      handleNotificationNavigation(type, rest)
+      handleNotificationNavigation(router, String(type || ''), rest)
     })
 
     return () => {
@@ -98,32 +117,34 @@ export default function RootLayout() {
   }
 
   return (
-    <I18nProvider>
-      <ErrorBoundary>
-        <GestureHandlerRootView style={{ flex: 1 }}>
+    <SafeGestureHandlerRootView style={{ flex: 1 }}>
+      <I18nProvider>
+        <ErrorBoundary>
           <StatusBar style="light" />
-          <Stack
-            screenOptions={{ headerShown: false }}
-            screenListeners={{
-              state: (e) => {
-                const state = e.data.state
-                if (!state) return
-                const routeName = state.routes[state.index]?.name
-                const isAuthRoute = routeName === '(auth)' || routeName === '(auth)/login' || routeName === '(auth)/register'
-                if (!isAuthRoute && !user) {
-                  router.replace('/(auth)/login')
-                } else if (isAuthRoute && user) {
-                  router.replace('/(tabs)/feed')
-                }
-              },
-            }}
-          >
-            <Stack.Screen name="(auth)" />
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="post" options={{ headerShown: false, presentation: 'modal' }} />
-          </Stack>
-        </GestureHandlerRootView>
-      </ErrorBoundary>
-    </I18nProvider>
+          <NavigationHistoryProvider>
+            <Stack
+              screenOptions={{ headerShown: false }}
+              screenListeners={{
+                state: (e: any) => {
+                  const state = e.data.state
+                  if (!state) return
+                  const routeName = state.routes[state.index]?.name
+                  const isAuthRoute = routeName === '(auth)' || routeName === '(auth)/login' || routeName === '(auth)/register'
+                  if (!isAuthRoute && !user) {
+                    router.replace('/(auth)/login')
+                  } else if (isAuthRoute && user) {
+                    router.replace('/(tabs)/feed')
+                  }
+                },
+              }}
+            >
+              <Stack.Screen name="(auth)" />
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="post" options={{ headerShown: false, presentation: 'modal' }} />
+            </Stack>
+          </NavigationHistoryProvider>
+        </ErrorBoundary>
+      </I18nProvider>
+    </SafeGestureHandlerRootView>
   )
 }

@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { Camera } from 'expo-camera'
 import * as MediaLibrary from 'expo-media-library'
 import * as ImagePicker from 'expo-image-picker'
+import { captureException } from '../lib/sentry'
 
 /**
  * Filtres visuels applicables aux vidéos/photos
@@ -47,6 +48,7 @@ export function useCamera() {
         media: mediaStatus === 'granted',
       }
     } catch (e) {
+      captureException(e instanceof Error ? e : new Error(String(e)), { context: 'requestPermissions' })
       console.error('Permission request failed:', e)
       return { camera: false, mic: false, media: false }
     }
@@ -63,6 +65,7 @@ export function useCamera() {
       const asset = await MediaLibrary.createAssetAsync(uri)
       return !!asset
     } catch (e) {
+      captureException(e instanceof Error ? e : new Error(String(e)), { context: 'saveToGallery' })
       console.error('saveToGallery error:', e)
       return false
     }
@@ -92,6 +95,7 @@ export function useCamera() {
       }
       return null
     } catch (e) {
+      captureException(e instanceof Error ? e : new Error(String(e)), { context: 'pickFromGallery' })
       console.error('pickFromGallery error:', e)
       return null
     }

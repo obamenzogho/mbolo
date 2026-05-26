@@ -1,0 +1,167 @@
+---
+description: Règles spécifiques Expo Router, expo-video, et React Native pour Mbolo
+globs:
+  - "app/**/*"
+  - "src/**/*"
+alwaysApply: true
+---
+
+# RÈGLE EXPO / REACT NATIVE
+
+## 1. Expo Router — navigation file-based
+
+- Les screens sont dans `app/`, le routing suit la structure des dossiers
+- `_layout.tsx` = layout parent (Stack, Tabs)
+- Routes dynamiques : `[param].tsx` (ex: `user/[userId].tsx`)
+- Routes groupées : `(group)/` (ex: `(auth)/`, `(tabs)/`)
+- `href: null` pour les routes cachées (non affichées dans la tab bar)
+- Toujours utiliser `useRouter()` pour la navigation programmatique
+
+```tsx
+const router = useRouter();
+router.push('/(tabs)/feed');
+router.back();
+```
+
+## 2. Layout racine — `app/_layout.tsx`
+
+Le layout racine DOIT contenir dans l'ordre :
+1. `SplashScreen.preventAutoHideAsync()` (tout début)
+2. Sentry init (avant tout import React)
+3. `ErrorBoundary` wrapper
+4. `I18nProvider` wrapper
+5. Auth guard (`onAuthStateChanged` + redirection)
+6. Notification handling (channel Android, response listener)
+7. `SplashScreen.hideAsync()` une fois auth résolu
+
+## 3. Pages — toujours PageWrapper + OrbitLoader
+
+Toute page DOIT utiliser `PageWrapper` pour l'animation d'entrée.
+
+```tsx
+import PageWrapper from '@/components/PageWrapper';
+import OrbitLoader from '@/components/OrbitLoader';
+
+const MaPage = () => (
+  <PageWrapper type="fadeSlide">
+    {loading ? (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <OrbitLoader size={80} />
+      </View>
+    ) : (
+      <View>{/* contenu */}</View>
+    )}
+  </PageWrapper>
+);
+```
+
+Types d'animation :
+- `fadeSlide` → pages normales (défaut)
+- `fade` → auth, splash
+- `scale` → modals, détails
+- `slideRight` → sous-pages, settings
+
+## 4. expo-video (nouveau) vs expo-av (legacy)
+
+Pour les NOUVEAUX développements, toujours utiliser `expo-video`.
+
+```tsx
+import { VideoView, useVideoPlayer } from 'expo-video';
+
+const player = useVideoPlayer({ uri: videoUrl }, (player) => {
+  player.loop = true;
+  player.muted = true;
+});
+
+<VideoView player={player} style={styles.video} />
+```
+
+`expo-av` est legacy — ne l'utiliser QUE pour maintenir les composants existants (editor, story, profile legacy).
+
+## 5. expo-image
+
+Pour les nouvelles images, privilégier `expo-image` pour bénéficier du caching natif et du blurhash.
+
+```tsx
+import { Image } from 'expo-image';
+
+<Image
+  source={{ uri: photoURL }}
+  style={{ width: 40, height: 40, borderRadius: 20 }}
+  cachePolicy="memory-disk"
+/>
+```
+
+Si `expo-image` n'est pas disponible, au minimum utiliser `Image.prefetch()`.
+
+## 6. Reanimated pour les animations
+
+Toutes les animations DOIVENT utiliser `react-native-reanimated` (pas d'Animated API).
+
+```tsx
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+```
+
+Worklets pour les animations sur le UI thread :
+```tsx
+const onPress = () => {
+  scale.value = withSequence(withSpring(0.85), withSpring(1));
+};
+```
+
+## 7. Gorhom Bottom Sheet pour les modals
+
+Utiliser `@gorhom/bottom-sheet` pour les panneaux qui glissent depuis le bas.
+
+```tsx
+import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
+
+<BottomSheet snapPoints={['50%', '90%']} index={0}>
+  <BottomSheetView>
+    {content}
+  </BottomSheetView>
+</BottomSheet>
+```
+
+## 8. Expo Camera — deux systèmes
+
+- `expo-camera` : simple, suffisant pour les cas basiques
+- `react-native-vision-camera` : haute performance, utilisé via `useVisionCamera` hook
+
+```tsx
+// Utiliser le hook existant
+import { useVisionCamera } from '@/hooks/useVisionCamera';
+```
+
+## 9. Expo Notifications
+
+Toujours passer par `notificationService.ts` pour :
+- Demander les permissions
+- Gérer les push tokens
+- Créer des notifications locales
+- Utiliser les templates de notification
+
+```tsx
+import { notify } from '@/services/notificationService';
+notify.newFollower(username);
+```
+
+## 10. SafeArea — utilisation
+
+Toujours utiliser `useSafeAreaInsets()` de `react-native-safe-area-context` pour les padding top/bottom, jamais de valeurs fixes.
+
+```tsx
+const insets = useSafeAreaInsets();
+const paddingTop = insets.top;
+```
+
+## 11. GestureHandler
+
+Toujours utiliser `GestureHandlerRootView` à la racine de l'app (déjà fait dans `index.ts`). Pour les gestes complexes, utiliser `react-native-gesture-handler` avec Reanimated.
+
+## 12. Configuration Expo (app.json)
+
+Ne pas modifier `app.json` sans vérifier :
+- Les permissions sont déclarées pour iOS et Android
+- Le plugin array est cohérent
+- Les schémas de partage (WhatsApp, Instagram, etc.) sont listés

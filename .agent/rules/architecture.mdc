@@ -1,0 +1,112 @@
+---
+description: Règles d'architecture et structure du code pour Mbolo
+globs:
+  - "src/**/*"
+  - "app/**/*"
+  - "utils/**/*"
+alwaysApply: true
+---
+
+# RÈGLE ARCHITECTURE — STRUCTURE & CONVENTIONS
+
+## 1. Structure des dossiers — ne pas dévier
+
+```
+src/
+├── components/       # Composants UI réutilisables (inter-features)
+│   └── ui/           # Composants de base (BottomTabBar, etc.)
+├── contexts/         # Contextes React (uniquement si vraiment global)
+├── features/         # Modules feature (chaque feature = un dossier)
+│   └── <feature>/
+│       ├── analytics/
+│       ├── cache/
+│       ├── components/
+│       ├── hooks/
+│       ├── optimizations/
+│       ├── player/
+│       └── services/
+├── hooks/            # Hooks génériques (réutilisables entre features)
+├── i18n/             # Traductions (français, fang, punu, nzebi)
+├── lib/              # Initialisation Firebase, Cloudinary, Sentry, etc.
+├── navigation/       # Transitions de navigation
+├── services/         # Services API externes (Tenor, Klipy, notifications)
+└── types/            # Types TypeScript partagés
+```
+
+## 2. Zéro duplicat
+
+**Avant de créer un fichier, vérifie qu'il n'existe pas déjà.**
+
+```bash
+# Vérifier si un hook existe
+grep -r "function use" src/hooks/ src/features/*/hooks/
+
+# Vérifier si un composant existe
+grep -r "export.*function\|export default" src/components/
+
+# Vérifier avec graphify
+graphify query "<concept>"
+```
+
+## 3. Règle du boy-scout
+
+Touche un fichier → laisse-le plus propre que tu ne l'as trouvé :
+- Supprime les `console.log` inutiles
+- Remplace les `catch {}` silencieux par `captureException` ou `console.warn`
+- Corrige les warning TypeScript si tu les vois
+- Ajoute les types manquants si tu passes sur le fichier
+
+## 4. Feature modules vs hooks génériques
+
+- **Feature module** (`src/features/<feature>/`) : quand la logique est complexe, avec plusieurs composants, hooks, services
+- **Hook générique** (`src/hooks/`) : quand c'est un pattern réutilisable entre features (useFollow, useComments)
+
+Si un hook générique devient trop spécifique à une feature, déplace-le.
+
+## 5. Dépendances entre features
+
+Une feature NE DOIT PAS importer directement depuis une autre feature.
+Les features communiquent via :
+- Les types partagés (`src/types/`)
+- Les hooks génériques (`src/hooks/`)
+- Les contextes globaux (`src/contexts/`)
+
+```ts
+// ✅ CORRECT — dépendance via hook générique
+import { useFollow } from '@/hooks/useFollow';
+
+// ❌ INCORRECT — dépendance directe entre features
+import { VideoItem } from '@/features/feed/components/VideoItem';
+```
+
+## 6. Exports — convention
+
+- **Pages** (`app/`) : `export default`
+- **Hooks** : `export function` (export nommé)
+- **Composants** : `export default` (composant principal) ou `export function` (sous-composants)
+- **Types** : `export interface` ou `export type`
+- **Constantes** : `export const`
+
+## 7. Nommage
+
+- **Fichiers** : `PascalCase.tsx` pour les composants, `camelCase.ts` pour les hooks/services/lib
+- **Dossiers de features** : singulier (`feed`, `story`, `create`)
+- **Composants** : `PascalCase`
+- **Hooks** : `camelCase` avec préfixe `use`
+- **Fonctions** : `camelCase`
+- **Types/Interfaces** : `PascalCase`
+
+## 8. i18n — toutes les chaînes visibles
+
+Tout texte visible par l'utilisateur DOIT passer par le système i18n.
+
+```tsx
+// ✅ CORRECT
+const { t } = useI18n();
+<Text>{t('profile.followers')}</Text>
+
+// ❌ INCORRECT — texte hardcodé
+<Text>Abonnés</Text>
+```
+
+Les traductions doivent exister dans les 4 langues (français, fang, punu, nzebi). Si la traduction manque dans une langue, le français est utilisé comme fallback.

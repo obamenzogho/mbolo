@@ -263,7 +263,7 @@ export type Language = keyof typeof translations
 export type TranslationKeys = typeof translations.fr
 
 export function getTranslation(lang: Language = 'fr'): TranslationKeys {
-  return translations[lang] || translations.fr
+  return { ...translations.fr, ...(translations[lang] || translations.fr) }
 }
 
 export default translations

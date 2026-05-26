@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import * as MediaLibrary from 'expo-media-library'
 import * as FileSystem from 'expo-file-system'
 import { Platform } from 'react-native'
+import { captureException } from '../lib/sentry'
 
 export interface GalleryAsset {
   id: string
@@ -25,6 +26,11 @@ export interface GalleryAlbum {
 
 const MBOLO_ALBUM_NAME = 'Mbolo'
 
+function normalizeMediaType(mediaType: string): GalleryAsset['mediaType'] {
+  if (mediaType === 'photo' || mediaType === 'video') return mediaType
+  return 'unknown'
+}
+
 export const useGallery = () => {
   const [permission, requestPermission] = MediaLibrary.usePermissions()
   const [albums, setAlbums] = useState<GalleryAlbum[]>([])
@@ -46,7 +52,7 @@ export const useGallery = () => {
     try {
       const options: any = {
         first: 30,
-        sortBy: [MediaLibrary.SortBy.CREATION_TIME_DESC],
+        sortBy: [MediaLibrary.SortBy.creationTime],
       }
 
       if (mediaType === 'photo') {
@@ -66,19 +72,20 @@ export const useGallery = () => {
         id: a.id,
         uri: a.uri,
         filename: a.filename || `media_${a.id}`,
-        mediaType: a.mediaType,
+        mediaType: normalizeMediaType(a.mediaType),
         width: a.width || 0,
         height: a.height || 0,
         creationTime: a.creationTime || Date.now(),
         duration: a.duration,
         modificationTime: a.modificationTime || a.creationTime || Date.now(),
-        localUri: a.localUri,
+        localUri: (a as any).localUri,
       }))
 
       setAssets(prev => reset ? mappedAssets : [...prev, ...mappedAssets])
       setCursor(result.endCursor)
       setHasMore(result.hasNextPage)
     } catch (e) {
+      captureException(e instanceof Error ? e : new Error(String(e)), { context: 'loadAssets' })
       console.error('loadAssets error:', e)
     } finally {
       setLoading(false)
@@ -97,6 +104,7 @@ export const useGallery = () => {
       }))
       setAlbums(mapped)
     } catch (e) {
+      captureException(e instanceof Error ? e : new Error(String(e)), { context: 'loadAlbums' })
       console.error('loadAlbums error:', e)
     }
   }, [permission])
@@ -113,13 +121,13 @@ export const useGallery = () => {
         id: asset.id,
         uri: asset.uri,
         filename: asset.filename || filename || `mbolo_${Date.now()}`,
-        mediaType: asset.mediaType,
+        mediaType: normalizeMediaType(asset.mediaType),
         width: asset.width,
         height: asset.height,
         creationTime: asset.creationTime,
         duration: asset.duration,
         modificationTime: asset.modificationTime,
-        localUri: asset.localUri,
+        localUri: (asset as any).localUri,
       }
 
       try {
@@ -130,11 +138,12 @@ export const useGallery = () => {
           await MediaLibrary.addAssetsToAlbumAsync([asset], mboloAlbum, false)
         }
       } catch (e) {
-        console.log('Could not add to Mbolo album:', e)
+        console.warn('Could not add to Mbolo album:', e)
       }
 
       return mapped
     } catch (e) {
+      captureException(e instanceof Error ? e : new Error(String(e)), { context: 'saveToGallery' })
       console.error('saveToGallery error:', e)
       return null
     }
@@ -183,13 +192,13 @@ export const useGallery = () => {
         id: info.id,
         uri: info.uri,
         filename: info.filename || `asset_${info.id}`,
-        mediaType: info.mediaType,
+        mediaType: normalizeMediaType(info.mediaType),
         width: info.width || 0,
         height: info.height || 0,
         creationTime: info.creationTime || Date.now(),
         duration: info.duration,
         modificationTime: info.modificationTime || info.creationTime || Date.now(),
-        localUri: info.localUri,
+        localUri: (info as any).localUri,
       }
     } catch {
       return null
@@ -203,6 +212,7 @@ export const useGallery = () => {
       setSelectedAssets(prev => prev.filter(a => a.id !== assetId))
       return true
     } catch (e) {
+      captureException(e instanceof Error ? e : new Error(String(e)), { context: 'deleteAsset' })
       console.error('deleteAsset error:', e)
       return false
     }

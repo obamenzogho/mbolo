@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { Video as AVVideo } from 'expo-av'
 import { auth } from '../../src/lib/firebase'
+import OrbitLoader from '../../src/components/OrbitLoader'
 import { colors } from '../../src/lib/theme'
 import { useStories } from '../../src/hooks/useStories'
 import HighlightPickerModal from '../../src/components/HighlightPickerModal'
@@ -223,7 +224,7 @@ export default function StoryUploadScreen() {
   if (step === 'uploading') {
     return (
       <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <OrbitLoader size={80} />
         <Text style={{ color: '#fff', fontSize: 16, marginTop: 16, fontWeight: '600' }}>Publication en cours...</Text>
       </View>
     )

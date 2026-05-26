@@ -1,10 +1,15 @@
 import { useState, useCallback, useRef } from 'react'
-import {
+import { getCameraModule } from '../../config/modules'
+import { captureException } from '../lib/sentry'
+
+const {
   Camera,
   useCameraDevice,
   useCameraPermission,
   useMicrophonePermission,
-} from 'react-native-vision-camera'
+} = getCameraModule()
+
+type CameraHandle = any
 
 export interface VisionCameraDevice {
   id: string
@@ -95,7 +100,7 @@ export function useVisionCamera() {
 }
 
 export function useVisionCameraRecording() {
-  const cameraRef = useRef<Camera>(null)
+  const cameraRef = useRef<CameraHandle>(null)
   const [isRecording, setIsRecording] = useState(false)
   const [recordingDuration, setRecordingDuration] = useState(0)
   const durationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -117,13 +122,13 @@ export function useVisionCameraRecording() {
       }, 1000)
 
       await cameraRef.current.startRecording({
-        onRecordingFinished: (video) => {
+        onRecordingFinished: (video: { path: string }) => {
           if (durationTimerRef.current) clearInterval(durationTimerRef.current)
           setIsRecording(false)
           setRecordingDuration(0)
           options?.onRecordingStopped?.({ uri: video.path })
         },
-        onRecordingError: (error) => {
+        onRecordingError: (error: Error) => {
           if (durationTimerRef.current) clearInterval(durationTimerRef.current)
           setIsRecording(false)
           setRecordingDuration(0)
@@ -154,7 +159,7 @@ export function useVisionCameraRecording() {
 }
 
 export function useVisionCameraPhoto() {
-  const cameraRef = useRef<Camera>(null)
+  const cameraRef = useRef<CameraHandle>(null)
 
   const takePhoto = useCallback(async (): Promise<VisionCameraResult | null> => {
     if (!cameraRef.current) return null
@@ -169,6 +174,7 @@ export function useVisionCameraPhoto() {
         isPortrait: photo.isPortrait || false,
       }
     } catch (e) {
+      captureException(e instanceof Error ? e : new Error(String(e)), { context: 'takePhoto' })
       console.error('Take photo error:', e)
       return null
     }
@@ -215,7 +221,7 @@ export function useVisionCameraZoom() {
 export function useVisionCameraFocus() {
   const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(null)
 
-  const focusAtPoint = useCallback((x: number, y: number, camera: Camera | null) => {
+  const focusAtPoint = useCallback((x: number, y: number, camera: CameraHandle | null) => {
     setFocusPoint({ x, y })
     if (camera) {
       camera.setFocusPoint({ x, y })

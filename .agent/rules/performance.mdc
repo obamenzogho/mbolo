@@ -1,0 +1,114 @@
+---
+description: Règles de performance React Native / Expo pour Mbolo
+globs:
+  - "src/**/*.tsx"
+  - "app/**/*.tsx"
+alwaysApply: true
+---
+
+# RÈGLE PERFORMANCE — REACT NATIVE & EXPO
+
+## 1. Mémoïsation des composants
+
+Tout composant qui reçoit des props objets ou fonctions DOIT utiliser `React.memo`.
+
+```tsx
+// ✅ CORRECT — avec comparateur personnalisé
+export const VideoItem = React.memo(({ item, isActive }: VideoItemProps) => {
+  return <View>...</View>;
+}, (prev, next) => prev.item.id === next.item.id && prev.isActive === next.isActive);
+```
+
+## 2. `useCallback` et `useMemo` systématiques
+
+Toute fonction passée en prop à un enfant mémoïsé DOIT être wrappée dans `useCallback`.
+
+```tsx
+// ✅ CORRECT
+const handlePress = useCallback(() => { ... }, [deps]);
+
+// ❌ INCORRECT — crée une nouvelle référence à chaque render
+const handlePress = () => { ... };
+```
+
+## 3. FlatList — toujours configurer les props d'optimisation
+
+```tsx
+// ✅ CORRECT
+<FlatList
+  data={data}
+  renderItem={renderItem}
+  keyExtractor={useCallback((item) => item.id, [])}
+  windowSize={5}
+  initialNumToRender={3}
+  maxToRenderPerBatch={3}
+  removeClippedSubviews={true}
+  ListFooterComponent={useCallback(() => <Footer />, [])}
+  onEndReached={handleLoadMore}
+  onEndReachedThreshold={0.5}
+/>
+```
+
+Ne JAMAIS utiliser de fonctions inline pour `keyExtractor`, `ListHeaderComponent`, `ListFooterComponent`.
+
+## 4. Images : préférer expo-image ou Image.prefetch
+
+Pour les images dans le feed et les listes :
+- Utiliser `Image.prefetch` pour les thumbnails des prochains items
+- Pour les composants photo utilisateur, RN `Image` avec `cache` est acceptable
+- Éviter les images non dimensionnées (toujours `width` + `height`)
+
+## 5. Éviter les re-rendus en chaîne
+
+- Ne pas créer de nouveaux objets/tableaux dans le render (les inline props)
+- Utiliser `useMemo` pour les données dérivées
+- Éviter les contextes qui changent trop souvent (préférer Zustand/Jotai pour les données fréquentes)
+
+```tsx
+// ❌ INCORRECT — nouvel objet à chaque render
+<FeedPage style={{ flex: 1, backgroundColor: 'black' }} />
+
+// ✅ CORRECT — stable
+<FeedPage style={styles.container} />
+```
+
+## 6. Images de fond — utiliser les bonnes pratiques
+
+```tsx
+// ✅ CORRECT — ImageBackground pour une image de fond
+<ImageBackground source={...} imageStyle={styles.image}>
+  {children}
+</ImageBackground>
+```
+
+## 7. Animations — toujours sur le UI Thread
+
+Toutes les animations DOIVENT utiliser Reanimated worklets pour s'exécuter sur le UI thread.
+
+```tsx
+// ✅ CORRECT — animations sur le UI thread
+const animatedStyle = useAnimatedStyle(() => ({
+  transform: [{ scale: withSpring( isActive ? 1 : 0.9 ) }],
+}));
+```
+
+## 8. Éviter les imports lourds
+
+- Ne pas importer Three.js dans une page qui n'en a pas besoin
+- Utiliser les imports dynamiques pour les bibliothèques lourdes
+- Surveiller la taille du bundle avec `npx expo export --platform web`
+
+## 9. Gestion des vidéos
+
+- Utiliser `expo-video` pour les nouveaux développements (pas `expo-av`, qui est legacy)
+- `VideoPlayer` est mémoïsé avec comparateur — ne pas le dé-mémoïser
+- La prélecture des vidéos est gérée par `useVideoPreloader` (thumbnails)
+
+## 10. Dev vs Prod
+
+En développement (`IS_DEV_MODE = true` dans `config/devMode.js`) :
+- Les logs sont permis
+- `PerformanceMonitor` peut être affiché
+- Les mocks sont utilisés pour VisionCamera et FFmpeg
+
+En production, zéro `console.log` ne doit subsister.

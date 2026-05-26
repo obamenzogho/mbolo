@@ -9,8 +9,8 @@ import { router } from 'expo-router'
 import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore'
 import { db, auth } from '../../src/lib/firebase'
 import { colors } from '../../src/lib/theme'
-import MboloLoader from '../../src/components/MboloLoader'
 import { getTranslation } from '../../src/i18n/translations'
+import OrbitLoader from '../../src/components/OrbitLoader'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
 
@@ -34,7 +34,7 @@ export default function Explore() {
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [searching, setSearching] = useState(false)
-  const searchTimeout = useRef<ReturnType<typeof setTimeout>>()
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   const t = getTranslation('fr')
 
   const performSearch = useCallback(async (term: string) => {
@@ -193,7 +193,7 @@ export default function Explore() {
           ListEmptyComponent={
             loading ? (
               <View style={{ alignItems: 'center', marginTop: 40 }}>
-                <MboloLoader size={40} />
+                <OrbitLoader size={80} />
               </View>
             ) : null
           }
@@ -226,7 +226,7 @@ export default function Explore() {
               Artistes gabonais
             </Text>
             {loading ? (
-              <ActivityIndicator size="large" color={colors.primary} style={{ marginVertical: 20 }} />
+              <OrbitLoader size={80} />
             ) : (
               <FlatList
                 horizontal

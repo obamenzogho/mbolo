@@ -230,7 +230,7 @@ export const useRecordButtonAnimation = () => {
     transform: [{ scale: innerScale.value }],
   }))
 
-  const progressAnimatedStyle = useAnimatedStyle(() => ({
+  const progressAnimatedStyle = useAnimatedStyle((): any => ({
     strokeDashoffset: interpolate(progress.value, [0, 1], [CIRCUMFERENCE, 0]),
   }))
 

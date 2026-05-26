@@ -6,6 +6,8 @@ import { doc, getDoc, updateDoc } from 'firebase/firestore'
 import { auth, db } from '../../src/lib/firebase'
 import { colors } from '../../src/lib/theme'
 import { router } from 'expo-router'
+import PageWrapper from '../../src/components/PageWrapper'
+import OrbitLoader from '../../src/components/OrbitLoader'
 
 export default function Settings() {
   const user = auth.currentUser
@@ -16,7 +18,7 @@ export default function Settings() {
 
   useEffect(() => {
     if (!user) return
-    getDoc(doc(db, 'users', user.uid)).then((snap) => {
+      getDoc(doc(db, 'users', user.uid)).then((snap: any) => {
       if (snap.exists()) {
         const d = snap.data()
         setNotifications(d.notifications !== false)
@@ -56,7 +58,13 @@ export default function Settings() {
     )
   }
 
-  if (loading) return null
+  if (loading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
+        <OrbitLoader size={80} />
+      </View>
+    )
+  }
 
   const sections = [
     {
@@ -146,6 +154,7 @@ export default function Settings() {
   ]
 
   return (
+    <PageWrapper type="slideRight">
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: '#222' }}>
         <TouchableOpacity onPress={() => router.back()} style={{ width: 36, height: 36, justifyContent: 'center' }}>
@@ -210,5 +219,6 @@ export default function Settings() {
         </Text>
       </ScrollView>
     </SafeAreaView>
+    </PageWrapper>
   )
 }

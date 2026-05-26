@@ -1,23 +1,10 @@
 import { useEffect, useRef, useCallback } from 'react'
-import { View, Text, Dimensions } from 'react-native'
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withRepeat,
-  withSequence,
-  withDelay,
-  Easing,
-  runOnJS,
-} from 'react-native-reanimated'
-
-const SCREEN_WIDTH = Dimensions.get('window').width
+import { View, useColorScheme, Image, Text } from 'react-native'
 
 export default function SplashScreen({ onReady }: { onReady?: () => void }) {
+  const scheme = useColorScheme()
+  const isDark = scheme === 'dark'
   const calledRef = useRef(false)
-  const scale = useSharedValue(1)
-  const progress = useSharedValue(0)
-  const opacity = useSharedValue(0)
 
   const triggerReady = useCallback(() => {
     if (!calledRef.current) {
@@ -27,88 +14,37 @@ export default function SplashScreen({ onReady }: { onReady?: () => void }) {
   }, [onReady])
 
   useEffect(() => {
-    opacity.value = withTiming(1, { duration: 500 })
-
-    scale.value = withRepeat(
-      withSequence(
-        withTiming(0.85, { duration: 800, easing: Easing.inOut(Easing.ease) }),
-        withTiming(1, { duration: 800, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1
-    )
-
-    progress.value = withTiming(1, {
-      duration: 2000,
-      easing: Easing.inOut(Easing.ease),
-    })
-
     const timer = setTimeout(() => {
       triggerReady()
-    }, 2000)
+    }, 1500)
 
     return () => {
       clearTimeout(timer)
     }
-  }, [])
-
-  const logoAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity: opacity.value,
-  }))
-
-  const subtitleAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-  }))
-
-  const progressStyle = useAnimatedStyle(() => ({
-    width: `${progress.value * 100}%`,
-  }))
+  }, [triggerReady])
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
-      <Animated.Text
-        style={{
-          fontSize: 52,
-          fontWeight: 'bold',
-          color: '#00A86B',
-          letterSpacing: 4,
-          ...logoAnimatedStyle,
-        }}
-      >
-        mbolo
-      </Animated.Text>
-      <Animated.Text
-        style={{
-          color: '#888',
-          fontSize: 14,
-          marginTop: 8,
-          letterSpacing: 1,
-          ...subtitleAnimatedStyle,
-        }}
-      >
-        Le réseau social gabonais
-      </Animated.Text>
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: isDark ? '#0D1117' : '#F7FFFB',
+        justifyContent: 'flex-start',
+        alignItems: 'center',
+        paddingTop: 120,
+      }}
+    >
+      <Image
+        source={require('../../assets/splash-icon.png')}
+        style={{ width: 220, height: 220, resizeMode: 'contain' }}
+      />
 
-      <View
-        style={{
-          position: 'absolute',
-          bottom: 80,
-          left: 40,
-          right: 40,
-          height: 3,
-          backgroundColor: '#222',
-          borderRadius: 2,
-          overflow: 'hidden',
-        }}
-      >
-        <Animated.View
-          style={{
-            height: '100%',
-            backgroundColor: '#FCD116',
-            borderRadius: 2,
-            ...progressStyle,
-          }}
-        />
+      <View style={{ position: 'absolute', bottom: 60, alignItems: 'center' }}>
+        <Text style={{ color: isDark ? '#A8A8A8' : '#5C5C5C', fontSize: 11, fontWeight: '400', letterSpacing: 0.3 }}>
+          Par
+        </Text>
+        <Text style={{ color: '#3797F0', fontSize: 13, fontWeight: '600', marginTop: 1, letterSpacing: 0.2 }}>
+          Groupe NZOGHO
+        </Text>
       </View>
     </View>
   )

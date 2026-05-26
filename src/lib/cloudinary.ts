@@ -1,3 +1,5 @@
+import { captureUploadError, startTransaction } from './sentry'
+
 const CLOUD_NAME = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME || ''
 const UPLOAD_PRESET = process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET || ''
 
@@ -27,6 +29,7 @@ interface CloudinaryResponse {
   secure_url: string
   public_id: string
   format: string
+  error?: { message?: string }
   duration?: number
   bytes: number
   width: number
@@ -81,6 +84,8 @@ export async function uploadToCloudinary(
 
   const timeout = options.timeout || 180000
 
+  const uploadSpan = startTransaction('upload.cloudinary', type)
+
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.open('POST', `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${endpoint}`)
@@ -96,12 +101,34 @@ export async function uploadToCloudinary(
     xhr.onload = () => {
       try {
         const data: CloudinaryResponse = JSON.parse(xhr.responseText)
-        if (data.secure_url) resolve(data.secure_url)
-        else reject(new Error(data.error?.message || 'Upload failed'))
-      } catch { reject(new Error('Parse error')) }
+        if (data.secure_url) {
+          uploadSpan?.finish()
+          resolve(data.secure_url)
+        } else {
+          const err = new Error(data.error?.message || 'Upload failed')
+          captureUploadError(err, { type, size: data.bytes })
+          uploadSpan?.finish()
+          reject(err)
+        }
+      } catch (e) {
+        const err = e instanceof Error ? e : new Error('Parse error')
+        captureUploadError(err, { type })
+        uploadSpan?.finish()
+        reject(err)
+      }
     }
-    xhr.onerror = () => reject(new Error('XHR error'))
-    xhr.ontimeout = () => reject(new Error('Timeout'))
+    xhr.onerror = () => {
+      const err = new Error('XHR error')
+      captureUploadError(err, { type })
+      uploadSpan?.finish()
+      reject(err)
+    }
+    xhr.ontimeout = () => {
+      const err = new Error('Timeout')
+      captureUploadError(err, { type })
+      uploadSpan?.finish()
+      reject(err)
+    }
     xhr.timeout = timeout
     xhr.send(formData)
   })
