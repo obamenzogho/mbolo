@@ -6,6 +6,7 @@ import {
 import { db } from '@/lib/firebase'
 import { withFirestoreRetry } from '@/lib/firestoreRetry'
 import { captureException } from '@/lib/sentry'
+import { getRepostedVideos } from '@/features/repost/services/repostService'
 import type { ProfileTab, Video as VideoType } from '@/types'
 
 const PAGE_SIZE = 30
@@ -22,22 +23,27 @@ export function useProfileTabs({ userId, tabs: allowedTabs }: UseProfileTabsOpti
   const [ownVideos, setOwnVideos] = useState<VideoType[]>([])
   const [savedVideos, setSavedVideos] = useState<VideoType[]>([])
   const [likedVideos, setLikedVideos] = useState<VideoType[]>([])
+  const [repostedVideos, setRepostedVideos] = useState<VideoType[]>([])
 
   const ownLastDoc = useRef<QueryDocumentSnapshot<DocumentData> | null>(null)
   const savedLastDoc = useRef<QueryDocumentSnapshot<DocumentData> | null>(null)
   const likedLastDoc = useRef<QueryDocumentSnapshot<DocumentData> | null>(null)
+  const repostedLastDoc = useRef<QueryDocumentSnapshot<DocumentData> | null>(null)
 
   const ownHasMore = useRef(true)
   const savedHasMore = useRef(true)
   const likedHasMore = useRef(true)
+  const repostedHasMore = useRef(true)
 
   const ownLoaded = useRef(false)
   const savedLoaded = useRef(false)
   const likedLoaded = useRef(false)
+  const repostedLoaded = useRef(false)
 
   const [ownLoading, setOwnLoading] = useState(false)
   const [savedLoading, setSavedLoading] = useState(false)
   const [likedLoading, setLikedLoading] = useState(false)
+  const [repostedLoading, setRepostedLoading] = useState(false)
 
   const [refreshing, setRefreshing] = useState(false)
 
@@ -102,13 +108,29 @@ export function useProfileTabs({ userId, tabs: allowedTabs }: UseProfileTabsOpti
         }
       } catch (e) { captureException(e instanceof Error ? e : new Error(String(e)), { context: 'fetchLiked' }) }
       setLikedLoading(false)
+      return
+    }
+
+    if (tab === 'reposted') {
+      if (!isRefresh && (repostedLoading || (!repostedHasMore.current && repostedLoaded.current))) return
+      setRepostedLoading(true)
+      try {
+        const result = await getRepostedVideos(userId, isRefresh ? null : repostedLastDoc.current)
+        repostedLastDoc.current = result.lastDoc
+        repostedHasMore.current = result.hasMore
+        repostedLoaded.current = true
+        setRepostedVideos(prev => isRefresh ? result.videos : [...prev, ...result.videos])
+      } catch (e) { captureException(e instanceof Error ? e : new Error(String(e)), { context: 'fetchReposted' }) }
+      setRepostedLoading(false)
     }
   }, [userId])
 
   useEffect(() => {
     const loaded = activeTab === 'grid' || activeTab === 'reels' ? ownLoaded.current
       : activeTab === 'saved' ? savedLoaded.current
-      : likedLoaded.current
+      : activeTab === 'liked' ? likedLoaded.current
+      : activeTab === 'reposted' ? repostedLoaded.current
+      : false
     if (!loaded) fetchPage(activeTab)
   }, [activeTab, fetchPage])
 
@@ -120,16 +142,19 @@ export function useProfileTabs({ userId, tabs: allowedTabs }: UseProfileTabsOpti
     if (activeTab === 'reels') return reelVideos
     if (activeTab === 'saved') return savedVideos
     if (activeTab === 'liked') return likedVideos
+    if (activeTab === 'reposted') return repostedVideos
     return []
-  }, [activeTab, gridVideos, reelVideos, savedVideos, likedVideos])
+  }, [activeTab, gridVideos, reelVideos, savedVideos, likedVideos, repostedVideos])
 
   const loading = activeTab === 'grid' || activeTab === 'reels' ? ownLoading
     : activeTab === 'saved' ? savedLoading
-    : likedLoading
+    : activeTab === 'liked' ? likedLoading
+    : repostedLoading
 
   const hasMore = activeTab === 'grid' || activeTab === 'reels' ? ownHasMore.current
     : activeTab === 'saved' ? savedHasMore.current
-    : likedHasMore.current
+    : activeTab === 'liked' ? likedHasMore.current
+    : repostedHasMore.current
 
   const loadMore = useCallback(async () => {
     await fetchPage(activeTab, false)
@@ -141,6 +166,7 @@ export function useProfileTabs({ userId, tabs: allowedTabs }: UseProfileTabsOpti
     if (ownLoaded.current) promises.push(fetchPage('grid', true))
     if (savedLoaded.current) promises.push(fetchPage('saved', true))
     if (likedLoaded.current) promises.push(fetchPage('liked', true))
+    if (repostedLoaded.current) promises.push(fetchPage('reposted', true))
     await Promise.all(promises)
     setRefreshing(false)
   }, [fetchPage])
@@ -153,6 +179,7 @@ export function useProfileTabs({ userId, tabs: allowedTabs }: UseProfileTabsOpti
     reelVideos,
     savedVideos,
     likedVideos,
+    repostedVideos,
     loading,
     refreshing,
     onRefresh,

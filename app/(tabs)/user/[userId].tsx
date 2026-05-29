@@ -13,7 +13,7 @@ import {
 import { GestureDetector, Gesture } from 'react-native-gesture-handler'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { doc, getDoc } from 'firebase/firestore'
+import { doc, onSnapshot } from 'firebase/firestore'
 import { auth, db } from '../../../src/lib/firebase'
 import { Avatar } from '../../../src/components/ui/Avatar'
 import { colors } from '../../../src/lib/theme'
@@ -29,7 +29,7 @@ import { getOrCreateConversation } from '@/features/chat/services/chatService'
 import { useProfileTabs } from '@/hooks/useProfileTabs'
 import { ProfileTabBar } from '@/components/ProfileTabBar'
 import { VideoGrid } from '@/components/VideoGrid'
-import { ProfileVideoViewer } from '@/features/profile/components/ProfileVideoViewer'
+import { ProfileVideoViewer } from '@/features/feed/profile-viewer/ProfileVideoViewer'
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 
@@ -48,6 +48,7 @@ export default function UserProfile() {
   const { goBack } = useGoBack()
   const [profile, setProfile] = useState<UserType | null>(null)
   const [profileLoaded, setProfileLoaded] = useState(false)
+  const [imgError, setImgError] = useState(false)
   const [ready, setReady] = useState(false)
   const tabsHook = useProfileTabs({ userId: userId || '', tabs: ['grid', 'reels'] })
   const { activeTab, setActiveTab, currentVideos, loading, refreshing, onRefresh: tabsRefresh, loadMore, hasMore } = tabsHook
@@ -78,25 +79,30 @@ export default function UserProfile() {
 
   const { isFollowing, isFriend, followerCount, followingCount, loading: followLoading, toggleFollow } = useFollow(userId || '')
 
-  const loadProfile = useCallback(async () => {
+  useEffect(() => {
     if (!userId) return
-    try {
-      const snap = await getDoc(doc(db, 'users', userId))
-      if (snap.exists()) {
-        setProfile(snap.data() as UserType)
-      }
-    } catch (e) { captureException(e instanceof Error ? e : new Error(String(e)), { context: 'loadProfile' }) }
-    setProfileLoaded(true)
+    const unsub = onSnapshot(
+      doc(db, 'users', userId),
+      (snap) => {
+        if (snap.exists()) {
+          setProfile(snap.data() as UserType)
+          setImgError(false)
+        }
+        setProfileLoaded(true)
+      },
+      (error) => {
+        captureException(error, { context: 'userProfile onSnapshot' })
+        setProfileLoaded(true)
+      },
+    )
+    return unsub
   }, [userId])
 
-
-
-  useEffect(() => { loadProfile() }, [loadProfile])
   useEffect(() => { if (profileLoaded && !loading) setReady(true) }, [profileLoaded, loading])
 
   const onRefresh = useCallback(async () => {
-    await Promise.all([tabsRefresh(), loadProfile()])
-  }, [tabsRefresh, loadProfile])
+    await tabsRefresh()
+  }, [tabsRefresh])
 
   const handleThumbnailPress = useCallback((videoId: string) => {
     const idx = currentVideos.findIndex(v => v.id === videoId)
@@ -220,7 +226,9 @@ export default function UserProfile() {
 
               <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingTop: 8 }}>
                 <View style={{ width: 90, height: 90, borderRadius: 45, justifyContent: 'center', alignItems: 'center' }}>
-                  {profile?.photoURL ? <Image source={{ uri: profile.photoURL }} style={{ width: 84, height: 84, borderRadius: 42 }} /> : <Ionicons name="person" size={40} color="#555" />}
+                  {profile?.photoURL && !imgError ? (
+                    <Image source={{ uri: profile.photoURL }} onError={() => setImgError(true)} style={{ width: 84, height: 84, borderRadius: 42 }} />
+                  ) : <Ionicons name="person" size={40} color="#555" />}
                 </View>
                 <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'center' }}>
                   <TouchableOpacity style={{ alignItems: 'center' }}>

@@ -218,6 +218,30 @@ export const notificationService = {
       })
     },
 
+    newRepost: async (username: string, postId: string) => {
+      return notificationService.scheduleLocal({
+        title: '🔄 Republication',
+        body: `${username} a republié ta vidéo`,
+        data: { type: 'repost', username, postId },
+      })
+    },
+
+    newShare: async (username: string, postId: string) => {
+      return notificationService.scheduleLocal({
+        title: '📤 Vidéo partagée',
+        body: `${username} a partagé ta vidéo`,
+        data: { type: 'share', username, postId },
+      })
+    },
+
+    videoHighlyShared: async (videoTitle: string, postId: string) => {
+      return notificationService.scheduleLocal({
+        title: '🚀 Vidéo très partagée !',
+        body: `Ta vidéo "${videoTitle}" est très partagée sur Mbolo 🚀`,
+        data: { type: 'trending', postId, videoTitle },
+      })
+    },
+
     storyViewed: async (count: number) => {
       return notificationService.scheduleLocal({
         title: '👀 Story vu',

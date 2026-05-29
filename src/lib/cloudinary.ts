@@ -137,3 +137,23 @@ export async function uploadToCloudinary(
 export function getCloudinaryConfig() {
   return { cloudName: CLOUD_NAME, configured: !!CLOUD_NAME }
 }
+
+const CLOUDINARY_BASE = 'res.cloudinary.com'
+
+export function generateThumbnailURL(
+  videoURL: string | null | undefined
+): string | null {
+  if (!videoURL) return null
+  if (videoURL.startsWith('file://')) return null
+  if (!videoURL.includes(CLOUDINARY_BASE)) return null
+  try {
+    return videoURL
+      .replace(
+        '/upload/',
+        '/upload/so_0,f_jpg,w_400,h_711,c_fill/'
+      )
+      .replace(/\.(mp4|mov|webm|avi)(\?.*)?$/, '.jpg')
+  } catch {
+    return null
+  }
+}

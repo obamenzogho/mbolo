@@ -8,7 +8,7 @@ import BottomSheet, {
 import { Ionicons } from '@expo/vector-icons'
 
 interface MboloBottomSheetProps {
-  sheetRef: React.RefObject<BottomSheet>
+  sheetRef: React.RefObject<BottomSheet | null>
   snapPoints?: (string | number)[]
   children?: ReactNode
   title?: string

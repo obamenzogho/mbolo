@@ -8,12 +8,14 @@ import { colors } from '../../src/lib/theme'
 import { router } from 'expo-router'
 import PageWrapper from '../../src/components/PageWrapper'
 import OrbitLoader from '../../src/components/OrbitLoader'
+import { useDataSaver } from '../../src/contexts/DataSaverContext'
 
 export default function Settings() {
   const user = auth.currentUser
   const [notifications, setNotifications] = useState(true)
   const [darkMode, setDarkMode] = useState(true)
   const [privateAccount, setPrivateAccount] = useState(false)
+  const { isEnabled: isDataSaver, toggle: toggleDataSaver } = useDataSaver()
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -83,6 +85,14 @@ export default function Settings() {
           type: 'toggle' as const,
           value: darkMode,
           onToggle: () => setDarkMode(!darkMode),
+        },
+        {
+          icon: 'leaf-outline',
+          label: 'Économie de données',
+          type: 'toggle' as const,
+          value: isDataSaver,
+          onToggle: toggleDataSaver,
+          description: 'Qualité vidéo réduite pour économiser les données',
         },
         {
           icon: 'lock-closed-outline',

@@ -69,6 +69,7 @@ export default function Notifications() {
     follow_request: 'person-add',
     follow_accept: 'checkmark-circle',
     message: 'chatbubble-ellipses',
+    repost: 'repeat',
   }
 
   if (!ready) {

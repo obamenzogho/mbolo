@@ -22,6 +22,8 @@ import * as Location from 'expo-location'
 import * as ImagePicker from 'expo-image-picker'
 
 import { auth, db } from '../../src/lib/firebase'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { useStartupStore } from '../../src/features/startup/store/startupStore'
 import { uploadToCloudinary } from '../../src/lib/cloudinary'
 import FollowButton from '../../src/components/FollowButton'
 import OrbitLoader from '../../src/components/OrbitLoader'
@@ -44,7 +46,7 @@ import HighlightEditSheet from '@/features/highlights/components/HighlightEditSh
 import { useProfileTabs } from '@/hooks/useProfileTabs'
 import { ProfileTabBar } from '@/components/ProfileTabBar'
 import { VideoGrid } from '@/components/VideoGrid'
-import { ProfileVideoViewer } from '@/features/profile/components/ProfileVideoViewer'
+import { ProfileVideoViewer } from '@/features/feed/profile-viewer/ProfileVideoViewer'
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 
@@ -201,7 +203,12 @@ export default function Profile() {
   const handleLogout = () => {
     Alert.alert('Déconnexion', 'Tu veux vraiment te déconnecter ?', [
       { text: 'Annuler', style: 'cancel' },
-      { text: 'Oui', style: 'destructive', onPress: async () => { await signOut(auth); router.replace('/(auth)/login') } },
+      { text: 'Oui', style: 'destructive', onPress: async () => {
+        await signOut(auth)
+        await AsyncStorage.removeItem('@mbolo_session_cache')
+        useStartupStore.getState().setUser(null)
+        router.replace('/(auth)/login')
+      }},
     ])
   }
 
@@ -230,9 +237,9 @@ export default function Profile() {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const animRef = useRef<Animated.CompositeAnimation | null>(null)
 
-  const openFollowList = async (initialType: 'followers' | 'following') => {
+  const openFollowList = async (initialType: 'followers' | 'following' | 'requests') => {
     if (!profile) return
-    const targetPage = initialType === 'followers' ? 0 : 1
+    const targetPage = initialType === 'followers' ? 0 : initialType === 'requests' ? 2 : 1
     setPage(targetPage)
     setScrollOffsetX(targetPage * SCREEN_WIDTH)
     setFollowListLoading(true)
@@ -264,7 +271,7 @@ export default function Profile() {
       setPendingRequestsUsers(pending)
     } catch (e) { captureException(e instanceof Error ? e : new Error(String(e)), { context: 'openFollowList-fetchPending' }) }
     setPendingRequestsLoading(false)
-    setShowRequestsTab(!!(profile?.privateAccount && pending.length > 0))
+    setShowRequestsTab(pending.length > 0)
   }
 
   const closeFollowModal = useCallback(() => setFollowersModal(false), [])
@@ -275,7 +282,7 @@ export default function Profile() {
     }
   }, [followersModal, page])
 
-  const tabConfig: ProfileTab[] = ['grid', 'reels', 'saved', 'liked']
+  const tabConfig: ProfileTab[] = ['grid', 'reels', 'saved', 'liked', 'reposted']
 
   const translateX = useSharedValue(0)
   const swipeOffsetPx = useDerivedValue(() => {
@@ -394,7 +401,14 @@ export default function Profile() {
                       <Text style={{ color: colors.secondary, fontSize: 12 }}>{(profile as any).externalLink}</Text>
                     </TouchableOpacity>
                   ) : null}
-
+                  {profile?.pendingFollowers?.length ? (
+                    <TouchableOpacity onPress={() => openFollowList('requests')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8 }}>
+                      <Ionicons name="person-add-outline" size={14} color={colors.secondary} />
+                      <Text style={{ color: colors.secondary, fontSize: 13, fontWeight: '600' }}>
+                        {profile!.pendingFollowers!.length} demande{profile!.pendingFollowers!.length > 1 ? 's' : ''} en attente
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
                 <View style={{ flexDirection: 'column', gap: 8, justifyContent: 'center', marginLeft: 12 }}>
                   <TouchableOpacity onPress={() => router.push('/(tabs)/edit-profile')} style={{ width: 34, height: 34, borderRadius: 8, backgroundColor: '#222', borderWidth: 1, borderColor: '#444', justifyContent: 'center', alignItems: 'center' }}>

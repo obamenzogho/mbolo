@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { collection, addDoc, doc, increment, updateDoc, serverTimestamp } from 'firebase/firestore'
 import { auth, db } from '../src/lib/firebase'
-import { uploadToCloudinary } from '../src/lib/cloudinary'
+import { uploadToCloudinary, generateThumbnailURL } from '../src/lib/cloudinary'
 import { colors } from '../src/lib/theme'
 import OrbitLoader from '../src/components/OrbitLoader'
 
@@ -75,8 +75,11 @@ export default function PostScreen() {
       }
       await addDoc(collection(db, 'videos'), {
         userId: auth.currentUser.uid,
+        userName: auth.currentUser?.displayName ?? auth.currentUser?.email?.split('@')[0] ?? 'Utilisateur',
+        userPhotoURL: auth.currentUser?.photoURL ?? null,
         videoURL: mediaUrl,
-        coverURL: '',
+        thumbnailURL: generateThumbnailURL(mediaUrl),
+        coverURL: generateThumbnailURL(mediaUrl) ?? '',
         description: description.trim(),
         hashtags: selectedHashtags,
         filter,

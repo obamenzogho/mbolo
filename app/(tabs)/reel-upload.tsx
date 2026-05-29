@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { collection, addDoc, doc, increment, updateDoc, serverTimestamp } from 'firebase/firestore'
 import { auth, db } from '../../src/lib/firebase'
-import { uploadToCloudinary } from '../../src/lib/cloudinary'
+import { uploadToCloudinary, generateThumbnailURL } from '../../src/lib/cloudinary'
 import OrbitLoader from '../../src/components/OrbitLoader'
 import { colors } from '../../src/lib/theme'
 
@@ -76,8 +76,11 @@ export default function ReelUploadScreen() {
 
       await addDoc(collection(db, 'videos'), {
         userId: user.uid,
+        userName: user?.displayName ?? user?.email?.split('@')[0] ?? 'Utilisateur',
+        userPhotoURL: user?.photoURL ?? null,
         videoURL: videoUrl,
-        coverURL: coverUri || '',
+        thumbnailURL: generateThumbnailURL(videoUrl),
+        coverURL: coverUri || generateThumbnailURL(videoUrl) || '',
         description: description.trim(),
         hashtags: [],
         likes: 0,

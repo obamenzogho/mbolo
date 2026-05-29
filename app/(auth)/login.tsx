@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import {
-  View, Text, TextInput, TouchableOpacity, Alert,
+  View, Text, TextInput, TouchableOpacity, Alert, Image,
   KeyboardAvoidingView, Platform, ActivityIndicator,
   Keyboard, ScrollView,
 } from 'react-native'
@@ -9,8 +9,10 @@ import { signInWithEmailAndPassword } from 'firebase/auth'
 import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore'
 import { auth, db } from '../../src/lib/firebase'
 import { colors } from '../../src/lib/theme'
-import { MboloLogo, EyeIcon, EyeOffIcon } from '../../src/components/Icons'
+import { EyeIcon, EyeOffIcon } from '../../src/components/Icons'
 import { router } from 'expo-router'
+import { useStartupStore } from '../../src/features/startup/store/startupStore'
+import type { User } from '../../src/types'
 
 const AUTH_ERRORS: Record<string, string> = {
   'auth/invalid-email': 'Email invalide',
@@ -80,6 +82,13 @@ export default function Login() {
     try {
       const email = await resolveEmail(identifier)
       await signInWithEmailAndPassword(auth, email, password)
+      const uid = auth.currentUser?.uid
+      if (uid) {
+        const userSnap = await getDoc(doc(db, 'users', uid))
+        if (userSnap.exists()) {
+          useStartupStore.getState().setUser({ id: uid, ...userSnap.data() } as User)
+        }
+      }
       router.replace('/(tabs)/feed')
     } catch (error: any) {
       Alert.alert('Erreur', getFirebaseError(error.code))
@@ -106,7 +115,11 @@ export default function Login() {
           >
             {/* Logo */}
             <View style={{ alignItems: 'center', marginBottom: 48 }}>
-              <MboloLogo size={88} />
+              <Image
+                source={require('../../assets/icon.png')}
+                style={{ width: 100, height: 100 }}
+                resizeMode="contain"
+              />
               <Text
                 style={{
                   fontSize: 15, color: colors.textSecondary, marginTop: 20,

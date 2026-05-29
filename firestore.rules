@@ -56,7 +56,7 @@ service cloud.firestore {
       allow create: if request.auth != null;
       allow update: if request.auth != null && (
         request.auth.uid == resource.data.userId ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likedBy', 'comments', 'commentCount', 'saves', 'savedBy', 'shares', 'views'])
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likedBy', 'comments', 'commentCount', 'previewComments', 'saves', 'savedBy', 'shares', 'views', 'reposts', 'repostedBy', 'latestRepostedBy'])
       );
       allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
 
@@ -70,6 +70,7 @@ service cloud.firestore {
           allow read: if request.auth != null;
           allow create: if request.auth != null && request.resource.data.text is string && request.resource.data.text.size() > 0;
           allow update: if request.auth.uid == resource.data.userId || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likedBy', 'dislikes', 'dislikedBy']);
+          allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
         }
       }
     }
@@ -111,11 +112,25 @@ service cloud.firestore {
       allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
 
+    match /reposts/{repostId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow update: if false;
+    }
+
     match /highlights/{highlightId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
       allow update: if request.auth != null && resource.data.userId == request.auth.uid;
       allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    match /shares/{shareId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.senderId == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.senderId == request.auth.uid;
+      allow update: if false;
     }
   }
 }

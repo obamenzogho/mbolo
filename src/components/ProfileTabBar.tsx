@@ -12,6 +12,7 @@ const TAB_ICONS: Record<ProfileTab, keyof typeof Ionicons.glyphMap> = {
   liked: 'heart-outline',
   grid: 'grid-outline',
   reels: 'film-outline',
+  reposted: 'repeat-outline',
 }
 
 interface ProfileTabBarProps {

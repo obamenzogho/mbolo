@@ -10,19 +10,22 @@ console.warn = (...args: any[]) => {
   if (msg.includes('THREE.Clock') || msg.includes('Reading from `value`')) return
   origWarn(...args)
 }
-import { useEffect, useRef, useState } from 'react'
-import { Platform } from 'react-native'
+import { useEffect, useRef } from 'react'
+import { InteractionManager, Platform } from 'react-native'
 import { Stack, useRouter, usePathname } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { onAuthStateChanged } from 'firebase/auth'
 import SafeGestureHandlerRootView from '../src/components/SafeGestureHandlerRootView'
 import * as Notifications from 'expo-notifications'
 import { auth } from '../src/lib/firebase'
-import SplashScreen from '../src/components/SplashScreen'
 import ErrorBoundary from '../src/components/ErrorBoundary'
 import { I18nProvider } from '../src/i18n/index'
+import { DataSaverProvider } from '../src/contexts/DataSaverContext'
+
 import notificationService from '../src/services/notificationService'
 import { usePresence } from '../src/hooks/usePresence'
+import { useStartup } from '../src/features/startup/hooks/useStartup'
+import { useStartupStore } from '../src/features/startup/store/startupStore'
+import StartupScreen from '../src/features/startup/components/StartupScreen'
 
 const handleNotificationNavigation = (router: ReturnType<typeof useRouter>, type: string, data: Record<string, any>) => {
   switch (type) {
@@ -48,35 +51,12 @@ const handleNotificationNavigation = (router: ReturnType<typeof useRouter>, type
   }
 }
 
-export default function RootLayout() {
-  const [authReady, setAuthReady] = useState(false)
-  const [splashDone, setSplashDone] = useState(false)
-  const [user, setUser] = useState<any>(null)
-  const splashPromise = useRef<Promise<void> | null>(null)
+function RootContent() {
   const router = useRouter()
-  const responseListenerRef = useRef<any>(null)
   const pathname = usePathname()
+  const responseListenerRef = useRef<any>(null)
   usePresence()
-
-  useEffect(() => {
-    splashPromise.current = new Promise((resolve) => {
-      setTimeout(resolve, 2000)
-    })
-  }, [])
-
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u: any) => {
-      setUser(u)
-      setSentryUser(u)
-      setAuthReady(true)
-    })
-    return () => unsub()
-  }, [])
-
-  useEffect(() => {
-    if (!authReady) return
-    splashPromise.current?.then(() => setSplashDone(true))
-  }, [authReady])
+  const user = useStartupStore((s) => s.user)
 
   useEffect(() => {
     setSentryRoute(pathname)
@@ -87,7 +67,7 @@ export default function RootLayout() {
 
     notificationService.requestPermissions().then((token) => {
       if (token) {
-        notificationService.saveToken(user.uid, token)
+        notificationService.saveToken(user.id, token)
       }
     }).catch(console.error)
 
@@ -110,41 +90,64 @@ export default function RootLayout() {
         responseListenerRef.current.remove()
       }
     }
-  }, [user, authReady])
+  }, [user, router])
 
-  if (!splashDone) {
-    return <SplashScreen />
-  }
+  useEffect(() => {
+    setSentryUser(user ? { uid: user.id, email: (user as any).email } : null)
+  }, [user])
 
   return (
-    <SafeGestureHandlerRootView style={{ flex: 1 }}>
-      <I18nProvider>
-        <ErrorBoundary>
-          <StatusBar style="light" />
-          <NavigationHistoryProvider>
-            <Stack
-              screenOptions={{ headerShown: false }}
-              screenListeners={{
-                state: (e: any) => {
-                  const state = e.data.state
-                  if (!state) return
-                  const routeName = state.routes[state.index]?.name
-                  const isAuthRoute = routeName === '(auth)' || routeName === '(auth)/login' || routeName === '(auth)/register'
-                  if (!isAuthRoute && !user) {
-                    router.replace('/(auth)/login')
-                  } else if (isAuthRoute && user) {
-                    router.replace('/(tabs)/feed')
-                  }
-                },
-              }}
-            >
-              <Stack.Screen name="(auth)" />
-              <Stack.Screen name="(tabs)" />
-              <Stack.Screen name="post" options={{ headerShown: false, presentation: 'modal' }} />
-            </Stack>
-          </NavigationHistoryProvider>
-        </ErrorBoundary>
-      </I18nProvider>
-    </SafeGestureHandlerRootView>
+    <Stack
+      screenOptions={{ headerShown: false }}
+      screenListeners={{
+        state: (e: any) => {
+          if (useStartupStore.getState().phase !== 'ready') return
+          const state = e.data.state
+          if (!state) return
+          const routeName = state.routes[state.index]?.name
+          const isAuthRoute = routeName === '(auth)' || routeName === '(auth)/login' || routeName === '(auth)/register'
+          const currentUser = useStartupStore.getState().user
+          if (!isAuthRoute && !currentUser) {
+            InteractionManager.runAfterInteractions(() => {
+              router.replace('/(auth)/login')
+            })
+          } else if (isAuthRoute && currentUser) {
+            InteractionManager.runAfterInteractions(() => {
+              router.replace('/(tabs)/feed')
+            })
+          }
+        },
+      }}
+    >
+      <Stack.Screen name="(auth)" />
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="post" options={{ headerShown: false, presentation: 'modal' }} />
+    </Stack>
+  )
+}
+
+export default function RootLayout() {
+  const { logoOpacity, logoScale, feedOpacity, feedScale } = useStartup()
+
+  return (
+    <StartupScreen
+      logoOpacity={logoOpacity}
+      logoScale={logoScale}
+      feedOpacity={feedOpacity}
+      feedScale={feedScale}
+    >
+      <SafeGestureHandlerRootView style={{ flex: 1 }}>
+        <I18nProvider>
+          <DataSaverProvider>
+          <ErrorBoundary>
+            <StatusBar style="light" />
+            <NavigationHistoryProvider>
+              <RootContent />
+            </NavigationHistoryProvider>
+          </ErrorBoundary>
+          </DataSaverProvider>
+        </I18nProvider>
+      </SafeGestureHandlerRootView>
+    </StartupScreen>
   )
 }

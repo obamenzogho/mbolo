@@ -28,25 +28,50 @@ export interface User {
   genre?: 'homme' | 'femme' | 'non-binaire' | 'prefere-ne-pas-dire'
 }
 
-export type ProfileTab = 'grid' | 'reels' | 'saved' | 'liked'
+export type ProfileTab = 'grid' | 'reels' | 'saved' | 'liked' | 'reposted'
+
+export interface Repost {
+  id: string
+  userId: string
+  postId: string
+  createdAt: Date
+}
+
+export interface PreviewComment {
+  id: string
+  text: string
+  authorName: string
+  authorPhoto?: string
+  likes: number
+}
 
 export interface Video {
   id: string
   userId: string
+  userName?: string
+  userPhotoURL?: string
   videoURL: string
+  videoURL_720p?: string
+  videoURL_480p?: string
+  videoURL_360p?: string
   thumbnailURL?: string
   description: string
   hashtags: string[]
   likes: number
   comments: number
   shares: number
+  reposts: number
+  repostedBy?: string[]
+  latestRepostedBy?: { userId: string; userName: string }
   saves: number
   savedBy?: string[]
   soundId?: string
   type?: 'video' | 'reel'
   views?: number
   likedBy?: string[]
+  corrupted?: boolean
   createdAt: Date
+  previewComments?: PreviewComment[]
 }
 
 export interface Comment {
@@ -56,6 +81,22 @@ export interface Comment {
   text: string
   likes: number
   likedBy: string[]
+  createdAt: Date
+}
+
+export interface Reply {
+  id: string
+  userId: string
+  commentId: string
+  text: string
+  likes: number
+  likedBy: string[]
+  replyToUserId?: string
+  replyToUsername?: string
+  userName?: string
+  authorName?: string
+  userPhotoURL?: string
+  authorPhoto?: string
   createdAt: Date
 }
 
@@ -81,7 +122,7 @@ export interface Story {
 export interface Notification {
   id: string
   userId: string
-  type: 'like' | 'comment' | 'follow' | 'follow_request' | 'follow_accept' | 'message'
+  type: 'like' | 'comment' | 'follow' | 'follow_request' | 'follow_accept' | 'message' | 'reply' | 'repost' | 'share'
   fromUserId: string
   videoId?: string
   read: boolean

@@ -6,6 +6,7 @@ import * as ImagePicker from 'expo-image-picker'
 import { collection, addDoc, doc, increment, updateDoc, serverTimestamp } from 'firebase/firestore'
 import { auth, db } from '../../src/lib/firebase'
 import { uploadVideo as uploadToStorage } from '../../src/lib/storage'
+import { generateThumbnailURL } from '../../src/lib/cloudinary'
 import { colors } from '../../src/lib/theme'
 
 export default function Upload() {
@@ -47,7 +48,10 @@ export default function Upload() {
 
       await addDoc(collection(db, 'videos'), {
         userId: auth.currentUser.uid,
+        userName: auth.currentUser?.displayName ?? auth.currentUser?.email?.split('@')[0] ?? 'Utilisateur',
+        userPhotoURL: auth.currentUser?.photoURL ?? null,
         videoURL: result.uri,
+        thumbnailURL: generateThumbnailURL(result.uri),
         description: '',
         hashtags: ['Gabon'],
         likes: 0,

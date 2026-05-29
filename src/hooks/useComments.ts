@@ -26,8 +26,8 @@ export function formatTime(timestamp: any): string {
   return Math.floor(diff / 86400) + ' j'
 }
 
-export function useComments(videoId: string, visible: boolean) {
-  const [comments, setComments] = useState<any[]>([])
+export function useComments(videoId: string, visible: boolean, initialPreviews?: any[]) {
+  const [comments, setComments] = useState<any[]>(initialPreviews ?? [])
   const [commentCount, setCommentCount] = useState(0)
   const [repliesData, setRepliesData] = useState<Record<string, any[]>>({})
   const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({})
@@ -118,6 +118,9 @@ export function useComments(videoId: string, visible: boolean) {
         const videoRef = doc(db, 'videos', videoId)
         const videoSnap = await transaction.get(videoRef)
         if (!videoSnap.exists() || videoSnap.data().commentsEnabled === false) return
+        const currentData = videoSnap.data()
+        const currentPreview = currentData?.previewComments ?? []
+        const displayName = currentUser.displayName || currentUser.email?.split('@')[0] || 'Utilisateur'
         if (replyingTo) {
           const replyRef = doc(collection(db, 'videos', videoId, 'comments', replyingTo.commentId, 'replies'))
           transaction.set(replyRef, {
@@ -148,7 +151,13 @@ export function useComments(videoId: string, visible: boolean) {
             replyCount: 0,
             createdAt: serverTimestamp(),
           })
-          transaction.update(videoRef, { comments: increment(1) })
+          transaction.update(videoRef, {
+            comments: increment(1),
+            previewComments: [
+              { id: commentRef.id, text: trimmed, authorName: displayName, authorPhoto: currentUser.photoURL || null, likes: 0 },
+              ...currentPreview,
+            ].slice(0, 3),
+          })
         }
       })
       if (replyingTo) {

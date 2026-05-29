@@ -18,6 +18,7 @@ export default function TabsLayout() {
         <Tabs.Screen name="feed" />
         <Tabs.Screen name="notifications" />
         <Tabs.Screen name="profile" />
+        <Tabs.Screen name="discover" options={{ href: null }} />
         <Tabs.Screen name="explore" options={{ href: null }} />
         <Tabs.Screen name="upload" options={{ href: null }} />
         <Tabs.Screen name="edit-profile" options={{ href: null }} />

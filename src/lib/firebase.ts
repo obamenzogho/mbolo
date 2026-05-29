@@ -4,6 +4,7 @@ import {
   initializeAuth,
   getAuth,
   browserLocalPersistence,
+  getReactNativePersistence,
   Auth,
 } from 'firebase/auth'
 import { type Firestore } from 'firebase/firestore'
@@ -32,47 +33,13 @@ const firebaseConfig = {
 const apps = getApps()
 const app: FirebaseApp = apps.length > 0 ? getApp() : initializeApp(firebaseConfig)
 
-function getAsyncStoragePersistence(storage: typeof ReactNativeAsyncStorage) {
-  return class AsyncStoragePersistence {
-    static type = 'LOCAL'
-    type = 'LOCAL'
-
-    async _isAvailable() {
-      try {
-        const key = '__mbolo_auth_storage_test__'
-        await storage.setItem(key, '1')
-        await storage.removeItem(key)
-        return true
-      } catch {
-        return false
-      }
-    }
-
-    _set(key: string, value: unknown) {
-      return storage.setItem(key, JSON.stringify(value))
-    }
-
-    async _get(key: string) {
-      const json = await storage.getItem(key)
-      return json ? JSON.parse(json) : null
-    }
-
-    _remove(key: string) {
-      return storage.removeItem(key)
-    }
-
-    _addListener() {}
-    _removeListener() {}
-  }
-}
-
 let auth: Auth
 try {
   if (Platform.OS === 'web') {
     auth = initializeAuth(app, { persistence: browserLocalPersistence })
   } else {
     auth = initializeAuth(app, {
-      persistence: getAsyncStoragePersistence(ReactNativeAsyncStorage) as any,
+      persistence: getReactNativePersistence(ReactNativeAsyncStorage),
     })
   }
 } catch (error: any) {

@@ -10,9 +10,11 @@ import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'
 import { doc, setDoc, getDoc, collection, query, where, getDocs, limit, serverTimestamp } from 'firebase/firestore'
 import { auth, db } from '../../src/lib/firebase'
 import { colors } from '../../src/lib/theme'
-import { MboloLogo, EyeIcon, EyeOffIcon } from '../../src/components/Icons'
+import { EyeIcon, EyeOffIcon } from '../../src/components/Icons'
 import DatePicker from '../../src/components/DatePicker'
 import { router } from 'expo-router'
+import { useStartupStore } from '../../src/features/startup/store/startupStore'
+import type { User } from '../../src/types'
 
 const AUTH_ERRORS: Record<string, string> = {
   'auth/email-already-in-use': 'Cet email est déjà utilisé',
@@ -243,6 +245,11 @@ export default function Register() {
         email: emailTrimmed,
       })
 
+      const userSnap = await getDoc(doc(db, 'users', cred.user.uid))
+      if (userSnap.exists()) {
+        useStartupStore.getState().setUser({ id: cred.user.uid, ...userSnap.data() } as User)
+      }
+
       router.replace('/(tabs)/feed')
     } catch (error: any) {
       Alert.alert('Erreur', getFirebaseError(error.code))
@@ -274,7 +281,6 @@ export default function Register() {
           >
             {/* Entête */}
             <View style={{ alignItems: 'center', marginBottom: 24 }}>
-              <MboloLogo size={60} />
               <Text style={{ fontSize: 14, color: colors.textSecondary, marginTop: 14, textAlign: 'center' }}>
                 Rejoins la communauté{'\n'}et partage ta passion avec le monde
               </Text>

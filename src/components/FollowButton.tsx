@@ -1,5 +1,8 @@
-import { View, TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native'
+import { useRef, useCallback } from 'react'
+import { View, TouchableOpacity, Text, StyleSheet, Animated } from 'react-native'
+import * as Haptics from 'expo-haptics'
 import { useFollow } from '../hooks/useFollow'
+import OrbitLoader from './OrbitLoader'
 import { colors } from '../lib/theme'
 
 interface Props {
@@ -12,11 +15,23 @@ interface Props {
 
 export default function FollowButton({ targetUserId, size = 'md', style, initialFollowing, initialRequested }: Props) {
   const { isFollowing, isRequested, loading, toggleFollow } = useFollow(targetUserId, initialFollowing, initialRequested)
+  const scaleAnim = useRef(new Animated.Value(1)).current
+
+  const handlePress = useCallback(async () => {
+    Animated.sequence([
+      Animated.timing(scaleAnim, { toValue: 0.92, duration: 80, useNativeDriver: true }),
+      Animated.timing(scaleAnim, { toValue: 1, duration: 120, useNativeDriver: true }),
+    ]).start()
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+
+    toggleFollow()
+  }, [toggleFollow, scaleAnim])
 
   if (loading) {
     return (
       <View style={[styles.button, size === 'sm' ? styles.sm : styles.md, style, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="small" color={colors.textSecondary} />
+        <OrbitLoader size={size === 'sm' ? 14 : 18} />
       </View>
     )
   }
@@ -24,19 +39,22 @@ export default function FollowButton({ targetUserId, size = 'md', style, initial
   const isActive = isFollowing || isRequested
 
   return (
-    <TouchableOpacity
-      style={[
-        styles.button,
-        size === 'sm' ? styles.sm : styles.md,
-        style,
-        isFollowing ? styles.following : isRequested ? styles.requested : styles.notFollowing,
-      ]}
-      onPress={toggleFollow}
-    >
-      <Text style={[styles.label, isActive && styles.activeLabel]}>
-        {isFollowing ? 'Abonné' : isRequested ? 'Demande envoyée' : 'Suivre'}
-      </Text>
-    </TouchableOpacity>
+    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+      <TouchableOpacity
+        activeOpacity={0.8}
+        style={[
+          styles.button,
+          size === 'sm' ? styles.sm : styles.md,
+          isFollowing ? styles.following : isRequested ? styles.requested : styles.notFollowing,
+          style,
+        ]}
+        onPress={handlePress}
+      >
+        <Text style={[styles.label, isActive && styles.activeLabel]}>
+          {isFollowing ? 'Abonné' : isRequested ? 'Demande envoyée' : 'Suivre'}
+        </Text>
+      </TouchableOpacity>
+    </Animated.View>
   )
 }
 

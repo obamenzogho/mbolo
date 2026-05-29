@@ -37,6 +37,9 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# Firebase service account
+serviceAccountKey.json
+
 # generated native folders
 /ios
 /android

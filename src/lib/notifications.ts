@@ -2,7 +2,7 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from './firebase'
 import { captureException } from './sentry'
 
-type NotificationType = 'like' | 'comment' | 'follow' | 'follow_request' | 'follow_accept' | 'reply'
+type NotificationType = 'like' | 'comment' | 'follow' | 'follow_request' | 'follow_accept' | 'reply' | 'repost' | 'share'
 
 export async function createNotification({
   userId,

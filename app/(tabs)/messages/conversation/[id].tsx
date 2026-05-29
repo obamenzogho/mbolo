@@ -6,6 +6,7 @@ import { useLocalSearchParams } from 'expo-router'
 import { doc, getDoc } from 'firebase/firestore'
 import * as Clipboard from 'expo-clipboard'
 import { auth, db } from '@/lib/firebase'
+import { captureException } from '@/lib/sentry'
 import { colors } from '@/lib/theme'
 import OrbitLoader from '@/components/OrbitLoader'
 import { Avatar } from '@/components/ui/Avatar'
@@ -255,6 +256,7 @@ export default function ConversationDetail() {
               isMine={msg.senderId === userId}
               createdAt={msg.createdAt}
               read={isRead}
+              onLongPress={() => handleMessageLongPress(msg)}
             />
           )
         }}
@@ -270,6 +272,27 @@ export default function ConversationDetail() {
           }}
           onSend={handleSend}
         />
+      )}
+
+      {contextMessage && (
+        <BottomSheet visible onClose={() => setContextMessage(null)} height="auto" containerStyle={{ paddingBottom: 34 }}>
+          <View style={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 }}>
+            <Text numberOfLines={1} style={{ color: '#888', fontSize: 12 }}>{contextMessage.text}</Text>
+          </View>
+          <View style={{ height: 0.5, backgroundColor: '#333', marginBottom: 4 }} />
+
+          <TouchableOpacity onPress={handleCopyMessage} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 20, gap: 14 }}>
+            <Ionicons name="copy-outline" size={22} color="#fff" />
+            <Text style={{ color: '#fff', fontSize: 16 }}>Copier</Text>
+          </TouchableOpacity>
+
+          {contextMessage.senderId === userId && (
+            <TouchableOpacity onPress={handleDeleteMessage} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 20, gap: 14 }}>
+              <Ionicons name="trash-outline" size={22} color="#ff4444" />
+              <Text style={{ color: '#ff4444', fontSize: 16 }}>Supprimer</Text>
+            </TouchableOpacity>
+          )}
+        </BottomSheet>
       )}
       </KeyboardAvoidingView>
     </SafeAreaView>
