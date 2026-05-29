@@ -48,3 +48,4 @@ serviceAccountKey.json
 screenshots/
 playwright-report/
 test-results/
+.opencode/opencode.json
