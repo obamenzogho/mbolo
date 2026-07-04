@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, ScrollView, Animated } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, Dimensions, ScrollView, Animated } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
 import { VideoView } from 'expo-video'
@@ -14,7 +14,7 @@ import { doc, getDoc } from 'firebase/firestore'
 import { captureException } from '@/lib/sentry'
 import type { FollowSuggestion } from '@/features/suggestions/types'
 
-const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window')
+const { height: MODULE_SCREEN_HEIGHT, width: MODULE_SCREEN_WIDTH } = Dimensions.get('window')
 
 interface SuggestionFeedCardProps {
   suggestions: FollowSuggestion[]
@@ -28,6 +28,7 @@ function SuggestionFeedCardInner({ suggestions, onDismiss, horizontal = false, n
   const [currentPage, setCurrentPage] = useState(0)
   const [followingIds, setFollowingIds] = useState<string[]>([])
   const bounceAnim = useRef(new Animated.Value(0)).current
+  const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = useWindowDimensions()
 
   const player = usePlayerForVideo(instanceId, nextVideoId ?? '')
 
@@ -269,7 +270,7 @@ const styles = StyleSheet.create({
   hTopSection: {
     flex: 0.58,
     backgroundColor: colors.black,
-    paddingTop: SCREEN_HEIGHT * 0.15,
+    paddingTop: MODULE_SCREEN_HEIGHT * 0.15,
     paddingBottom: 8,
   },
   hHeader: {
@@ -289,7 +290,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   hPage: {
-    width: SCREEN_WIDTH,
+    width: MODULE_SCREEN_WIDTH,
     alignItems: 'center',
     paddingHorizontal: 32,
   },

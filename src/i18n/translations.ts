@@ -77,6 +77,11 @@ export const translations = {
       cancel: 'Annuler',
       yes: 'Oui',
     },
+    follow: {
+      follow: 'Suivre',
+      following: 'Abonné',
+      requested: 'Demande envoyée',
+    },
     stories: {
       title: 'Stories',
       empty: 'Aucune story pour le moment',
@@ -196,6 +201,11 @@ export const translations = {
       cancel: 'Nlege',
       yes: 'Ee',
     },
+    follow: {
+      follow: 'Lana',
+      following: 'Na lana',
+      requested: 'Wa ta lana',
+    },
     stories: {
       title: 'Nlan',
       empty: 'Nlan si wé',
@@ -308,6 +318,11 @@ export const translations = {
       cancel: 'Tengula',
       yes: 'Ee',
     },
+    follow: {
+      follow: 'Landa',
+      following: 'Na landa',
+      requested: 'Wana landa',
+    },
     stories: {
       title: 'Nganu',
       empty: 'Kana nganu',
@@ -419,6 +434,11 @@ export const translations = {
       logoutConfirm: 'Wa kumi?',
       cancel: 'Nyenwi',
       yes: 'Ee',
+    },
+    follow: {
+      follow: 'Landa',
+      following: 'Na landa',
+      requested: 'Wana landa',
     },
     stories: {
       title: 'Ngasu',

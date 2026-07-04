@@ -1,7 +1,12 @@
-import { useState, useCallback, useEffect } from 'react'
-import { doc, getDoc, runTransaction, arrayUnion, arrayRemove, serverTimestamp, collection, addDoc, onSnapshot } from 'firebase/firestore'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { doc, getDoc, runTransaction, arrayUnion, arrayRemove, onSnapshot } from 'firebase/firestore'
 import { auth, db } from '../lib/firebase'
 import { captureException } from '../lib/sentry'
+import { createNotification } from '../lib/notifications'
+
+const RATE_LIMIT_MS = 500
+const MAX_FOLLOWING = 10000
+const MAX_FOLLOWERS = 100000
 
 export function useFollow(targetUserId: string, initialFollowing?: boolean, initialRequested?: boolean) {
   const [isFollowing, setIsFollowing] = useState(initialFollowing ?? false)
@@ -10,6 +15,7 @@ export function useFollow(targetUserId: string, initialFollowing?: boolean, init
   const [followerCount, setFollowerCount] = useState(0)
   const [followingCount, setFollowingCount] = useState(0)
   const [loading, setLoading] = useState(initialFollowing === undefined && initialRequested === undefined)
+  const lastActionRef = useRef<number>(0)
 
   useEffect(() => {
     if (!targetUserId) return
@@ -17,9 +23,10 @@ export function useFollow(targetUserId: string, initialFollowing?: boolean, init
       setLoading(false)
       return
     }
+
     const unsub = onSnapshot(
       doc(db, 'users', targetUserId),
-      (snap) => {
+      (snap: any) => {
         if (!snap.exists()) return
         const data = snap.data()
         const currentUid = auth.currentUser?.uid
@@ -31,7 +38,7 @@ export function useFollow(targetUserId: string, initialFollowing?: boolean, init
         setFollowingCount(data.followingCount ?? data.following?.length ?? 0)
         setLoading(false)
       },
-      (error) => {
+      (error: any) => {
         captureException(error, { context: 'useFollow onSnapshot' })
         setLoading(false)
       },
@@ -40,6 +47,10 @@ export function useFollow(targetUserId: string, initialFollowing?: boolean, init
   }, [targetUserId, initialFollowing, initialRequested])
 
   const toggleFollow = useCallback(async () => {
+    const now = Date.now()
+    if (now - lastActionRef.current < RATE_LIMIT_MS) return
+    lastActionRef.current = now
+
     const currentUid = auth.currentUser?.uid
     if (!currentUid || !targetUserId) return
 
@@ -97,6 +108,10 @@ export function useFollow(targetUserId: string, initialFollowing?: boolean, init
       const isPrivate = targetData?.privateAccount === true
       const targetFollowsMe = targetData?.following?.includes(currentUid) ?? false
 
+      const mySnap = await getDoc(userRef)
+      const myFollowingCount = mySnap.data()?.followingCount ?? 0
+      if (myFollowingCount >= MAX_FOLLOWING) return
+
       if (isPrivate) {
         setIsRequested(true)
         try {
@@ -112,12 +127,10 @@ export function useFollow(targetUserId: string, initialFollowing?: boolean, init
               pendingFollowers: arrayUnion(currentUid),
             })
           })
-          await addDoc(collection(db, 'notifications'), {
+          createNotification({
             userId: targetUserId,
             type: 'follow_request',
             fromUserId: currentUid,
-            read: false,
-            createdAt: serverTimestamp(),
           })
         } catch (e) {
           captureException(e instanceof Error ? e : new Error(String(e)), { context: 'followRequest' })
@@ -143,12 +156,10 @@ export function useFollow(targetUserId: string, initialFollowing?: boolean, init
               followerCount: (targetSnap2.data()?.followerCount ?? 0) + 1,
             })
           })
-          await addDoc(collection(db, 'notifications'), {
+          createNotification({
             userId: targetUserId,
             type: 'follow',
             fromUserId: currentUid,
-            read: false,
-            createdAt: serverTimestamp(),
           })
         } catch (e) {
           captureException(e instanceof Error ? e : new Error(String(e)), { context: 'follow' })
@@ -179,12 +190,10 @@ export function useFollow(targetUserId: string, initialFollowing?: boolean, init
           pendingFollowings: arrayRemove(targetUserId),
         })
       })
-      await addDoc(collection(db, 'notifications'), {
+      createNotification({
         userId: fromUserId,
         type: 'follow_accept',
         fromUserId: targetUserId,
-        read: false,
-        createdAt: serverTimestamp(),
       })
       setFollowerCount((p) => p + 1)
     } catch (e) {

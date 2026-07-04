@@ -1,16 +1,17 @@
 import { useState, useRef } from 'react'
 import {
   View, Text, TouchableOpacity, Image, TextInput,
-  ActivityIndicator, Alert, Dimensions, Modal,
+  Alert, Dimensions, Modal,
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
-import { collection, addDoc, doc, increment, updateDoc, serverTimestamp } from 'firebase/firestore'
+import { collection, addDoc, doc, increment, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore'
 import { auth, db } from '../../src/lib/firebase'
 import { uploadToCloudinary, generateThumbnailURL } from '../../src/lib/cloudinary'
 import OrbitLoader from '../../src/components/OrbitLoader'
+import { BackButton } from '../../src/components/ui/BackButton'
 import { colors } from '../../src/lib/theme'
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window')
@@ -67,6 +68,19 @@ export default function ReelUploadScreen() {
     if (!user || !videoUri) return
     setStep('uploading')
     try {
+      // Fetch Firestore profile for correct photoURL/name
+      let firestorePhotoURL = user?.photoURL ?? null
+      let firestoreUserName = user?.displayName ?? user?.email?.split('@')[0] ?? 'Utilisateur'
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid))
+        if (userDoc.exists()) {
+          const data = userDoc.data()
+          if (typeof data.photoURL === 'string' && data.photoURL) firestorePhotoURL = data.photoURL
+          if (typeof data.nom === 'string' && data.nom) firestoreUserName = data.nom
+          else if (typeof data.pseudo === 'string' && data.pseudo) firestoreUserName = data.pseudo
+        }
+      } catch {}
+
       const videoUrl = await uploadToCloudinaryFn(videoUri)
       if (!videoUrl) {
         Alert.alert('Erreur', 'Impossible d\'uploader le vidéo')
@@ -76,8 +90,8 @@ export default function ReelUploadScreen() {
 
       await addDoc(collection(db, 'videos'), {
         userId: user.uid,
-        userName: user?.displayName ?? user?.email?.split('@')[0] ?? 'Utilisateur',
-        userPhotoURL: user?.photoURL ?? null,
+        userName: firestoreUserName,
+        userPhotoURL: firestorePhotoURL,
         videoURL: videoUrl,
         thumbnailURL: generateThumbnailURL(videoUrl),
         coverURL: coverUri || generateThumbnailURL(videoUrl) || '',
@@ -93,7 +107,7 @@ export default function ReelUploadScreen() {
       updateDoc(doc(db, 'users', user.uid), { postsCount: increment(1) }).catch(() => {})
 
       Alert.alert('Succès', 'Reel publié ! 🇬🇦', [
-        { text: 'OK', onPress: () => router.back() },
+        { text: 'OK', onPress: () => router.replace('/(tabs)/feed') },
       ])
     } catch (e) {
       console.error(e)
@@ -106,9 +120,7 @@ export default function ReelUploadScreen() {
   if (step === 'select') {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
-        <TouchableOpacity onPress={() => router.back()} style={{ position: 'absolute', top: 50, left: 20 }}>
-          <Ionicons name="close" size={30} color="#fff" />
-        </TouchableOpacity>
+        <BackButton fallbackRoute="/(tabs)/feed" style={{ position: 'absolute', top: 50, left: 20 }} />
 
         <View style={{ alignItems: 'center', marginBottom: 40 }}>
           <Ionicons name="videocam" size={64} color={colors.primary} />

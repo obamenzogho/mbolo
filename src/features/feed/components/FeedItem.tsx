@@ -1,9 +1,9 @@
 import { memo, useCallback, useRef, useState, useEffect } from 'react'
-import { View, Text, Animated, TouchableOpacity, Dimensions, StyleSheet, Image, Alert } from 'react-native'
-import { GestureDetector, Gesture } from 'react-native-gesture-handler'
+import { View, Text, Animated, TouchableOpacity, Pressable, PanResponder, useWindowDimensions, Dimensions, StyleSheet, Image } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
+import type { EventSubscription } from 'expo-modules-core'
 import { auth } from '../../../lib/firebase'
 import { updateDoc, doc, increment, arrayUnion, arrayRemove } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
@@ -11,15 +11,14 @@ import { createNotification } from '../../../lib/notifications'
 import { captureException } from '../../../lib/sentry'
 
 import { VideoPlayerSlot, usePlayerForVideo } from './VideoPlayerSlot'
-import { useFeedStore, FEED_DEBUG } from '../store/feedStore'
+import { useFeedStore } from '../store/feedStore'
 import { RepostButton } from '@/features/repost/components/RepostButton'
 import { RepostedByBanner } from '@/features/repost/components/RepostedByBanner'
-import { useFollow } from '@/hooks/useFollow'
+import { useFollowFast } from '@/hooks/useFollowFast'
+import { useFollowAction } from '@/hooks/useFollowAction'
 import { ShareButton } from '@/features/share/components/ShareButton'
 import type { Video } from '../../../types'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { runOnJS } from 'react-native-reanimated'
-const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window')
 
 interface FeedItemProps {
   item: Video
@@ -27,6 +26,7 @@ interface FeedItemProps {
   instanceId?: string
   onPressComment?: (videoId: string) => void
   onPressShare?: (videoId: string) => void
+  onPressMore?: (videoId: string) => void
   onLongPress?: () => void
   username?: string
   userPhotoURL?: string
@@ -34,7 +34,7 @@ interface FeedItemProps {
   currentIndex?: number
 }
 
-function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, onPressShare, onLongPress, username, userPhotoURL, isActive: isActiveProp, currentIndex: currentIndexProp }: FeedItemProps) {
+function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, onPressShare, onPressMore, onLongPress, username, userPhotoURL, isActive: isActiveProp, currentIndex: currentIndexProp }: FeedItemProps) {
   const storeCurrentIndex = useFeedStore((s) => s.currentIndex)
   const currentIndex = currentIndexProp ?? storeCurrentIndex
   const isActive = isActiveProp !== undefined ? isActiveProp : (index === currentIndex)
@@ -43,6 +43,10 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
   const avatarURL = item.userPhotoURL || userPhotoURL
   const isOwn = item.userId === currentUserId
   const insets = useSafeAreaInsets()
+  const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = useWindowDimensions()
+  const BOTTOM_ACTIONS = 80
+  const BOTTOM_PROGRESS = BOTTOM_ACTIONS - 15
+  const BOTTOM_PADDING = BOTTOM_ACTIONS + 7
   const player = usePlayerForVideo(instanceId, item.id)
   const [liked, setLiked] = useState(item.likedBy?.includes(currentUserId) ?? false)
   const [saved, setSaved] = useState(item.savedBy?.includes(currentUserId) ?? false)
@@ -51,24 +55,30 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
   const [showFullDesc, setShowFullDesc] = useState(false)
   const [gestureIcon, setGestureIcon] = useState<'play' | 'pause'>('play')
   const [isPlaying, setIsPlaying] = useState(true)
-  const barHeight = useRef(new Animated.Value(1)).current
-  const likeHeartOpacity = useRef(new Animated.Value(0)).current
-  const likeHeartScale = useRef(new Animated.Value(0.5)).current
-  const likeIconScale = useRef(new Animated.Value(1)).current
+  const [likeHeartOpacity] = useState(() => new Animated.Value(0))
+  const [likeHeartScale] = useState(() => new Animated.Value(0.5))
+  const [likeIconScale] = useState(() => new Animated.Value(1))
   const [repostToast, setRepostToast] = useState<string | null>(null)
-  const repostToastTimer = useRef<ReturnType<typeof setTimeout>>()
+  const repostToastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const [followState, setFollowState] = useState<'idle' | 'done' | 'hidden'>('idle')
-  const followTimer = useRef<ReturnType<typeof setTimeout>>()
-  const { isFollowing, toggleFollow } = useFollow(item.userId)
+  const followTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const { isFollowing } = useFollowFast(item.userId)
+  const { toggleFollow: doToggleFollow } = useFollowAction()
   const isDirty = useRef(false)
   const isPausedRef = useRef(false)
-  const gesturePlayOpacity = useRef(new Animated.Value(0)).current
-  const gestureSeekLeftOpacity = useRef(new Animated.Value(0)).current
-  const gestureSeekRightOpacity = useRef(new Animated.Value(0)).current
-  const progressAnim = useRef(new Animated.Value(0)).current
+  const [gesturePlayOpacity] = useState(() => new Animated.Value(0))
+  const [gestureSeekLeftOpacity] = useState(() => new Animated.Value(0))
+  const [gestureSeekRightOpacity] = useState(() => new Animated.Value(0))
+  const [progressAnim] = useState(() => new Animated.Value(0))
+  const progressValueRef = useRef(0)
+  const [barOpacity] = useState(() => new Animated.Value(1))
+  const [isSeeking, setIsSeeking] = useState(false)
   const isSeekingRef = useRef(false)
+  isSeekingRef.current = isSeeking
+  const wasPlayingBeforeSeekRef = useRef(false)
+  const barWidthRef = useRef(SCREEN_WIDTH)
   const [seekInfo, setSeekInfo] = useState<{ label: string; x: number } | null>(null)
-  const discRotation = useRef(new Animated.Value(0)).current
+  const [discRotation] = useState(() => new Animated.Value(0))
 
   useEffect(() => {
     const uid = auth.currentUser?.uid ?? ''
@@ -79,28 +89,67 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
   }, [item.id, item.likes, item.saves, item.likedBy, item.savedBy])
 
   useEffect(() => {
-    if (!isActive || !player) return
-    const interval = setInterval(() => {
+    if (!player || !isActive) {
+      progressValueRef.current = 0
+      isPausedRef.current = true
+      setIsPlaying(false)
+      try { progressAnim.setValue(0) } catch {}
+      return
+    }
+
+    const setProgress = (ratio: number) => {
+      const nextRatio = Math.max(0, Math.min(1, ratio))
+      progressValueRef.current = nextRatio
+      try { progressAnim.setValue(nextRatio) } catch {}
+    }
+
+    const syncProgress = () => {
       if (isSeekingRef.current) return
       const dur = player.duration
       if (dur && dur > 0) {
-        progressAnim.setValue(player.currentTime / dur)
+        setProgress(player.currentTime / dur)
       }
-      setIsPlaying(player.playing ?? true)
-    }, 100)
-    return () => {
-      clearInterval(interval)
-      progressAnim.setValue(0)
     }
-  }, [isActive, player, progressAnim])
+
+    isPausedRef.current = !player.playing
+    setIsPlaying(player.playing)
+    syncProgress()
+    player.timeUpdateEventInterval = 0.1
+
+    const subscriptions: EventSubscription[] = [
+      player.addListener('timeUpdate', ({ currentTime }) => {
+        if (isSeekingRef.current) return
+        const dur = player.duration
+        if (dur && dur > 0) {
+          setProgress(currentTime / dur)
+        }
+      }),
+      player.addListener('playingChange', ({ isPlaying: nextPlaying }) => {
+        isPausedRef.current = !nextPlaying
+        setIsPlaying(nextPlaying)
+      }),
+      player.addListener('sourceChange', () => {
+        setProgress(0)
+      }),
+    ]
+
+    return () => {
+      for (const sub of subscriptions) sub.remove()
+      try { player.timeUpdateEventInterval = 0 } catch {}
+      setProgress(0)
+    }
+  }, [isActive, player, progressAnim, item.id])
 
   useEffect(() => {
-    Animated.spring(barHeight, {
-      toValue: isPlaying ? 1 : 4,
-      useNativeDriver: false,
-      friction: 8,
-    }).start()
-  }, [isPlaying, barHeight])
+    if (isPlaying && !isSeeking) {
+      const timer = setTimeout(() => {
+        Animated.timing(barOpacity, { toValue: 0.3, duration: 500, useNativeDriver: true }).start()
+      }, 1500)
+      return () => clearTimeout(timer)
+    } else {
+      barOpacity.setValue(1)
+    }
+  }, [isPlaying, isSeeking, barOpacity])
 
   useEffect(() => {
     discRotation.setValue(0)
@@ -193,25 +242,16 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
   }, [item.id, onPressShare])
 
   const handleMore = useCallback(() => {
-    const options: { text: string; onPress: () => void; style?: 'cancel' }[] = [
-      { text: 'Ne plus voir ce contenu', onPress: () => {} },
-      { text: 'Signaler', onPress: () => {} },
-    ]
-    if (isOwn) {
-      options.push({ text: 'Supprimer la vidéo', onPress: () => {} })
-      options.push({ text: 'Modifier la description', onPress: () => {} })
-    }
-    options.push({ text: 'Annuler', onPress: () => {}, style: 'cancel' })
-    Alert.alert('Options', undefined, options)
-  }, [isOwn])
+    onPressMore?.(item.id)
+  }, [item.id, onPressMore])
 
   const handleFollow = useCallback(() => {
     if (followState !== 'idle') return
-    toggleFollow()
+    doToggleFollow(item.userId)
     setFollowState('done')
     clearTimeout(followTimer.current)
     followTimer.current = setTimeout(() => setFollowState('hidden'), 2000)
-  }, [followState, toggleFollow])
+  }, [followState, doToggleFollow, item.userId])
 
   const showGestureIcon = useCallback((type: 'play' | 'seekLeft' | 'seekRight') => {
     const opac = type === 'seekLeft' ? gestureSeekLeftOpacity : type === 'seekRight' ? gestureSeekRightOpacity : gesturePlayOpacity
@@ -224,97 +264,166 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
 
   const handleTogglePlay = useCallback(() => {
     if (!player) return
-    if (isPausedRef.current) {
-      player.play()
-      isPausedRef.current = false
-      setGestureIcon('pause')
-    } else {
-      player.pause()
-      isPausedRef.current = true
-      setGestureIcon('play')
-    }
-    showGestureIcon('play')
-    if (FEED_DEBUG) console.log('[FEED_DEBUG] FEEDITEM: tap →', isPausedRef.current ? 'pause' : 'play', item.id)
-  }, [player, showGestureIcon, item.id])
+    try {
+      barOpacity.setValue(1)
+      setIsSeeking(false)
+      if (isPausedRef.current) {
+        player.play()
+        isPausedRef.current = false
+        setIsPlaying(true)
+        setSeekInfo(null)
+        setGestureIcon('pause')
+      } else {
+        player.pause()
+        isPausedRef.current = true
+        setIsPlaying(false)
+        setGestureIcon('play')
+      }
+      showGestureIcon('play')
+    } catch {}
+  }, [player, showGestureIcon, item.id, barOpacity])
 
   const handleLongPressAction = useCallback(() => {
     if (!player) return
-    player.pause()
+    try { player.pause() } catch {}
     isPausedRef.current = true
     onLongPress?.()
-    if (FEED_DEBUG) console.log('[FEED_DEBUG] FEEDITEM: long press → sheet open', item.id)
   }, [player, item.id, onLongPress])
+
+  const seekBeginRef = useRef<() => void>(() => {})
+  const seekUpdateRef = useRef<(ratio: number) => void>(() => {})
+  const seekEndRef = useRef<() => void>(() => {})
 
   const handleSeekBegin = useCallback(() => {
     isSeekingRef.current = true
+    setIsSeeking(true)
+    wasPlayingBeforeSeekRef.current = player?.playing ?? false
+    barOpacity.setValue(1)
     if (!player) return
-    if (player.playing) {
-      player.pause()
-      isPausedRef.current = true
-    }
-  }, [player])
+    try {
+      if (player.playing) {
+        player.pause()
+        isPausedRef.current = true
+      }
+    } catch {}
+  }, [player, barOpacity])
 
   const handleSeekUpdate = useCallback((ratio: number) => {
     if (!player) return
-    const dur = player.duration
-    if (!dur || dur <= 0) return
-    const newTime = ratio * dur
-    player.currentTime = newTime
-    progressAnim.setValue(ratio)
-    const totalSecs = Math.round(newTime)
-    const m = Math.floor(totalSecs / 60)
-    const s = totalSecs % 60
-    setSeekInfo({ label: `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`, x: ratio * SCREEN_WIDTH })
+    try {
+      const dur = player.duration
+      if (!dur || dur <= 0) return
+      const newTime = ratio * dur
+      progressValueRef.current = ratio
+      progressAnim.setValue(ratio)
+      const totalSecs = Math.round(newTime)
+      const m = Math.floor(totalSecs / 60)
+      const s = totalSecs % 60
+      setSeekInfo({ label: `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`, x: ratio * barWidthRef.current })
+    } catch {}
   }, [player, progressAnim])
 
   const handleSeekEnd = useCallback(() => {
     isSeekingRef.current = false
+    setIsSeeking(false)
     setSeekInfo(null)
+    if (player) {
+      try {
+        const dur = player.duration
+        if (dur && dur > 0) {
+          player.currentTime = progressValueRef.current * dur
+        }
+      } catch {}
+    }
+    if (wasPlayingBeforeSeekRef.current && player) {
+      try {
+        player.play()
+        isPausedRef.current = false
+        setIsPlaying(true)
+      } catch {}
+    } else {
+      setIsPlaying(false)
+    }
+  }, [player, progressAnim])
+
+  seekBeginRef.current = handleSeekBegin
+  seekUpdateRef.current = handleSeekUpdate
+  seekEndRef.current = handleSeekEnd
+
+  const seekPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, g) => {
+        if (Math.abs(g.dx) > 5) {
+          seekGestureTakenRef.current = true
+          return true
+        }
+        return false
+      },
+      onPanResponderGrant: (evt) => {
+        seekBeginRef.current()
+        const locX = evt.nativeEvent?.locationX ?? 0
+        const ratio = Math.max(0, Math.min(1, locX / barWidthRef.current))
+        seekUpdateRef.current(ratio)
+      },
+      onPanResponderMove: (_, g) => {
+        const ratio = Math.max(0, Math.min(1, g.moveX / barWidthRef.current))
+        seekUpdateRef.current(ratio)
+      },
+      onPanResponderRelease: () => {
+        seekGestureTakenRef.current = false
+        seekEndRef.current()
+      },
+      onPanResponderTerminate: () => {
+        seekGestureTakenRef.current = false
+        seekEndRef.current()
+      },
+    })
+  ).current
+
+  const lastTapRef = useRef(0)
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const seekGestureTakenRef = useRef(false)
+
+  const handleTouchStart = useCallback(() => {
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTimerRef.current = undefined
+      handleLongPressAction()
+    }, 500)
+  }, [handleLongPressAction])
+
+  const handleTouchEnd = useCallback(() => {
+    if (seekGestureTakenRef.current) {
+      seekGestureTakenRef.current = false
+      return
+    }
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = undefined
+      const now = Date.now()
+      if (now - lastTapRef.current < 300) {
+        const cx = Dimensions.get('window').width / 2
+        handleDoubleTapLike()
+        showLikeHeart()
+        animateLikeIcon()
+        lastTapRef.current = 0
+      } else {
+        lastTapRef.current = now
+        setTimeout(() => {
+          if (lastTapRef.current !== 0 && Date.now() - lastTapRef.current >= 280) {
+            lastTapRef.current = 0
+            handleTogglePlay()
+          }
+        }, 300)
+      }
+    }
+  }, [handleTogglePlay, handleDoubleTapLike, showLikeHeart, animateLikeIcon])
+
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current)
+    }
   }, [])
-
-  const seekPanGesture = Gesture.Pan()
-    .onBegin(() => {
-      runOnJS(handleSeekBegin)()
-    })
-    .onUpdate((e) => {
-      const ratio = Math.max(0, Math.min(1, e.x / SCREEN_WIDTH))
-      runOnJS(handleSeekUpdate)(ratio)
-    })
-    .onEnd(() => {
-      runOnJS(handleSeekEnd)()
-    })
-
-  const tapGesture = Gesture.Tap()
-    .maxDuration(250)
-    .numberOfTaps(1)
-    .onStart((e) => {
-      const isOnRightButtons = e.x > SCREEN_WIDTH - 80
-      const isOnBottomArea = e.y > SCREEN_HEIGHT - 250
-      if (!isOnRightButtons && !isOnBottomArea) {
-        runOnJS(handleTogglePlay)()
-      }
-    })
-
-  const doubleTapGesture = Gesture.Tap()
-    .numberOfTaps(2)
-    .maxDuration(250)
-    .onStart((e) => {
-      const x = e.x
-      if (x >= SCREEN_WIDTH * 0.3 && x <= SCREEN_WIDTH * 0.7) {
-        runOnJS(handleDoubleTapLike)()
-        runOnJS(showLikeHeart)()
-        runOnJS(animateLikeIcon)()
-      }
-    })
-
-  const longPressGesture = Gesture.LongPress()
-    .minDuration(500)
-    .onStart(() => {
-      runOnJS(handleLongPressAction)()
-    })
-
-  const tapGestures = Gesture.Exclusive(doubleTapGesture, tapGesture)
-  const composedGestures = Gesture.Simultaneous(longPressGesture, tapGestures)
 
   const SPEEDS = [
     { label: '0.5×', value: 0.5 },
@@ -328,11 +437,17 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
 
   return (
     <>
-    <GestureDetector gesture={composedGestures}>
     <View style={{ width: SCREEN_WIDTH, height: SCREEN_HEIGHT }}>
       <View style={StyleSheet.absoluteFill}>
         <VideoPlayerSlot videoId={item.id} thumbnailURL={item.thumbnailURL} instanceId={instanceId} />
       </View>
+
+      <Pressable
+        onPressIn={handleTouchStart}
+        onPressOut={handleTouchEnd}
+        style={[StyleSheet.absoluteFill, { right: 80 }]}
+        pointerEvents="auto"
+      />
 
       <Animated.View
         pointerEvents="none"
@@ -383,10 +498,10 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
         pointerEvents="box-none"
         colors={['transparent', 'rgba(0,0,0,0.75)']}
         locations={[0.4, 1]}
-        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 500 }}
+        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: SCREEN_HEIGHT * 0.55 }}
       >
-        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <View style={{ paddingHorizontal: 12, paddingBottom: 87 + insets.bottom, paddingRight: 66 }}>
+        <View style={{ flex: 1, justifyContent: 'flex-end' }} pointerEvents="box-none">
+          <View style={{ paddingHorizontal: 12, paddingBottom: BOTTOM_PADDING + insets.bottom, paddingRight: 66 }}>
             <View style={styles.userRow}>
               <View style={styles.avatarWrapper}>
                 {!isOwn && !isFollowing && followState !== 'hidden' && (
@@ -483,11 +598,11 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
           </View>
         </View>
 
-        <View style={[styles.actionsColumn, { bottom: 80 + insets.bottom }]}>
+      </LinearGradient>
+
+        <View style={[styles.actionsColumn, { bottom: BOTTOM_ACTIONS + insets.bottom }]}>
           <TouchableOpacity style={styles.actionBtn} onPress={() => { handleLike(); animateLikeIcon() }}>
-            <Animated.View style={{ transform: [{ scale: likeIconScale }] }}>
-              <Ionicons name={liked ? 'heart' : 'heart-outline'} size={32} color={liked ? '#FFD700' : '#FFF'} />
-            </Animated.View>
+            <Ionicons name={liked ? 'heart' : 'heart-outline'} size={32} color={liked ? '#FFD700' : '#FFF'} />
             <Text style={styles.actionLabel}>{formatCount(likeCount)}</Text>
           </TouchableOpacity>
 
@@ -519,30 +634,71 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
             <Ionicons name="ellipsis-horizontal" size={24} color="#FFF" />
           </TouchableOpacity>
         </View>
-      </LinearGradient>
     </View>
-    </GestureDetector>
 
     {player && (
-      <GestureDetector gesture={seekPanGesture}>
-        <View style={{ position: 'absolute', bottom: 65 + insets.bottom, left: 0, right: 0, height: 40, justifyContent: 'flex-end' }}>
-          <Animated.View style={{ height: barHeight, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 1.5 }}>
-            <Animated.View style={{ height: '100%', backgroundColor: '#00C853', width: progressAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }} />
-          </Animated.View>
-
-          {!isPlaying && (
-            <Animated.View style={{ position: 'absolute', bottom: -4, left: progressAnim.interpolate({ inputRange: [0, 1], outputRange: [0, SCREEN_WIDTH] }), width: 12, height: 12, borderRadius: 6, backgroundColor: '#00C853', transform: [{ translateX: -6 }] }} />
-          )}
-
-          {seekInfo && (
-            <View style={{ position: 'absolute', bottom: 46, left: seekInfo.x, transform: [{ translateX: -30 }], alignItems: 'center' }}>
-              <View style={{ backgroundColor: 'rgba(0,0,0,0.75)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4 }}>
-                <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '600' }}>{seekInfo.label}</Text>
-              </View>
-            </View>
-          )}
+      <Animated.View
+        {...seekPanResponder.panHandlers}
+        onLayout={(e) => { barWidthRef.current = e.nativeEvent.layout.width }}
+        style={{
+          position: 'absolute',
+          bottom: BOTTOM_PROGRESS + insets.bottom,
+          left: 0,
+          right: 0,
+          height: 60,
+          justifyContent: 'flex-end',
+          opacity: barOpacity,
+        }}
+      >
+        {/* Track background */}
+        <View style={{ height: isPlaying ? 2 : 6, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 3, marginHorizontal: 16 }}>
+          {/* Filled track */}
+          <Animated.View style={{ height: '100%', backgroundColor: '#00C853', borderRadius: 3, width: progressAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }} />
         </View>
-      </GestureDetector>
+
+        {/* Thumb + time label (visible when paused or seeking) */}
+        {(!isPlaying || isSeeking) && (
+          <>
+            {/* Thumb */}
+            <Animated.View
+              style={{
+                position: 'absolute',
+                bottom: 60 / 2 - 8,
+                left: progressAnim.interpolate({ inputRange: [0, 1], outputRange: [16, SCREEN_WIDTH - 16] }),
+                width: 16,
+                height: 16,
+                borderRadius: 8,
+                backgroundColor: '#00C853',
+                borderWidth: 2,
+                borderColor: '#FFF',
+                transform: [{ translateX: -8 }],
+                elevation: 3,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.3,
+                shadowRadius: 2,
+              }}
+            />
+
+            {/* Time label */}
+            {seekInfo && (
+              <View
+                style={{
+                  position: 'absolute',
+                  bottom: 24,
+                  left: seekInfo.x,
+                  transform: [{ translateX: -30 }],
+                  alignItems: 'center',
+                }}
+              >
+                <View style={{ backgroundColor: 'rgba(0,0,0,0.8)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4 }}>
+                  <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{seekInfo.label}</Text>
+                </View>
+              </View>
+            )}
+          </>
+        )}
+      </Animated.View>
     )}
     </>
   )
@@ -560,6 +716,7 @@ export const FeedItem = memo(FeedItemComponent, (prev, next) => {
   if (prev.item.latestRepostedBy?.userId !== next.item.latestRepostedBy?.userId) return false
   if (prev.username !== next.username) return false
   if (prev.isActive !== next.isActive) return false
+  if (prev.currentIndex !== next.currentIndex) return false
   return true
 })
 

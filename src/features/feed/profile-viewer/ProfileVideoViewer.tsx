@@ -5,7 +5,7 @@
    useVisibleIndex réutilisé avec callbacks locaux. */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { View, FlatList, Dimensions, StatusBar, Modal, TouchableOpacity, AppState } from 'react-native'
+import { View, FlatList, useWindowDimensions, Dimensions, StatusBar, Modal, TouchableOpacity, AppState } from 'react-native'
 import Animated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -18,8 +18,6 @@ import { useProfileFeedData } from './useProfileFeedData'
 import CommentSheet from '../components/CommentSheet'
 import ShareModal, { type ShareVideoData } from '../../../components/ShareModal'
 import type { Video } from '../../../types'
-
-const { height: SCREEN_HEIGHT } = Dimensions.get('window')
 
 interface ProfileVideoViewerProps {
   videos: Video[]
@@ -40,6 +38,7 @@ export function ProfileVideoViewer({
   const [pendingActivation, setPendingActivation] = useState(false)
   const flatListRef = useRef<FlatList>(null)
   const isScrollingRef = useRef(false)
+  const { height: SCREEN_HEIGHT } = useWindowDimensions()
 
   const pool = useVideoPlayerPool('profile-viewer', skipToNext)
   const username = profileUser?.nom ?? userId
@@ -83,7 +82,7 @@ export function ProfileVideoViewer({
 
   const sheetHeight = useSharedValue(0)
   const profileVideoAreaStyle = useAnimatedStyle(() => ({
-    height: SCREEN_HEIGHT - sheetHeight.value,
+    height: Dimensions.get('window').height - sheetHeight.value,
     overflow: 'hidden',
   }))
 

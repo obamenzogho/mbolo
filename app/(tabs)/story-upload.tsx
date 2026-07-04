@@ -11,6 +11,7 @@ import * as ImagePicker from 'expo-image-picker'
 import { Video as AVVideo } from 'expo-av'
 import { auth } from '../../src/lib/firebase'
 import OrbitLoader from '../../src/components/OrbitLoader'
+import { BackButton } from '../../src/components/ui/BackButton'
 import { colors } from '../../src/lib/theme'
 import { useStories } from '../../src/hooks/useStories'
 import HighlightPickerModal from '../../src/components/HighlightPickerModal'
@@ -98,9 +99,7 @@ export default function StoryUploadScreen() {
   if (step === 'select') {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
-        <TouchableOpacity onPress={() => router.back()} style={{ position: 'absolute', top: 50, left: 20 }}>
-          <Ionicons name="close" size={30} color="#fff" />
-        </TouchableOpacity>
+        <BackButton style={{ position: 'absolute', top: 50, left: 20 }} />
 
         <Text style={{ color: '#fff', fontSize: 24, fontWeight: '700', marginBottom: 40 }}>
           Nouvelle story
@@ -150,9 +149,7 @@ export default function StoryUploadScreen() {
         {/* TOP BAR */}
         <SafeAreaView style={{ position: 'absolute', top: 0, left: 0, right: 0 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 }}>
-            <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
-              <Ionicons name="close" size={28} color="#fff" />
-            </TouchableOpacity>
+            <BackButton style={{ padding: 8 }} />
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <TouchableOpacity onPress={() => setShowTextEditor(true)} style={{ padding: 8 }}>
                 <Ionicons name="text" size={26} color="#fff" />

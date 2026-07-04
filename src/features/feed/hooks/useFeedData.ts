@@ -19,12 +19,13 @@ import { db } from '../../../lib/firebase'
 import { captureException } from '../../../lib/sentry'
 import { generateThumbnailURL } from '../../../lib/cloudinary'
 import { getSeenVideos } from '../../../lib/feed'
+import { getBlockedUserIds } from '../../../lib/blockService'
 import { FEED_DEBUG } from '../store/feedStore'
 import type { Video } from '../../../types'
 import type { FeedState } from '../store/feedStore'
 
 const PAGE_SIZE = 20
-const TRIGGER_OFFSET = 5
+const TRIGGER_OFFSET = 10
 const MIN_KEEP = 5
 const MAX_EXTRA_FETCHES = 3
 
@@ -58,6 +59,8 @@ export function useFeedData({ store }: { store: StoreApi<FeedState> }) {
         seenLoadedRef.current = true
       }
 
+      const blockedIds = await getBlockedUserIds()
+
       const constraints = [orderBy('createdAt', 'desc'), limit(PAGE_SIZE)]
       if (lastDocRef.current) {
         constraints.push(startAfter(lastDocRef.current))
@@ -78,6 +81,7 @@ export function useFeedData({ store }: { store: StoreApi<FeedState> }) {
         const data = d.data()
         if (data.corrupted) continue
         if (seenVideosRef.current.has(d.id)) continue
+        if (blockedIds.has(data.userId)) continue
         videoList.push({
           id: d.id,
           userId: data.userId,

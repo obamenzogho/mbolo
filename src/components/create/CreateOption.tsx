@@ -1,6 +1,5 @@
-import React, { useCallback, useEffect } from 'react'
+import React, { useCallback } from 'react'
 import { View, Text, Pressable } from 'react-native'
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, withDelay, withSequence } from 'react-native-reanimated'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../lib/theme'
 import { useHaptics } from '../../hooks/useHaptics'
@@ -12,44 +11,21 @@ interface CreateOptionProps {
   onPress: () => void
 }
 
-function CreateOptionComponent({ icon, label, index, onPress }: CreateOptionProps) {
-  const scale = useSharedValue(1)
-  const entryScale = useSharedValue(0.6)
-  const entryOpacity = useSharedValue(0)
+function CreateOptionComponent({ icon, label, onPress }: CreateOptionProps) {
   const { lightImpact } = useHaptics()
-
-  useEffect(() => {
-    entryScale.value = withDelay(
-      index * 60,
-      withSpring(1, { stiffness: 200, damping: 14 }),
-    )
-    entryOpacity.value = withDelay(
-      index * 60,
-      withSpring(1, { stiffness: 200, damping: 14 }),
-    )
-  }, [])
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value * entryScale.value }],
-    opacity: entryOpacity.value,
-  }))
 
   const handlePress = useCallback(() => {
     lightImpact()
-    scale.value = withSequence(
-      withSpring(0.9, { stiffness: 500, damping: 12 }),
-      withSpring(1, { stiffness: 400, damping: 15 }),
-    )
     onPress()
-  }, [onPress, lightImpact, scale])
+  }, [onPress, lightImpact])
 
   return (
     <Pressable onPress={handlePress}>
-      <Animated.View style={[{
+      <View style={{
         width: 80, height: 90,
         alignItems: 'center', justifyContent: 'center',
         gap: 6,
-      }, animatedStyle]}>
+      }}>
         <View style={{
           width: 60, height: 60, borderRadius: 30,
           backgroundColor: 'transparent',
@@ -62,7 +38,7 @@ function CreateOptionComponent({ icon, label, index, onPress }: CreateOptionProp
         <Text style={{ color: colors.white, fontSize: 12, fontWeight: '600', textAlign: 'center' }}>
           {label}
         </Text>
-      </Animated.View>
+      </View>
     </Pressable>
   )
 }

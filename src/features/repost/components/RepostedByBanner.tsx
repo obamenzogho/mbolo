@@ -2,6 +2,7 @@ import { memo } from 'react'
 import { View, Text, TouchableOpacity } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 interface RepostedByBannerProps {
   repostedBy: string[]
@@ -16,6 +17,7 @@ function RepostedByBannerComponent({
   reposterName,
   reposterId,
 }: RepostedByBannerProps) {
+  const insets = useSafeAreaInsets()
   if (!repostedBy?.length || !reposterName || reposterId === currentUserId) return null
 
   return (
@@ -29,7 +31,7 @@ function RepostedByBannerComponent({
       activeOpacity={0.7}
       style={{
         position: 'absolute',
-        top: 60,
+        top: insets.top + 8,
         left: 12,
         flexDirection: 'row',
         alignItems: 'center',

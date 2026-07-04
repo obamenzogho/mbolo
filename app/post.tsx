@@ -11,6 +11,7 @@ import { auth, db } from '../src/lib/firebase'
 import { uploadToCloudinary, generateThumbnailURL } from '../src/lib/cloudinary'
 import { colors } from '../src/lib/theme'
 import OrbitLoader from '../src/components/OrbitLoader'
+import { BackButton } from '../src/components/ui/BackButton'
 
 const SUGGESTED_HASHTAGS = ['#Gabon', '#Mbolo', '#Libreville', '#Afrique', '#241', '#GabonTikTok', '#PourToi', '#Viral']
 
@@ -115,9 +116,7 @@ export default function PostScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         {/* HEADER */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 }}>
-          <TouchableOpacity onPress={() => router.back()} style={{ padding: 4 }}>
-            <Ionicons name="arrow-back" size={26} color="#fff" />
-          </TouchableOpacity>
+          <BackButton icon="arrow-back" />
           <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700' }}>Publier</Text>
           <TouchableOpacity onPress={publish} disabled={uploading} style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 6, backgroundColor: uploading ? '#333' : '#00A86B' }}>
             {uploading ? (

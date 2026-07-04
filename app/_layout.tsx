@@ -1,3 +1,4 @@
+import '../src/lib/crash-debug'
 import '../global.css'
 
 import { NavigationHistoryProvider } from '../src/providers/NavigationHistoryProvider'

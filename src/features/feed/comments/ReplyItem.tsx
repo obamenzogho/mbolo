@@ -3,7 +3,6 @@ import { View, Text, TouchableOpacity, Alert, Image, StyleSheet } from 'react-na
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { captureException } from '../../../lib/sentry'
-import { FEED_DEBUG } from '../store/feedStore'
 
 export interface ReplyData {
   id: string
@@ -40,7 +39,7 @@ function formatTimeAgo(date: unknown): string {
   return `${Math.floor(diff / 86400)}j`
 }
 
-function ReplyItemComponent({ reply, commentId, videoId, currentUserId, onLike, onDelete }: ReplyItemProps) {
+function ReplyItemComponent({ reply, commentId, currentUserId, onLike, onDelete }: ReplyItemProps) {
   const displayName = reply.authorName || reply.userName || 'Utilisateur'
   const photoURL = reply.authorPhoto || reply.userPhotoURL || null
   const isOwn = currentUserId === reply.userId
@@ -66,7 +65,6 @@ function ReplyItemComponent({ reply, commentId, videoId, currentUserId, onLike, 
     } else {
       options.push({ text: 'Signaler', onPress: () => {
         Alert.alert('Signalé', 'Cette réponse a été signalée.')
-        if (FEED_DEBUG) console.log('[FEED_DEBUG] COMMENTS: reportReply', reply.id)
       } })
     }
     options.push({ text: 'Annuler', style: 'cancel', onPress: () => {} })
@@ -96,13 +94,11 @@ function ReplyItemComponent({ reply, commentId, videoId, currentUserId, onLike, 
             ) : null}
             {reply.text}
           </Text>
-          <View style={styles.actions}>
-            <TouchableOpacity onPress={handleLike}>
-              <Ionicons name={liked ? 'heart' : 'heart-outline'} size={12} color={liked ? '#FF2D55' : 'rgba(255,255,255,0.5)'} />
-            </TouchableOpacity>
-            {likeCount > 0 && <Text style={styles.likeCount}>{likeCount}</Text>}
-          </View>
         </View>
+        <TouchableOpacity onPress={handleLike} style={styles.likeSection}>
+          <Ionicons name={liked ? 'heart' : 'heart-outline'} size={12} color={liked ? '#FF2D55' : 'rgba(255,255,255,0.4)'} />
+          {likeCount > 0 && <Text style={styles.likeCount}>{likeCount}</Text>}
+        </TouchableOpacity>
       </View>
     </TouchableOpacity>
   )
@@ -113,15 +109,15 @@ export const ReplyItem = memo(ReplyItemComponent)
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    paddingLeft: 46,
+    paddingLeft: 42,
     paddingRight: 16,
-    paddingVertical: 6,
-    gap: 8,
+    paddingVertical: 5,
+    gap: 7,
   },
   avatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
   },
   avatarPlaceholder: {
     backgroundColor: '#333',
@@ -130,7 +126,7 @@ const styles = StyleSheet.create({
   },
   avatarInitial: {
     color: '#FFF',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
   },
   body: {
@@ -139,7 +135,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
   },
   username: {
     color: '#FFF',
@@ -147,27 +143,27 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   timestamp: {
-    color: 'rgba(255,255,255,0.4)',
+    color: 'rgba(255,255,255,0.35)',
     fontSize: 11,
   },
   text: {
     color: 'rgba(255,255,255,0.9)',
     fontSize: 13,
-    lineHeight: 18,
+    lineHeight: 17,
     marginTop: 1,
   },
   mention: {
     color: '#00C853',
     fontWeight: '600',
   },
-  actions: {
-    flexDirection: 'row',
+  likeSection: {
     alignItems: 'center',
-    gap: 4,
-    marginTop: 4,
+    gap: 2,
+    paddingTop: 2,
+    width: 28,
   },
   likeCount: {
     color: 'rgba(255,255,255,0.4)',
-    fontSize: 11,
+    fontSize: 10,
   },
 })

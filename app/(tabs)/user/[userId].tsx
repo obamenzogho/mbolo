@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { doc, onSnapshot } from 'firebase/firestore'
 import { auth, db } from '../../../src/lib/firebase'
+import { batchFetchUsers } from '../../../src/lib/firestore'
 import { Avatar } from '../../../src/components/ui/Avatar'
 import { colors } from '../../../src/lib/theme'
 import { captureException } from '../../../src/lib/sentry'
@@ -162,14 +163,8 @@ export default function UserProfile() {
       const followerIds = profile.followers || []
       const followingIds = profile.following || []
       const allIds = [...new Set([...followerIds, ...followingIds])].slice(0, 50)
-      const users: any[] = []
-      for (const id of allIds) {
-        const snap = await getDoc(doc(db, 'users', id))
-        if (snap.exists()) {
-          users.push({ id: snap.id, ...snap.data() })
-        }
-      }
-      setFollowListUsers(users)
+      const userMap = await batchFetchUsers(allIds)
+      setFollowListUsers(Array.from(userMap.values()))
     } catch (e) { captureException(e instanceof Error ? e : new Error(String(e)), { context: 'openFollowList-userFetch' }) }
     setFollowListLoading(false)
   }

@@ -1,19 +1,18 @@
 import { memo, useCallback, useRef, useMemo } from 'react'
-import { FlatList, View, Dimensions, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native'
+import { FlatList, View, Text, useWindowDimensions, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native'
 import OrbitLoader from '../../../components/OrbitLoader'
 import { FeedItem } from './FeedItem'
 import { SuggestionFeedCard } from './SuggestionFeedCard'
 import type { Video } from '../../../types'
 import type { FollowSuggestion } from '@/features/suggestions/types'
 
-const ITEM_HEIGHT = Dimensions.get('window').height
 const SUGGESTION_INTERVAL = 6
 const SUGGESTION_STRIDE = SUGGESTION_INTERVAL + 1
 
 type FeedMode = 'forYou' | 'following'
 type FeedListItem = Video | { type: 'suggestion'; key: string }
 
-function isSuggestionItem(item: FeedListItem): boolean {
+function isSuggestionItem(item: FeedListItem): item is { type: 'suggestion'; key: string } {
   return 'type' in item && item.type === 'suggestion'
 }
 
@@ -39,6 +38,7 @@ interface FeedListProps {
   onLongPress?: (videoId: string) => void
   onPressComment?: (videoId: string) => void
   onPressShare?: (videoId: string) => void
+  onPressMore?: (videoId: string) => void
   refreshing?: boolean
   onRefresh?: () => void
   scrollEnabled?: boolean
@@ -61,13 +61,14 @@ function FeedListComponent({
   onLongPress,
   onPressComment,
   onPressShare,
+  onPressMore,
   refreshing = false,
   onRefresh,
   scrollEnabled = true,
 }: FeedListProps) {
   const indexRef = useRef(currentIndex)
   indexRef.current = currentIndex
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const { height: ITEM_HEIGHT } = useWindowDimensions()
 
   const handleScrollBeginDrag = useCallback(() => {
     setIsScrolling(true)
@@ -111,17 +112,15 @@ function FeedListComponent({
       if (top && top.index != null) {
         const videoIdx = flatToVideoIdx(top.index, feedType)
         if (videoIdx !== indexRef.current) {
-          if (debounceRef.current) clearTimeout(debounceRef.current)
-          debounceRef.current = setTimeout(() => {
-            setCurrentIndex(videoIdx)
-          }, 50)
+          setCurrentIndex(videoIdx)
+          setIsScrolling(false)
         }
       }
     },
   ).current
 
   const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 85,
+    itemVisiblePercentThreshold: 80,
   }).current
 
   const handleMomentumEnd = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -157,10 +156,11 @@ function FeedListComponent({
           onLongPress={onLongPress ? () => onLongPress(video.id) : undefined}
           onPressComment={onPressComment ? () => onPressComment(video.id) : undefined}
           onPressShare={onPressShare ? () => onPressShare(video.id) : undefined}
+          onPressMore={onPressMore ? () => onPressMore(video.id) : undefined}
         />
       )
     },
-    [instanceId, currentIndex, userNames, userPhotos, onLongPress, onPressComment, onPressShare, suggestions, onDismissSuggestion, feedType, data],
+    [instanceId, currentIndex, userNames, userPhotos, onLongPress, onPressComment, onPressShare, onPressMore, suggestions, onDismissSuggestion, feedType, data],
   )
 
   const keyExtractor = useCallback((item: FeedListItem) => {
@@ -178,6 +178,21 @@ function FeedListComponent({
     [isLoadingMore],
   )
 
+  const listEmpty = useCallback(
+    () => (
+      <View style={{ flex: 1, height: ITEM_HEIGHT, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
+        <OrbitLoader size={48} />
+        <Text style={{ color: '#888', fontSize: 16, fontWeight: '600', marginTop: 20, textAlign: 'center' }}>
+          Aucune vidéo pour le moment
+        </Text>
+        <Text style={{ color: '#555', fontSize: 13, marginTop: 8, textAlign: 'center', paddingHorizontal: 40 }}>
+          Appuie sur le bouton + pour créer ton premier reel
+        </Text>
+      </View>
+    ),
+    [ITEM_HEIGHT],
+  )
+
   return (
     <FlatList
       data={data}
@@ -192,10 +207,11 @@ function FeedListComponent({
       viewabilityConfig={viewabilityConfig}
       onScrollBeginDrag={() => isActive && handleScrollBeginDrag()}
       onMomentumScrollEnd={handleMomentumEnd}
-      windowSize={3}
-      maxToRenderPerBatch={1}
-      initialNumToRender={1}
-      removeClippedSubviews={false}
+      windowSize={5}
+      maxToRenderPerBatch={3}
+      initialNumToRender={3}
+      removeClippedSubviews={true}
+      ListEmptyComponent={listEmpty}
       ListFooterComponent={listFooter}
       getItemLayout={(_data, index) => ({ length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index })}
       scrollEnabled={scrollEnabled}

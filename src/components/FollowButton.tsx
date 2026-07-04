@@ -4,6 +4,7 @@ import * as Haptics from 'expo-haptics'
 import { useFollow } from '../hooks/useFollow'
 import OrbitLoader from './OrbitLoader'
 import { colors } from '../lib/theme'
+import { useI18n } from '../i18n'
 
 interface Props {
   targetUserId: string
@@ -16,6 +17,7 @@ interface Props {
 export default function FollowButton({ targetUserId, size = 'md', style, initialFollowing, initialRequested }: Props) {
   const { isFollowing, isRequested, loading, toggleFollow } = useFollow(targetUserId, initialFollowing, initialRequested)
   const scaleAnim = useRef(new Animated.Value(1)).current
+  const { t } = useI18n()
 
   const handlePress = useCallback(async () => {
     Animated.sequence([
@@ -51,7 +53,7 @@ export default function FollowButton({ targetUserId, size = 'md', style, initial
         onPress={handlePress}
       >
         <Text style={[styles.label, isActive && styles.activeLabel]}>
-          {isFollowing ? 'Abonné' : isRequested ? 'Demande envoyée' : 'Suivre'}
+          {isFollowing ? t.follow.following : isRequested ? t.follow.requested : t.follow.follow}
         </Text>
       </TouchableOpacity>
     </Animated.View>

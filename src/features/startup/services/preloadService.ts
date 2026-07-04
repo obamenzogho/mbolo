@@ -9,7 +9,6 @@ export async function preloadFeed(): Promise<Video[]> {
     const q = query(
       collection(db, 'videos'),
       where('corrupted', '!=', true),
-      orderBy('corrupted'),
       orderBy('createdAt', 'desc'),
       limit(20),
     )

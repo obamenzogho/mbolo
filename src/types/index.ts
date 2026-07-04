@@ -81,21 +81,27 @@ export interface Comment {
   text: string
   likes: number
   likedBy: string[]
+  dislikes: number
+  dislikedBy: string[]
+  replyCount: number
+  authorName?: string
+  authorPhoto?: string
   createdAt: Date
 }
 
 export interface Reply {
   id: string
   userId: string
-  commentId: string
+  videoId: string
+  commentId?: string
   text: string
   likes: number
   likedBy: string[]
-  replyToUserId?: string
+  dislikes: number
+  dislikedBy: string[]
   replyToUsername?: string
-  userName?: string
+  username?: string
   authorName?: string
-  userPhotoURL?: string
   authorPhoto?: string
   createdAt: Date
 }

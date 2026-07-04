@@ -11,10 +11,8 @@ interface CreateModalProps {
 }
 
 const OPTIONS = [
-  { icon: 'videocam-outline', label: 'Vidéo', route: '/(tabs)/camera' },
-  { icon: 'camera-outline', label: 'Photo', route: '/(tabs)/camera' },
+  { icon: 'camera-outline', label: 'Caméra', route: '/(tabs)/camera' },
   { icon: 'time-outline', label: 'Story', route: '/story-upload' },
-  { icon: 'radio-outline', label: 'Live', route: '/(tabs)/live' },
   { icon: 'document-text-outline', label: 'Brouillons', route: '/(tabs)/drafts' },
 ]
 
@@ -42,8 +40,9 @@ function CreateModalComponent({ onClose }: CreateModalProps) {
   }, [onClose])
 
   const handleOptionPress = useCallback((route: string) => {
-    router.replace(route as any)
-  }, [])
+    onClose()
+    router.push(route as any)
+  }, [onClose])
 
   return (
     <BottomSheet

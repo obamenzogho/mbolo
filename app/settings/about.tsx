@@ -1,16 +1,13 @@
-import { View, Text, TouchableOpacity, ScrollView } from 'react-native'
+import { View, Text, ScrollView } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../src/lib/theme'
-import { router } from 'expo-router'
+import { BackButton } from '../../src/components/ui/BackButton'
 
 export default function About() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: '#222' }}>
-        <TouchableOpacity onPress={() => router.back()} style={{ width: 36, height: 36, justifyContent: 'center' }}>
-          <Ionicons name="chevron-back" size={26} color={colors.white} />
-        </TouchableOpacity>
+        <BackButton icon="chevron-back" style={{ width: 36, height: 36, justifyContent: 'center' }} />
         <View style={{ flex: 1, alignItems: 'center' }}>
           <Text style={{ color: colors.white, fontSize: 17, fontWeight: '700' }}>À propos</Text>
         </View>

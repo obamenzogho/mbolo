@@ -11,7 +11,9 @@ import {
   type LayoutChangeEvent,
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
+import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useCreateModal } from '../../../contexts/CreateModalContext'
 
 const TAB_GAP = 32
 
@@ -22,6 +24,7 @@ interface FeedTabsHeaderProps {
 
 export default function FeedTabsHeader({ scrollPosition, onTabPress }: FeedTabsHeaderProps) {
   const insets = useSafeAreaInsets()
+  const { openCreateModal } = useCreateModal()
 
   const [labelWidths, setLabelWidths] = useState({ forYou: 0, following: 0 })
   const [labelPositions, setLabelPositions] = useState({ forYou: 0, following: 0 })
@@ -75,74 +78,96 @@ export default function FeedTabsHeader({ scrollPosition, onTabPress }: FeedTabsH
   )
 
   return (
-    <LinearGradient
-      colors={['rgba(0,0,0,0.4)', 'transparent']}
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 10,
-        paddingTop: insets.top + 12,
-        paddingBottom: 8,
-      }}
-      pointerEvents="box-none"
-    >
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'center',
-          alignItems: 'center',
-          gap: TAB_GAP,
-        }}
-      >
-        <TouchableOpacity
-          onLayout={handleLayout0}
-          onPress={() => onTabPress(0)}
-          activeOpacity={0.7}
-        >
-          <Animated.Text
-            style={{
-              color: '#fff',
-              fontSize: 15,
-              fontWeight: '700',
-              letterSpacing: 0.3,
-              opacity: forYouOpacity,
-            }}
-          >
-            Pour toi
-          </Animated.Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onLayout={handleLayout1}
-          onPress={() => onTabPress(1)}
-          activeOpacity={0.7}
-        >
-          <Animated.Text
-            style={{
-              color: '#fff',
-              fontSize: 15,
-              fontWeight: '700',
-              letterSpacing: 0.3,
-              opacity: followingOpacity,
-            }}
-          >
-            Suivi
-          </Animated.Text>
-        </TouchableOpacity>
-      </View>
-      <Animated.View
+    <>
+      <LinearGradient
+        colors={['rgba(0,0,0,0.4)', 'transparent']}
         style={{
           position: 'absolute',
+          top: 0,
           left: 0,
-          bottom: 0,
-          height: 2,
-          borderRadius: 2,
-          backgroundColor: '#00C853',
-          width: indicatorWidth,
-          transform: [{ translateX: indicatorX }],
+          right: 0,
+          zIndex: 10,
+          paddingTop: insets.top + 12,
+          paddingBottom: 8,
         }}
-      />
-    </LinearGradient>
+        pointerEvents="box-none"
+      >
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: TAB_GAP,
+          }}
+        >
+          <TouchableOpacity
+            onLayout={handleLayout0}
+            onPress={() => onTabPress(0)}
+            activeOpacity={0.7}
+          >
+            <Animated.Text
+              style={{
+                color: '#fff',
+                fontSize: 15,
+                fontWeight: '700',
+                letterSpacing: 0.3,
+                opacity: forYouOpacity,
+              }}
+            >
+              Pour toi
+            </Animated.Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onLayout={handleLayout1}
+            onPress={() => onTabPress(1)}
+            activeOpacity={0.7}
+          >
+            <Animated.Text
+              style={{
+                color: '#fff',
+                fontSize: 15,
+                fontWeight: '700',
+                letterSpacing: 0.3,
+                opacity: followingOpacity,
+              }}
+            >
+              Suivi
+            </Animated.Text>
+          </TouchableOpacity>
+        </View>
+        <Animated.View
+          style={{
+            position: 'absolute',
+            left: 0,
+            bottom: 0,
+            height: 2,
+            borderRadius: 2,
+            backgroundColor: '#00C853',
+            width: indicatorWidth,
+            transform: [{ translateX: indicatorX }],
+          }}
+        />
+      </LinearGradient>
+
+      <TouchableOpacity
+        onPress={openCreateModal}
+        activeOpacity={0.7}
+        style={{
+          position: 'absolute',
+          right: 16,
+          top: insets.top + 10,
+          width: 32,
+          height: 32,
+          borderRadius: 16,
+          borderWidth: 1.5,
+          borderColor: '#00C853',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 11,
+        }}
+      >
+        <Ionicons name="add" size={22} color="#00C853" />
+      </TouchableOpacity>
+    </>
   )
 }

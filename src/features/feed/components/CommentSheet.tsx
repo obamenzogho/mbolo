@@ -1,25 +1,20 @@
-import { useCallback, useRef, useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, Keyboard, StyleSheet, Dimensions, FlatList, Pressable, Platform } from 'react-native'
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS } from 'react-native-reanimated'
-import type { SharedValue } from 'react-native-reanimated'
-import { GestureDetector, Gesture } from 'react-native-gesture-handler'
+/* CommentSheet — bottom sheet commentaires style Instagram. */
+
+import { useCallback, useRef, useState, useEffect, useMemo } from 'react'
+import { View, Text, TouchableOpacity, Keyboard, Pressable, StyleSheet } from 'react-native'
+import Animated, { useAnimatedKeyboard, useAnimatedStyle } from 'react-native-reanimated'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import BottomSheet, { BottomSheetFlatList, BottomSheetBackdrop } from '@gorhom/bottom-sheet'
 import { Ionicons } from '@expo/vector-icons'
-import * as Haptics from 'expo-haptics'
 import { doc, getDoc } from 'firebase/firestore'
-import { db, auth } from '../../../lib/firebase'
+import { db } from '../../../lib/firebase'
 import { useComments } from '../../../hooks/useComments'
-import { useCommentActions } from '../comments/useCommentActions'
 import { CommentItem, type CommentData } from '../comments/CommentItem'
 import { CommentInput } from '../comments/CommentInput'
 import OrbitLoader from '../../../components/OrbitLoader'
 import type { PreviewComment } from '../../../types'
 
-const SCREEN_HEIGHT = Dimensions.get('window').height
-const SHEET_SNAP_55 = SCREEN_HEIGHT * 0.55
-const SHEET_SNAP_90 = SCREEN_HEIGHT * 0.90
-
-const SPRING_SNAP = { damping: 22, stiffness: 280, mass: 0.6 }
-const SPRING_OPEN = { damping: 20, stiffness: 200, mass: 0.5 }
+type SortMode = 'top' | 'new'
 
 interface CommentSheetProps {
   videoId: string
@@ -27,47 +22,67 @@ interface CommentSheetProps {
   isOwner: boolean
   previewComments?: PreviewComment[]
   onClose: () => void
-  sheetHeight: SharedValue<number>
+  sheetRef: React.RefObject<BottomSheet | null>
 }
 
-export default function CommentSheet({ videoId, videoOwnerId, isOwner, previewComments, onClose, sheetHeight }: CommentSheetProps) {
+function formatCommentCount(n: number): string {
+  if (n >= 1000) return n.toLocaleString('fr-FR')
+  return String(n)
+}
+
+export default function CommentSheet({ videoId, videoOwnerId, isOwner, previewComments, onClose, sheetRef }: CommentSheetProps) {
   const {
     comments, commentCount: liveCommentCount, repliesData, expandedReplies,
+    hasMoreComments, loadingMore, hasMoreReplies, loadingMoreReplies,
     likeComment: hookLikeComment, likeReply: hookLikeReply,
     deleteComment: hookDeleteComment,
-    toggleReplies, loadReplies, currentUser,
-  } = useComments(videoId, true, previewComments)
-
-  const { reportComment, addComment, addReply, deleteReply } = useCommentActions(videoId, videoOwnerId)
+    toggleReplies, currentUser,
+    addComment, addReply, reportComment, deleteReply,
+    loadMoreComments, loadMoreReplies,
+  } = useComments(videoId, true, previewComments, videoOwnerId)
 
   const [localReplyingTo, setLocalReplyingTo] = useState<CommentData | null>(null)
   const [currentUserPhoto, setCurrentUserPhoto] = useState<string | null>(null)
-  const [kbHeight, setKbHeight] = useState(0)
   const [loading, setLoading] = useState(true)
-  const pendingClose = useRef(false)
-  const internalHeight = useSharedValue(0)
-  const baseHeight = useSharedValue(0)
+  const [sortMode, setSortMode] = useState<SortMode>('top')
+
+  const snapPoints = useMemo(() => ['50%', '92%'], [])
+
+  const insets = useSafeAreaInsets()
+  const keyboard = useAnimatedKeyboard()
+  const inputBarStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: -keyboard.height.value }],
+  }))
+
+  const sortedComments = useMemo(() => {
+    const arr = [...(comments as CommentData[])]
+    if (sortMode === 'top') {
+      arr.sort((a, b) => (b.likes ?? 0) - (a.likes ?? 0))
+    } else {
+      arr.sort((a, b) => {
+        const toMs = (v: unknown): number => {
+          if (!v) return 0
+          const d = (v as { toDate?: () => Date }).toDate ? (v as { toDate: () => Date }).toDate() : new Date(v as string | number)
+          return isNaN(d.getTime()) ? 0 : d.getTime()
+        }
+        return toMs(b.createdAt) - toMs(a.createdAt)
+      })
+    }
+    return arr
+  }, [comments, sortMode])
 
   useEffect(() => {
-    pendingClose.current = false
-    const target = SHEET_SNAP_55
-    internalHeight.value = withSpring(target, SPRING_OPEN)
-    sheetHeight.value = withSpring(target, SPRING_OPEN)
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    setLoading(true)
     const timer = setTimeout(() => setLoading(false), 300)
     return () => clearTimeout(timer)
-  }, [])
-
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow'
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide'
-    const show = Keyboard.addListener(showEvent, (e) => setKbHeight(e.endCoordinates.height))
-    const hide = Keyboard.addListener(hideEvent, () => setKbHeight(0))
-    return () => { show.remove(); hide.remove() }
-  }, [])
+  }, [videoId])
 
   useEffect(() => {
     if (!currentUser?.uid) return
+    if (currentUser.photoURL) {
+      setCurrentUserPhoto(currentUser.photoURL)
+      return
+    }
     let cancelled = false
     getDoc(doc(db, 'users', currentUser.uid)).then((snap) => {
       if (cancelled || !snap.exists()) return
@@ -75,81 +90,46 @@ export default function CommentSheet({ videoId, videoOwnerId, isOwner, previewCo
       if (typeof data.photoURL === 'string') setCurrentUserPhoto(data.photoURL)
     })
     return () => { cancelled = true }
-  }, [currentUser?.uid])
+  }, [currentUser?.uid, currentUser?.photoURL])
 
   useEffect(() => {
     setLocalReplyingTo(null)
   }, [videoId])
 
-  const close = useCallback(() => {
-    if (pendingClose.current) return
-    pendingClose.current = true
+  const handleClose = useCallback(() => {
     Keyboard.dismiss()
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-    internalHeight.value = withSpring(0, { damping: 22, stiffness: 280, mass: 0.6 }, (finished) => {
-      if (finished) {
-        pendingClose.current = false
-        runOnJS(onClose)()
-      }
-    })
-    sheetHeight.value = withSpring(0, { damping: 22, stiffness: 280, mass: 0.6 })
+    sheetRef.current?.close()
+  }, [sheetRef])
+
+  const handleSheetChange = useCallback((index: number) => {
+    if (index === -1) onClose()
   }, [onClose])
 
-  const panGesture = Gesture.Pan()
-    .minDistance(10)
-    .onStart(() => {
-      'worklet'
-      baseHeight.value = internalHeight.value
-    })
-    .onUpdate((e) => {
-      'worklet'
-      let newHeight = baseHeight.value - e.translationY
-      if (newHeight > SHEET_SNAP_90) {
-        newHeight = SHEET_SNAP_90 + Math.sqrt(newHeight - SHEET_SNAP_90) * 0.3
-      } else if (newHeight < 0) {
-        newHeight = -Math.sqrt(-newHeight) * 0.5
-      }
-      internalHeight.value = newHeight
-      sheetHeight.value = newHeight
-    })
-    .onEnd((e) => {
-      'worklet'
-      const currentHeight = internalHeight.value
-      const vy = -e.velocityY
+  const renderBackdrop = useCallback(
+    (props: any) => (
+      <BottomSheetBackdrop
+        {...props}
+        disappearsOnIndex={-1}
+        appearsOnIndex={0}
+        opacity={0.5}
+        pressBehavior="none"
+      >
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={() => {
+            if (Keyboard.isVisible()) {
+              Keyboard.dismiss()
+            } else {
+              sheetRef.current?.close()
+            }
+          }}
+        />
+      </BottomSheetBackdrop>
+    ),
+    [sheetRef],
+  )
 
-      let targetHeight: number
-      if (vy > 800) {
-        targetHeight = SHEET_SNAP_90
-      } else if (vy < -800) {
-        targetHeight = 0
-      } else {
-        const mid55_90 = (SHEET_SNAP_55 + SHEET_SNAP_90) / 2
-        const midClose55 = SHEET_SNAP_55 / 2
-        if (currentHeight > mid55_90) {
-          targetHeight = SHEET_SNAP_90
-        } else if (currentHeight > midClose55) {
-          targetHeight = SHEET_SNAP_55
-        } else {
-          targetHeight = 0
-        }
-      }
-
-      if (targetHeight === 0) {
-        runOnJS(close)()
-      } else {
-        internalHeight.value = withSpring(targetHeight, { damping: 22, stiffness: 280, mass: 0.6, velocity: vy })
-        sheetHeight.value = withSpring(targetHeight, { damping: 22, stiffness: 280, mass: 0.6, velocity: vy })
-        if (targetHeight === SHEET_SNAP_90) {
-          runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Light)
-        }
-      }
-    })
-
-  const sheetAnimStyle = useAnimatedStyle(() => ({
-    height: Math.max(0, internalHeight.value),
-  }))
-
-  const handleReply = useCallback((commentId: string, username: string) => {
+  const handleReply = useCallback((commentId: string, _username: string) => {
     const found = comments.find((c: CommentData) => c.id === commentId)
     if (found) setLocalReplyingTo(found)
   }, [comments])
@@ -162,11 +142,8 @@ export default function CommentSheet({ videoId, videoOwnerId, isOwner, previewCo
 
   const handlePostReply = useCallback(async (commentId: string, text: string, replyToUsername: string | null) => {
     const result = await addReply(commentId, text, replyToUsername)
-    if (result) {
-      loadReplies(commentId)
-      setLocalReplyingTo(null)
-    }
-  }, [addReply, loadReplies])
+    if (result) setLocalReplyingTo(null)
+  }, [addReply])
 
   const renderItem = useCallback(({ item }: { item: CommentData }) => (
     <CommentItem
@@ -181,60 +158,118 @@ export default function CommentSheet({ videoId, videoOwnerId, isOwner, previewCo
       onToggleReplies={toggleReplies}
       onReplyLike={(commentId, replyId, liked) => hookLikeReply(commentId, replyId, liked)}
       onReplyDelete={(commentId, replyId) => deleteReply(commentId, replyId)}
+      onLoadMoreReplies={loadMoreReplies}
       repliesExpanded={expandedReplies[item.id] ?? false}
       replies={repliesData[item.id] ?? []}
+      hasMoreReplies={hasMoreReplies[item.id] ?? false}
+      isLoadingMoreReplies={loadingMoreReplies[item.id] ?? false}
     />
-  ), [videoId, isOwner, currentUser, hookLikeComment, hookDeleteComment, reportComment, handleReply, toggleReplies, hookLikeReply, deleteReply, expandedReplies, repliesData])
+  ), [videoId, isOwner, currentUser, hookLikeComment, hookDeleteComment, reportComment, handleReply, toggleReplies, hookLikeReply, deleteReply, loadMoreReplies, expandedReplies, repliesData, hasMoreReplies, loadingMoreReplies])
 
   const keyExtractor = useCallback((item: CommentData) => item.id, [])
+
+  const renderFooter = useCallback(() => (
+    <>
+      {loadingMore && (
+        <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+          <OrbitLoader size={24} />
+        </View>
+      )}
+      {!hasMoreComments && sortedComments.length > 0 && (
+        <View style={{ paddingVertical: 12, alignItems: 'center' }}>
+          <Text style={styles.endOfListText}>— Fin des commentaires —</Text>
+        </View>
+      )}
+    </>
+  ), [loadingMore, hasMoreComments, sortedComments.length])
+
+  const renderInputBar = useCallback(() => (
+    <View style={styles.inputBar}>
+      <CommentInput
+        videoId={videoId}
+        replyingTo={localReplyingTo}
+        currentUserPhotoURL={currentUserPhoto ?? currentUser?.photoURL}
+        currentUserDisplayName={currentUser?.displayName}
+        onCancelReply={handleCancelReply}
+        onPostComment={handlePostComment}
+        onPostReply={handlePostReply}
+      />
+    </View>
+  ), [videoId, localReplyingTo, currentUserPhoto, currentUser, handleCancelReply, handlePostComment, handlePostReply])
 
   const renderEmpty = useCallback(() => (
     loading ? (
       <View style={styles.emptyContainer}>
         <OrbitLoader size={32} />
-        <Text style={styles.emptySubtext}>Chargement des commentaires...</Text>
+        <Text style={styles.emptySubtext}>Chargement...</Text>
       </View>
     ) : (
       <View style={styles.emptyContainer}>
-        <Ionicons name="chatbubble-ellipses-outline" size={48} color="rgba(255,255,255,0.2)" />
-        <Text style={styles.emptyText}>Aucun commentaire pour l'instant</Text>
+        <Ionicons name="chatbubble-ellipses-outline" size={48} color="rgba(255,255,255,0.15)" />
+        <Text style={styles.emptyText}>Aucun commentaire</Text>
         <Text style={styles.emptySubtext}>Soyez le premier à commenter</Text>
       </View>
     )
   ), [loading])
 
   return (
-    <Animated.View style={[styles.sheet, sheetAnimStyle, { paddingBottom: kbHeight }]}>
-      <GestureDetector gesture={panGesture}>
-        <View style={styles.dragArea}>
-          <View style={styles.handleBar} />
-        </View>
-      </GestureDetector>
-      <Pressable onPress={Keyboard.dismiss} style={styles.header}>
+    <>
+    <BottomSheet
+      ref={sheetRef}
+      index={-1}
+      snapPoints={snapPoints}
+      enablePanDownToClose
+      backdropComponent={renderBackdrop}
+      backgroundStyle={styles.background}
+      handleIndicatorStyle={styles.handleIndicator}
+      handleStyle={styles.handleBar}
+      keyboardBehavior="none"
+      keyboardBlurBehavior="restore"
+      onChange={handleSheetChange}
+    >
+      <View style={styles.header}>
         <Text style={styles.headerTitle}>
-          {liveCommentCount} commentaire{liveCommentCount !== 1 ? 's' : ''}
+          {formatCommentCount(liveCommentCount)} commentaire{liveCommentCount !== 1 ? 's' : ''}
         </Text>
-        <TouchableOpacity onPress={close} style={styles.closeBtn}>
-          <Ionicons name="close" size={22} color="#FFF" />
+        <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
+          <Ionicons name="close" size={20} color="#FFF" />
         </TouchableOpacity>
-      </Pressable>
-      <View
-        style={{ flex: 1 }}
-        onStartShouldSetResponderCapture={() => {
-          Keyboard.dismiss()
-          return false
-        }}
-      >
-        <FlatList
-          data={comments as CommentData[]}
-          renderItem={renderItem}
-          keyExtractor={keyExtractor}
-          ListEmptyComponent={renderEmpty}
-          contentContainerStyle={{ flexGrow: 1, paddingBottom: 80 }}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        />
       </View>
+
+      <View style={styles.sortTabs}>
+        <TouchableOpacity
+          style={[styles.sortTab, sortMode === 'top' && styles.sortTabActive]}
+          onPress={() => setSortMode('top')}
+        >
+          <Text style={[styles.sortTabText, sortMode === 'top' && styles.sortTabTextActive]}>Top</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.sortTab, sortMode === 'new' && styles.sortTabActive]}
+          onPress={() => setSortMode('new')}
+        >
+          <Text style={[styles.sortTabText, sortMode === 'new' && styles.sortTabTextActive]}>Nouveau</Text>
+        </TouchableOpacity>
+      </View>
+
+      <BottomSheetFlatList
+        data={sortedComments}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
+        ListEmptyComponent={renderEmpty}
+        ListFooterComponent={renderFooter}
+        contentContainerStyle={{ flexGrow: 1 }}
+        keyboardShouldPersistTaps="never"
+        keyboardDismissMode="on-drag"
+        showsVerticalScrollIndicator={false}
+        onEndReached={loadMoreComments}
+        onEndReachedThreshold={0.5}
+      />
+    </BottomSheet>
+
+    <Animated.View
+      style={[styles.inputBarOverlay, { bottom: insets.bottom }, inputBarStyle]}
+      pointerEvents="box-none"
+    >
       <CommentInput
         videoId={videoId}
         replyingTo={localReplyingTo}
@@ -245,37 +280,29 @@ export default function CommentSheet({ videoId, videoOwnerId, isOwner, previewCo
         onPostReply={handlePostReply}
       />
     </Animated.View>
+    </>
   )
 }
 
 const styles = StyleSheet.create({
-  sheet: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
+  background: {
+    backgroundColor: '#121212',
+  },
+  handleIndicator: {
+    backgroundColor: '#555',
+    width: 36,
+  },
+  handleBar: {
     backgroundColor: '#121212',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    overflow: 'hidden',
-  },
-  dragArea: {
-    paddingTop: 10,
-    paddingBottom: 4,
-    alignItems: 'center',
-  },
-  handleBar: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.25)',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingBottom: 4,
   },
   headerTitle: {
     color: '#FFF',
@@ -285,7 +312,7 @@ const styles = StyleSheet.create({
   closeBtn: {
     position: 'absolute',
     right: 16,
-    bottom: 8,
+    top: 4,
     width: 28,
     height: 28,
     borderRadius: 14,
@@ -293,20 +320,61 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  sortTabs: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 24,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  sortTab: {
+    paddingVertical: 4,
+  },
+  sortTabActive: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#FFF',
+  },
+  sortTabText: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  sortTabTextActive: {
+    color: '#FFF',
+  },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 60,
-    gap: 12,
+    gap: 8,
   },
   emptyText: {
-    color: 'rgba(255,255,255,0.45)',
+    color: 'rgba(255,255,255,0.4)',
     fontSize: 15,
     fontWeight: '600',
   },
   emptySubtext: {
-    color: 'rgba(255,255,255,0.3)',
+    color: 'rgba(255,255,255,0.25)',
     fontSize: 13,
+  },
+  endOfListText: {
+    color: 'rgba(255,255,255,0.2)',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  inputBar: {
+    paddingHorizontal: 8,
+    paddingBottom: 8,
+  },
+  inputBarOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    backgroundColor: '#121212',
+    paddingHorizontal: 8,
+    paddingBottom: 8,
+    zIndex: 10,
   },
 })

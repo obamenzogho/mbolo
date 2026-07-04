@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../lib/theme'
 import { useHaptics } from '../../hooks/useHaptics'
+import { useTabBarVisibility } from '../../contexts/TabBarVisibilityContext'
 import TabItem from './TabItem'
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs'
 
@@ -39,6 +40,7 @@ const BottomTabBar = React.memo(function BottomTabBar({
 }: BottomTabBarProps) {
   const insets = useSafeAreaInsets()
   const { lightImpact } = useHaptics()
+  const { isTabBarHidden } = useTabBarVisibility()
 
   const activeRouteName = state.routes[state.index]?.name
   const isFeed = activeRouteName === 'feed'
@@ -57,6 +59,8 @@ const BottomTabBar = React.memo(function BottomTabBar({
     },
     [navigation, state.routes, lightImpact],
   )
+
+  if (isTabBarHidden) return null
 
   if (!(VISIBLE_TABS as readonly string[]).includes(activeRouteName)) {
     return null

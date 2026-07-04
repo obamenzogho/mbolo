@@ -49,3 +49,4 @@ screenshots/
 playwright-report/
 test-results/
 .opencode/opencode.json
+.aider*

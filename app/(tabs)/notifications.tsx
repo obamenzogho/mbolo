@@ -3,8 +3,9 @@ import { View, Text, FlatList, TouchableOpacity } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import { collection, query, where, orderBy, onSnapshot, doc, getDoc } from 'firebase/firestore'
+import { collection, query, where, orderBy, onSnapshot, limit } from 'firebase/firestore'
 import { auth, db } from '../../src/lib/firebase'
+import { batchFetchUsers } from '../../src/lib/firestore'
 import { colors } from '../../src/lib/theme'
 import QueryErrorMessage, { getIndexErrorMessage } from '../../src/components/ui/QueryErrorMessage'
 import OrbitLoader from '../../src/components/OrbitLoader'
@@ -24,23 +25,29 @@ export default function Notifications() {
     const q = query(
       collection(db, 'notifications'),
       where('userId', '==', userId),
-      orderBy('createdAt', 'desc')
+      orderBy('createdAt', 'desc'),
+      limit(100)
     )
     const unsub = onSnapshot(q,
-      (snap: any) => {
+      async (snap: any) => {
         setErrorMessage(null)
         setReady(true)
         const items = snap.docs.map((d: any) => ({ id: d.id, ...d.data() })) as NotificationType[]
         setNotifications(items)
-        items.forEach((n) => {
-          if (n.fromUserId && !fromUserNames[n.fromUserId]) {
-            getDoc(doc(db, 'users', n.fromUserId)).then((s: any) => {
-              if (s.exists()) {
-                setFromUserNames((prev) => ({ ...prev, [n.fromUserId]: s.data().nom || s.data().pseudo || 'Quelqu\'un' }))
-              }
-            }).catch(() => {})
-          }
-        })
+
+        const fromUserIds = [...new Set(items.map((n) => n.fromUserId).filter(Boolean))]
+        const unknownIds = fromUserIds.filter((id) => !fromUserNames[id])
+
+        if (unknownIds.length > 0) {
+          try {
+            const userMap = await batchFetchUsers(unknownIds)
+            const names: Record<string, string> = {}
+            userMap.forEach((user, id) => {
+              names[id] = user.nom || user.pseudo || 'Quelqu\'un'
+            })
+            setFromUserNames((prev) => ({ ...prev, ...names }))
+          } catch {}
+        }
       },
       (error: any) => {
         const msg = error?.code === 'failed-precondition'
@@ -51,7 +58,7 @@ export default function Notifications() {
       },
     )
     return unsub
-  }, [userId, fromUserNames])
+  }, [userId])
 
   useEffect(() => {
     const unsub = subscribe()

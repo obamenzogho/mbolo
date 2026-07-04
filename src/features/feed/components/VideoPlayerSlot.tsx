@@ -2,16 +2,14 @@
    Rôle : affiche VideoView (via playerRegistry) OU thumbnail/firstFrame en fallback.
    Crossfade animé image → vidéo via Reanimated. Gère le chargement firstFrame depuis le cache. */
 
-import { memo, useRef, useState, useEffect } from 'react'
+import { memo, useRef, useState, useEffect, useCallback } from 'react'
 import { View, Image, StyleSheet } from 'react-native'
 import { VideoView } from 'expo-video'
 import type { VideoPlayer } from 'expo-video'
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated'
+import Animated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { VideoCache } from '../services/VideoCache'
-import { FEED_DEBUG } from '../store/feedStore'
-import { captureException } from '../../../lib/sentry'
 
 type Listener = (key: string) => void
 const playerRegistry = new Map<string, VideoPlayer>()
@@ -64,10 +62,6 @@ function VideoPlayerSlotComponent({ videoId, thumbnailURL, instanceId }: VideoPl
   const player = usePlayerForVideo(instanceId, videoId)
 
   useEffect(() => {
-    if (FEED_DEBUG) console.log('[FEED_DEBUG] SLOT: render state →', videoId, '| player:', player ? 'SET' : 'NULL', '| firstFrame:', firstFrameUri ? 'SET' : 'NULL', '| thumbnail:', thumbnailURL ? 'SET' : 'NULL', '| ready:', ready)
-  })
-
-  useEffect(() => {
     if (prevVideoId.current !== videoId) {
       firstFrameRef.current = false
       setReady(false)
@@ -83,45 +77,18 @@ function VideoPlayerSlotComponent({ videoId, thumbnailURL, instanceId }: VideoPl
       if (cancelled) return
       if (entry?.firstFrame) {
         setFirstFrameUri(entry.firstFrame)
-        if (FEED_DEBUG) console.log('[FEED_DEBUG] SLOT: first frame from cache', videoId)
       }
     })
     return () => { cancelled = true }
   }, [videoId])
 
-  useEffect(() => {
-    if (!player) return
-
-    if (player.status === 'readyToPlay' || player.status === 'error') {
-      firstFrameRef.current = true
-      setReady(true)
-      if (player.status === 'readyToPlay' && FEED_DEBUG) console.log('[FEED_DEBUG] SLOT: crossfade start', videoId)
-      if (player.status === 'error') {
-        if (FEED_DEBUG) console.log('[FEED_DEBUG] SLOT: player error', videoId)
-        captureException(new Error('VideoPlayer error'), { context: 'slot:status', videoId })
-      }
-      thumbOpacity.value = withTiming(0, { duration: 300, easing: Easing.out(Easing.ease) })
-      return
-    }
-
-    const unsub = (player as any).addListener?.('statusChange', (e: any) => {
-      const status = e.status ?? e
-      if (status === 'readyToPlay' || status === 'error') {
-        firstFrameRef.current = true
-        setReady(true)
-        if (status === 'readyToPlay' && FEED_DEBUG) console.log('[FEED_DEBUG] SLOT: crossfade start', videoId)
-        if (status === 'error') {
-          if (FEED_DEBUG) console.log('[FEED_DEBUG] SLOT: player error', videoId)
-          captureException(new Error('VideoPlayer error'), { context: 'slot:statusChange', videoId })
-        }
-        thumbOpacity.value = withTiming(0, { duration: 300, easing: Easing.out(Easing.ease) })
-      }
-    })
-
-    return () => {
-      unsub?.remove()
-    }
-  }, [player])
+  const handleFirstFrameRender = useCallback(() => {
+    if (firstFrameRef.current) return
+    firstFrameRef.current = true
+    // Instantly hide — video is already rendering, no need to fade
+    setReady(true)
+    thumbOpacity.value = 0
+  }, [thumbOpacity])
 
   const thumbAnimatedStyle = useAnimatedStyle(() => ({
     opacity: thumbOpacity.value,
@@ -138,10 +105,11 @@ function VideoPlayerSlotComponent({ videoId, thumbnailURL, instanceId }: VideoPl
           style={StyleSheet.absoluteFill}
           contentFit="cover"
           nativeControls={false}
+          onFirstFrameRender={handleFirstFrameRender}
         />
       ) : null}
 
-      {(!ready || thumbOpacity.value > 0) && (
+      {!ready && (
         <Animated.View style={[StyleSheet.absoluteFill, thumbAnimatedStyle]}>
           {displayUri ? (
             <Image

@@ -1,20 +1,46 @@
-import * as FileSystem from 'expo-file-system/legacy'
 import { IS_DEV_MODE } from '../config/devMode'
 
-const {
-  FFmpegKit,
-  FFprobeKit,
-} = IS_DEV_MODE
-  ? require('../mocks/FFmpegMock')
-  : require('ffmpeg-kit-react-native')
+let _ffmpegKit: any = null
+let _ffprobeKit: any = null
 
-const CACHE_DIR = FileSystem.cacheDirectory || ''
-const TEMP_DIR = `${CACHE_DIR}ffmpeg/`
+function getFFmpegModules() {
+  if (!_ffmpegKit) {
+    if (IS_DEV_MODE) {
+      const mock = require('../mocks/FFmpegMock')
+      _ffmpegKit = mock.FFmpegKit
+      _ffprobeKit = mock.FFprobeKit
+    } else {
+      try {
+        const mod = require('ffmpeg-kit-react-native')
+        _ffmpegKit = mod.FFmpegKit
+        _ffprobeKit = mod.FFprobeKit
+      } catch (e: any) {
+        throw new Error(
+          'ffmpeg-kit-react-native is not installed. This module requires a native build (dev-client / EAS). ' +
+          'If using Expo Go, set IS_DEV_MODE to true in config/devMode.js to use mocks.',
+          { cause: e }
+        )
+      }
+    }
+  }
+  return { FFmpegKit: _ffmpegKit, FFprobeKit: _ffprobeKit }
+}
+
+let _fs: any = null
+function fs() {
+  if (!_fs) {
+    _fs = require('expo-file-system/legacy')
+  }
+  return _fs
+}
+
+const CACHE_DIR = () => fs().cacheDirectory || ''
+const TEMP_DIR = () => `${CACHE_DIR()}ffmpeg/`
 
 async function ensureTempDir(): Promise<void> {
-  const dir = await FileSystem.getInfoAsync(TEMP_DIR)
+  const dir = await fs().getInfoAsync(TEMP_DIR())
   if (!dir.exists) {
-    await FileSystem.makeDirectoryAsync(TEMP_DIR, { intermediates: true })
+    await fs().makeDirectoryAsync(TEMP_DIR(), { intermediates: true })
   }
 }
 
@@ -23,14 +49,14 @@ export async function initFFmpeg(): Promise<void> {
 }
 
 export function getTempPath(filename: string): string {
-  return `${TEMP_DIR}${filename}`
+  return `${TEMP_DIR()}${filename}`
 }
 
 export async function cleanupTemp(): Promise<void> {
   try {
-    const files = await FileSystem.readDirectoryAsync(TEMP_DIR)
+    const files = await fs().readDirectoryAsync(TEMP_DIR())
     for (const file of files) {
-      await FileSystem.deleteAsync(`${TEMP_DIR}${file}`, { idempotent: true })
+      await fs().deleteAsync(`${TEMP_DIR()}${file}`, { idempotent: true })
     }
   } catch {}
 }
@@ -44,6 +70,7 @@ export interface FFmpegResult {
 
 async function runCommand(cmd: string, timeout = 300000): Promise<FFmpegResult> {
   try {
+    const { FFmpegKit } = getFFmpegModules()
     const session = await FFmpegKit.execute(cmd)
     const returnCode = await session.getReturnCode()
     const output = await session.getOutput()
@@ -121,16 +148,16 @@ export async function mergeClips(
   }
 
   await ensureTempDir()
-  const listPath = `${TEMP_DIR}clips.txt`
+  const listPath = `${TEMP_DIR()}clips.txt`
 
   const listContent = clipUris.map(uri => `file '${uri}'`).join('\n')
-  await FileSystem.writeAsStringAsync(listPath, listContent)
+  await fs().writeAsStringAsync(listPath, listContent)
 
   const cmd = `-f concat -safe 0 -i "${listPath}" -c copy "${outputPath}"`
   const result = await runCommand(cmd)
 
   try {
-    await FileSystem.deleteAsync(listPath, { idempotent: true })
+    await fs().deleteAsync(listPath, { idempotent: true })
   } catch {}
 
   return result
@@ -191,6 +218,7 @@ export interface VideoInfo {
 
 export async function getVideoInfo(uri: string): Promise<VideoInfo | null> {
   try {
+    const { FFprobeKit } = getFFmpegModules()
     const cmd = `-v quiet -print_format json -show_streams -show_format "${uri}"`
     const session = await FFprobeKit.execute(cmd)
     const output = await session.getOutput()
@@ -313,9 +341,11 @@ export async function addWaterMark(
 }
 
 export function cancelAllOperations(): void {
+  const { FFmpegKit } = getFFmpegModules()
   FFmpegKit.cancel()
 }
 
 export function cancelOperation(sessionId: string): void {
+  const { FFmpegKit } = getFFmpegModules()
   FFmpegKit.cancel(sessionId)
 }

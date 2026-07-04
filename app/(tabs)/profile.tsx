@@ -22,6 +22,7 @@ import * as Location from 'expo-location'
 import * as ImagePicker from 'expo-image-picker'
 
 import { auth, db } from '../../src/lib/firebase'
+import { batchFetchUsers } from '../../src/lib/firestore'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useStartupStore } from '../../src/features/startup/store/startupStore'
 import { uploadToCloudinary } from '../../src/lib/cloudinary'
@@ -248,30 +249,18 @@ export default function Profile() {
       const followerIds = profile.followers || []
       const followingIds = profile.following || []
       const allIds = [...new Set([...followerIds, ...followingIds])].slice(0, 50)
-      const users: any[] = []
-      for (const id of allIds) {
-        const snap = await getDoc(doc(db, 'users', id))
-        if (snap.exists()) {
-          users.push({ id: snap.id, ...snap.data() })
-        }
-      }
-      setFollowListUsers(users)
+      const userMap = await batchFetchUsers(allIds)
+      setFollowListUsers(Array.from(userMap.values()))
     } catch (e) { captureException(e instanceof Error ? e : new Error(String(e)), { context: 'openFollowList-fetchUsers' }) }
     setFollowListLoading(false)
     setPendingRequestsLoading(true)
-    const pending: any[] = []
     try {
       const pendingIds = profile.pendingFollowers || []
-      for (const id of pendingIds.slice(0, 50)) {
-        const snap = await getDoc(doc(db, 'users', id))
-        if (snap.exists()) {
-          pending.push({ id: snap.id, ...snap.data() })
-        }
-      }
-      setPendingRequestsUsers(pending)
+      const pendingMap = await batchFetchUsers(pendingIds.slice(0, 50))
+      setPendingRequestsUsers(Array.from(pendingMap.values()))
     } catch (e) { captureException(e instanceof Error ? e : new Error(String(e)), { context: 'openFollowList-fetchPending' }) }
     setPendingRequestsLoading(false)
-    setShowRequestsTab(pending.length > 0)
+    setShowRequestsTab((profile.pendingFollowers || []).length > 0)
   }
 
   const closeFollowModal = useCallback(() => setFollowersModal(false), [])

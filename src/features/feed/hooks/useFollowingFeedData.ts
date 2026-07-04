@@ -23,12 +23,13 @@ import { auth, db } from '../../../lib/firebase'
 import { captureException } from '../../../lib/sentry'
 import { generateThumbnailURL } from '../../../lib/cloudinary'
 import { getSeenVideos } from '../../../lib/feed'
+import { getBlockedUserIds } from '../../../lib/blockService'
 import { FEED_DEBUG } from '../store/feedStore'
 import type { Video } from '../../../types'
 import type { FeedState } from '../store/feedStore'
 
 const PAGE_SIZE = 20
-const TRIGGER_OFFSET = 5
+const TRIGGER_OFFSET = 10
 const MIN_KEEP = 5
 const MAX_EXTRA_FETCHES = 3
 
@@ -86,6 +87,8 @@ export function useFollowingFeedData({ store, isActive = true }: { store: StoreA
         seenLoadedRef.current = true
       }
 
+      const blockedIds = await getBlockedUserIds()
+
       if (extraFetchesRef.current >= MAX_EXTRA_FETCHES) {
         loadingRef.current = false
         setLoadingMore(false)
@@ -120,6 +123,7 @@ export function useFollowingFeedData({ store, isActive = true }: { store: StoreA
           const data = d.data()
           if (data.corrupted) continue
           if (seenVideosRef.current.has(d.id)) continue
+          if (blockedIds.has(data.userId)) continue
           allDocs.push({ doc: d, createdAt: data.createdAt?.toDate?.() ?? new Date() })
         }
       }
@@ -201,6 +205,8 @@ export function useFollowingFeedData({ store, isActive = true }: { store: StoreA
         } else {
           fetchVideos()
         }
+      }).catch((e) => {
+        captureException(e instanceof Error ? e : new Error(String(e)), { context: 'useFollowingFeedData:init' })
       })
     }
   }, [fetchVideos, fetchFollowing, setVideos, setHasMore])

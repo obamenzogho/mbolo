@@ -1,9 +1,8 @@
-import { memo, useState, useCallback } from 'react'
+import { memo, useState, useCallback, useRef } from 'react'
 import { View, Text, TouchableOpacity, Alert, Image, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { captureException } from '../../../lib/sentry'
-import { FEED_DEBUG } from '../store/feedStore'
 import { ReplyItem, type ReplyData } from './ReplyItem'
 
 export interface CommentData {
@@ -34,8 +33,11 @@ interface CommentItemProps {
   onToggleReplies: (commentId: string) => void
   onReplyLike: (commentId: string, replyId: string, liked: boolean) => void
   onReplyDelete: (commentId: string, replyId: string) => void
+  onLoadMoreReplies?: (commentId: string) => void
   repliesExpanded: boolean
   replies: ReplyData[]
+  hasMoreReplies?: boolean
+  isLoadingMoreReplies?: boolean
   isLoadingReplies?: boolean
 }
 
@@ -52,14 +54,15 @@ function formatTimeAgo(date: unknown): string {
 
 function CommentItemComponent({
   comment, videoId, isVideoOwner, currentUserId, onLike, onDelete, onReport, onReply,
-  onToggleReplies, onReplyLike, onReplyDelete,
-  repliesExpanded, replies, isLoadingReplies,
+  onToggleReplies, onReplyLike, onReplyDelete, onLoadMoreReplies,
+  repliesExpanded, replies, hasMoreReplies, isLoadingMoreReplies,
 }: CommentItemProps) {
   const displayName = comment.authorName || comment.userName || 'Utilisateur'
   const photoURL = comment.authorPhoto || comment.userPhotoURL || null
   const isOwn = currentUserId === comment.userId
   const [liked, setLiked] = useState(comment.likedBy?.includes(currentUserId ?? '') ?? false)
   const [likeCount, setLikeCount] = useState(comment.likes ?? 0)
+  const lastTapRef = useRef(0)
 
   const handleLike = useCallback(() => {
     const newLiked = !liked
@@ -67,6 +70,14 @@ function CommentItemComponent({
     setLikeCount((p) => Math.max(0, newLiked ? p + 1 : p - 1))
     onLike(comment.id, newLiked)
   }, [liked, comment.id, onLike])
+
+  const handleDoubleTap = useCallback(() => {
+    const now = Date.now()
+    if (now - lastTapRef.current < 300) {
+      if (!liked) handleLike()
+    }
+    lastTapRef.current = now
+  }, [liked, handleLike])
 
   const handleLongPress = useCallback(() => {
     const options: { text: string; onPress: () => void; style?: 'cancel' | 'destructive' }[] = []
@@ -108,7 +119,9 @@ function CommentItemComponent({
             <Text style={styles.username}>{displayName}</Text>
             <Text style={styles.timestamp}>{formatTimeAgo(comment.createdAt)}</Text>
           </View>
-          <Text style={styles.text}>{comment.text}</Text>
+          <TouchableOpacity onPress={handleDoubleTap} activeOpacity={1}>
+            <Text style={styles.text}>{comment.text}</Text>
+          </TouchableOpacity>
           <View style={styles.commentActions}>
             <TouchableOpacity onPress={() => onReply(comment.id, displayName)}>
               <Text style={styles.actionText}>Répondre</Text>
@@ -137,18 +150,20 @@ function CommentItemComponent({
                   onDelete={(cId, rId) => onReplyDelete(cId, rId)}
                 />
               ))}
-              {isLoadingReplies && (
-                <Text style={styles.loadingText}>Chargement…</Text>
+              {hasMoreReplies && onLoadMoreReplies && (
+                <TouchableOpacity onPress={() => onLoadMoreReplies(comment.id)} disabled={isLoadingMoreReplies}>
+                  <Text style={styles.viewMoreReplies}>
+                    {isLoadingMoreReplies ? 'Chargement…' : 'Voir plus de réponses'}
+                  </Text>
+                </TouchableOpacity>
               )}
             </View>
           )}
         </View>
-        <View style={styles.likeSection}>
-          <TouchableOpacity onPress={handleLike}>
-            <Ionicons name={liked ? 'heart' : 'heart-outline'} size={16} color={liked ? '#FF2D55' : '#FFF'} />
-          </TouchableOpacity>
+        <TouchableOpacity onPress={handleLike} style={styles.likeSection}>
+          <Ionicons name={liked ? 'heart' : 'heart-outline'} size={14} color={liked ? '#FF2D55' : 'rgba(255,255,255,0.5)'} />
           {likeCount > 0 && <Text style={styles.likeCount}>{likeCount}</Text>}
-        </View>
+        </TouchableOpacity>
       </View>
     </TouchableOpacity>
   )
@@ -160,13 +175,13 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 10,
+    paddingVertical: 8,
+    gap: 8,
   },
   avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
   },
   avatarPlaceholder: {
     backgroundColor: '#333',
@@ -175,7 +190,7 @@ const styles = StyleSheet.create({
   },
   avatarInitial: {
     color: '#FFF',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   body: {
@@ -192,46 +207,48 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   timestamp: {
-    color: 'rgba(255,255,255,0.4)',
+    color: 'rgba(255,255,255,0.35)',
     fontSize: 12,
   },
   text: {
     color: 'rgba(255,255,255,0.9)',
     fontSize: 14,
-    lineHeight: 20,
+    lineHeight: 19,
     marginTop: 2,
   },
   commentActions: {
     flexDirection: 'row',
     gap: 16,
-    marginTop: 6,
+    marginTop: 5,
   },
   actionText: {
-    color: 'rgba(255,255,255,0.5)',
+    color: 'rgba(255,255,255,0.45)',
     fontSize: 12,
     fontWeight: '600',
   },
   viewReplies: {
-    color: 'rgba(255,255,255,0.5)',
+    color: 'rgba(255,255,255,0.45)',
     fontSize: 12,
     fontWeight: '600',
+  },
+  viewMoreReplies: {
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: 12,
+    fontWeight: '600',
+    paddingLeft: 42,
+    paddingVertical: 4,
   },
   likeSection: {
     alignItems: 'center',
     gap: 2,
     paddingTop: 2,
+    width: 32,
   },
   likeCount: {
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(255,255,255,0.5)',
     fontSize: 11,
   },
   repliesContainer: {
     marginTop: 4,
-  },
-  loadingText: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 12,
-    paddingLeft: 46,
-    paddingVertical: 4,
   },
 })

@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react'
-import { getThumbnailAsync } from 'expo-video-thumbnails'
 import { useFeedStore, FEED_DEBUG } from '../store/feedStore'
 import { PrefetchQueue } from '../services/PrefetchQueue'
 import { VideoCache } from '../services/VideoCache'
@@ -30,6 +29,7 @@ async function timeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 async function extractAndCacheFirstFrame(video: Video) {
   const uri = resolveVideoUrl(video)
   try {
+    const { getThumbnailAsync } = await import('expo-video-thumbnails')
     const result = await timeout(getThumbnailAsync(uri, { time: 0 }), 500)
     await VideoCache.set(video.id, { firstFrame: result.uri }, 0)
     if (FEED_DEBUG) console.log('[FEED_DEBUG] PREFETCH: first frame cached', video.id)

@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, Alert, Image } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
-import { collection, addDoc, doc, increment, updateDoc, serverTimestamp } from 'firebase/firestore'
+import { collection, addDoc, doc, increment, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore'
 import { auth, db } from '../../src/lib/firebase'
 import { uploadVideo as uploadToStorage } from '../../src/lib/storage'
 import { generateThumbnailURL } from '../../src/lib/cloudinary'
@@ -44,12 +44,25 @@ export default function Upload() {
     if (!video || !auth.currentUser) return
     setUploading(true)
     try {
+      // Fetch Firestore profile for correct photoURL/name
+      let firestorePhotoURL = auth.currentUser?.photoURL ?? null
+      let firestoreUserName = auth.currentUser?.displayName ?? auth.currentUser?.email?.split('@')[0] ?? 'Utilisateur'
+      try {
+        const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid))
+        if (userDoc.exists()) {
+          const data = userDoc.data()
+          if (typeof data.photoURL === 'string' && data.photoURL) firestorePhotoURL = data.photoURL
+          if (typeof data.nom === 'string' && data.nom) firestoreUserName = data.nom
+          else if (typeof data.pseudo === 'string' && data.pseudo) firestoreUserName = data.pseudo
+        }
+      } catch {}
+
       const result = await uploadToStorage(video.uri)
 
       await addDoc(collection(db, 'videos'), {
         userId: auth.currentUser.uid,
-        userName: auth.currentUser?.displayName ?? auth.currentUser?.email?.split('@')[0] ?? 'Utilisateur',
-        userPhotoURL: auth.currentUser?.photoURL ?? null,
+        userName: firestoreUserName,
+        userPhotoURL: firestorePhotoURL,
         videoURL: result.uri,
         thumbnailURL: generateThumbnailURL(result.uri),
         description: '',

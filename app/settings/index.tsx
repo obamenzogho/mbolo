@@ -8,6 +8,7 @@ import { colors } from '../../src/lib/theme'
 import { router } from 'expo-router'
 import PageWrapper from '../../src/components/PageWrapper'
 import OrbitLoader from '../../src/components/OrbitLoader'
+import { BackButton } from '../../src/components/ui/BackButton'
 import { useDataSaver } from '../../src/contexts/DataSaverContext'
 
 export default function Settings() {
@@ -167,9 +168,7 @@ export default function Settings() {
     <PageWrapper type="slideRight">
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: '#222' }}>
-        <TouchableOpacity onPress={() => router.back()} style={{ width: 36, height: 36, justifyContent: 'center' }}>
-          <Ionicons name="chevron-back" size={26} color={colors.white} />
-        </TouchableOpacity>
+        <BackButton icon="chevron-back" style={{ width: 36, height: 36, justifyContent: 'center' }} />
         <View style={{ flex: 1, alignItems: 'center' }}>
           <Text style={{ color: colors.white, fontSize: 17, fontWeight: '700' }}>Paramètres</Text>
         </View>
