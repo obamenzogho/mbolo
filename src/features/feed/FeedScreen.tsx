@@ -9,7 +9,6 @@ import { View, AppState } from 'react-native'
 import { useStore } from 'zustand'
 import { useFocusEffect } from '@react-navigation/native'
 import BottomSheet from '@gorhom/bottom-sheet'
-import { doc, getDoc } from 'firebase/firestore'
 import { useTabBarVisibility } from '../../contexts/TabBarVisibilityContext'
 import { useFeedData } from './hooks/useFeedData'
 import { useFollowingFeedData } from './hooks/useFollowingFeedData'
@@ -17,7 +16,7 @@ import { useVideoPlayerPool } from './hooks/useVideoPlayerPool'
 import { usePrefetch } from './hooks/usePrefetch'
 import { FeedList } from './components/FeedList'
 import { forYouFeedStore, followingFeedStore } from './store/feedStore'
-import { auth, db } from '../../lib/firebase'
+import { auth } from '../../lib/firebase'
 import { colors } from '../../lib/theme'
 import { captureException } from '../../lib/sentry'
 import { VideoCache } from './services/VideoCache'
@@ -48,9 +47,6 @@ export default function FeedScreen({ feedType = 'forYou', isActive = true }: Fee
   const commentSheetRef = useRef<BottomSheet>(null)
   const videoOptionsSheetRef = useRef<BottomSheet>(null)
   const prevActiveRef = useRef(isActive)
-  const fetchedUserIds = useRef(new Set<string>())
-  const [userNames, setUserNames] = useState<Record<string, string>>({})
-  const [userPhotos, setUserPhotos] = useState<Record<string, string>>({})
   const isShareModalVisible = useShareStore((s) => s.isModalVisible)
 
   const skipToNext = useStore(store, (s) => s.skipToNext)
@@ -88,9 +84,9 @@ export default function FeedScreen({ feedType = 'forYou', isActive = true }: Fee
       url: video.videoURL_480p || video.videoURL,
       description: video.description,
       thumbnailURL: video.thumbnailURL,
-      userName: userNames[video.userId] || video.userName,
+      userName: video.userName,
     })
-  }, [feedData.videos, userNames])
+  }, [feedData.videos])
 
   const handleLongPress = useCallback((videoId: string) => {
     const video = feedData.videos.find((v) => v.id === videoId)
@@ -189,46 +185,6 @@ export default function FeedScreen({ feedType = 'forYou', isActive = true }: Fee
     }
   }, [isActive, pool, store])
 
-  useEffect(() => {
-    const currentUid = auth.currentUser?.uid
-    const missingIds = new Set<string>()
-    for (const v of feedData.videos) {
-      if ((!v.userName || !v.userPhotoURL) && v.userId && v.userId !== currentUid && !fetchedUserIds.current.has(v.userId)) {
-        missingIds.add(v.userId)
-      }
-    }
-    if (missingIds.size === 0) return
-    for (const id of missingIds) fetchedUserIds.current.add(id)
-    const ids = Array.from(missingIds)
-    let cancelled = false
-    ;(async () => {
-      const nomMap: Record<string, string> = {}
-      const photoMap: Record<string, string> = {}
-      for (let i = 0; i < ids.length; i += 30) {
-        const batch = ids.slice(i, i + 30)
-        const results = await Promise.allSettled(
-          batch.map((id) => getDoc(doc(db, 'users', id)))
-        )
-        for (let j = 0; j < results.length; j++) {
-          const r = results[j]
-          if (r.status === 'fulfilled' && r.value.exists()) {
-            const data = r.value.data()
-            nomMap[batch[j]] = typeof data?.nom === 'string' ? data.nom : batch[j]
-            photoMap[batch[j]] = typeof data?.photoURL === 'string' ? data.photoURL : ''
-          } else {
-            nomMap[batch[j]] = batch[j]
-            photoMap[batch[j]] = ''
-          }
-        }
-      }
-      if (!cancelled) {
-        setUserNames((prev) => ({ ...prev, ...nomMap }))
-        setUserPhotos((prev) => ({ ...prev, ...photoMap }))
-      }
-    })()
-    return () => { cancelled = true }
-  }, [feedData.videos])
-
   return (
     <View style={{ flex: 1, backgroundColor: colors.black }}>
       <FeedList
@@ -243,8 +199,6 @@ export default function FeedScreen({ feedType = 'forYou', isActive = true }: Fee
         setCurrentIndex={setCurrentIndex}
         setIsScrolling={setIsScrolling}
         isActive={isActive}
-        userNames={userNames}
-        userPhotos={userPhotos}
         onLongPress={handleLongPress}
         onPressComment={handlePressComment}
         onPressShare={handlePressShare}

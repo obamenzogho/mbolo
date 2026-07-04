@@ -1,5 +1,6 @@
 import { memo, useCallback, useRef, useMemo } from 'react'
 import { FlatList, View, Text, useWindowDimensions, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import OrbitLoader from '../../../components/OrbitLoader'
 import { FeedItem } from './FeedItem'
 import { SuggestionFeedCard } from './SuggestionFeedCard'
@@ -33,8 +34,6 @@ interface FeedListProps {
   setCurrentIndex: (index: number) => void
   setIsScrolling: (scrolling: boolean) => void
   isActive?: boolean
-  userNames?: Record<string, string>
-  userPhotos?: Record<string, string>
   onLongPress?: (videoId: string) => void
   onPressComment?: (videoId: string) => void
   onPressShare?: (videoId: string) => void
@@ -56,8 +55,6 @@ function FeedListComponent({
   setCurrentIndex,
   setIsScrolling,
   isActive = true,
-  userNames = {},
-  userPhotos = {},
   onLongPress,
   onPressComment,
   onPressShare,
@@ -68,7 +65,9 @@ function FeedListComponent({
 }: FeedListProps) {
   const indexRef = useRef(currentIndex)
   indexRef.current = currentIndex
-  const { height: ITEM_HEIGHT } = useWindowDimensions()
+  const { height: SCREEN_HEIGHT } = useWindowDimensions()
+  const insets = useSafeAreaInsets()
+  const ITEM_HEIGHT = SCREEN_HEIGHT - insets.bottom
 
   const handleScrollBeginDrag = useCallback(() => {
     setIsScrolling(true)
@@ -101,14 +100,9 @@ function FeedListComponent({
 
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: any[] }) => {
-      const videoItems = viewableItems.filter(
-        (v: any) => !(v.item && isSuggestionItem(v.item)),
-      )
+      const videoItems = viewableItems.filter((v) => !(v.item && isSuggestionItem(v.item)))
       if (videoItems.length === 0) return
-      const sorted = [...videoItems].sort(
-        (a, b) => (b.percentInView ?? 0) - (a.percentInView ?? 0),
-      )
-      const top = sorted[0]
+      const top = videoItems[0]
       if (top && top.index != null) {
         const videoIdx = flatToVideoIdx(top.index, feedType)
         if (videoIdx !== indexRef.current) {
@@ -150,9 +144,7 @@ function FeedListComponent({
           item={video}
           index={videoIndex}
           instanceId={instanceId}
-          currentIndex={currentIndex}
-          username={userNames[video.userId]}
-          userPhotoURL={userPhotos[video.userId]}
+          isActive={videoIndex === currentIndex}
           onLongPress={onLongPress ? () => onLongPress(video.id) : undefined}
           onPressComment={onPressComment ? () => onPressComment(video.id) : undefined}
           onPressShare={onPressShare ? () => onPressShare(video.id) : undefined}
@@ -160,7 +152,7 @@ function FeedListComponent({
         />
       )
     },
-    [instanceId, currentIndex, userNames, userPhotos, onLongPress, onPressComment, onPressShare, onPressMore, suggestions, onDismissSuggestion, feedType, data],
+    [instanceId, onLongPress, onPressComment, onPressShare, onPressMore, suggestions, onDismissSuggestion, feedType, data, currentIndex],
   )
 
   const keyExtractor = useCallback((item: FeedListItem) => {

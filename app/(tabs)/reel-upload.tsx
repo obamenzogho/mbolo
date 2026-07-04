@@ -101,7 +101,6 @@ export default function ReelUploadScreen() {
         comments: 0,
         shares: 0,
         saves: 0,
-        savedBy: [],
         createdAt: serverTimestamp(),
       })
       updateDoc(doc(db, 'users', user.uid), { postsCount: increment(1) }).catch(() => {})

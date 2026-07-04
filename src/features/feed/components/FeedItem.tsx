@@ -1,17 +1,16 @@
 import { memo, useCallback, useRef, useState, useEffect } from 'react'
-import { View, Text, Animated, TouchableOpacity, Pressable, PanResponder, useWindowDimensions, Dimensions, StyleSheet, Image } from 'react-native'
+import { View, Text, Animated, TouchableOpacity, Pressable, PanResponder, useWindowDimensions, StyleSheet, Image } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import type { EventSubscription } from 'expo-modules-core'
 import { auth } from '../../../lib/firebase'
-import { updateDoc, doc, increment, arrayUnion, arrayRemove } from 'firebase/firestore'
+import { updateDoc, doc, increment, setDoc, deleteDoc, getDoc } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
 import { createNotification } from '../../../lib/notifications'
 import { captureException } from '../../../lib/sentry'
 
 import { VideoPlayerSlot, usePlayerForVideo } from './VideoPlayerSlot'
-import { useFeedStore } from '../store/feedStore'
 import { RepostButton } from '@/features/repost/components/RepostButton'
 import { RepostedByBanner } from '@/features/repost/components/RepostedByBanner'
 import { useFollowFast } from '@/hooks/useFollowFast'
@@ -31,13 +30,10 @@ interface FeedItemProps {
   username?: string
   userPhotoURL?: string
   isActive?: boolean
-  currentIndex?: number
 }
 
-function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, onPressShare, onPressMore, onLongPress, username, userPhotoURL, isActive: isActiveProp, currentIndex: currentIndexProp }: FeedItemProps) {
-  const storeCurrentIndex = useFeedStore((s) => s.currentIndex)
-  const currentIndex = currentIndexProp ?? storeCurrentIndex
-  const isActive = isActiveProp !== undefined ? isActiveProp : (index === currentIndex)
+function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, onPressShare, onPressMore, onLongPress, username, userPhotoURL, isActive: isActiveProp }: FeedItemProps) {
+  const isActive = isActiveProp ?? false
   const currentUserId = auth.currentUser?.uid ?? ''
   const displayName = item.userName ?? username ?? 'Utilisateur'
   const avatarURL = item.userPhotoURL || userPhotoURL
@@ -48,8 +44,8 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
   const BOTTOM_PROGRESS = BOTTOM_ACTIONS - 15
   const BOTTOM_PADDING = BOTTOM_ACTIONS + 7
   const player = usePlayerForVideo(instanceId, item.id)
-  const [liked, setLiked] = useState(item.likedBy?.includes(currentUserId) ?? false)
-  const [saved, setSaved] = useState(item.savedBy?.includes(currentUserId) ?? false)
+  const [liked, setLiked] = useState(false)
+  const [saved, setSaved] = useState(false)
   const [likeCount, setLikeCount] = useState(item.likes)
   const [saveCount, setSaveCount] = useState(item.saves)
   const [showFullDesc, setShowFullDesc] = useState(false)
@@ -81,12 +77,13 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
   const [discRotation] = useState(() => new Animated.Value(0))
 
   useEffect(() => {
-    const uid = auth.currentUser?.uid ?? ''
-    setLiked(item.likedBy?.includes(uid) ?? false)
-    setSaved(item.savedBy?.includes(uid) ?? false)
-    setLikeCount(item.likes)
-    setSaveCount(item.saves)
-  }, [item.id, item.likes, item.saves, item.likedBy, item.savedBy])
+    const uid = auth.currentUser?.uid
+    if (!uid) return
+    let cancelled = false
+    getDoc(doc(db, 'videos', item.id, 'likes', uid)).then((s) => { if (!cancelled) setLiked(s.exists()) })
+    getDoc(doc(db, 'videos', item.id, 'saves', uid)).then((s) => { if (!cancelled) setSaved(s.exists()) })
+    return () => { cancelled = true }
+  }, [item.id])
 
   useEffect(() => {
     if (!player || !isActive) {
@@ -173,19 +170,28 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
     isDirty.current = true
     const user = auth.currentUser
     if (!user) return
-    const ref = doc(db, 'videos', item.id)
+    const videoRef = doc(db, 'videos', item.id)
+    const likeRef = doc(db, 'videos', item.id, 'likes', user.uid)
+
     if (liked) {
-      setLiked(false)
-      setLikeCount((p) => Math.max(0, p - 1))
-      try { await updateDoc(ref, { likes: increment(-1), likedBy: arrayRemove(user.uid) }) }
-      catch (e) { captureException(e instanceof Error ? e : new Error(String(e)), { context: 'unlike' }); setLiked(true); setLikeCount((p) => p + 1) }
-    } else {
-      setLiked(true)
-      setLikeCount((p) => p + 1)
+      setLiked(false); setLikeCount((p) => Math.max(0, p - 1))
       try {
-        await updateDoc(ref, { likes: increment(1), likedBy: arrayUnion(user.uid) })
+        await deleteDoc(likeRef)
+        await updateDoc(videoRef, { likes: increment(-1) })
+      } catch (e) {
+        captureException(e instanceof Error ? e : new Error(String(e)), { context: 'unlike' })
+        setLiked(true); setLikeCount((p) => p + 1)
+      }
+    } else {
+      setLiked(true); setLikeCount((p) => p + 1)
+      try {
+        await setDoc(likeRef, { createdAt: Date.now() })
+        await updateDoc(videoRef, { likes: increment(1) })
         createNotification({ userId: item.userId, type: 'like', fromUserId: user.uid, videoId: item.id })
-      } catch (e) { captureException(e instanceof Error ? e : new Error(String(e)), { context: 'like' }); setLiked(false); setLikeCount((p) => Math.max(0, p - 1)) }
+      } catch (e) {
+        captureException(e instanceof Error ? e : new Error(String(e)), { context: 'like' })
+        setLiked(false); setLikeCount((p) => Math.max(0, p - 1))
+      }
     }
   }, [liked, item.id, item.userId])
 
@@ -195,7 +201,8 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
     setLiked(true)
     setLikeCount((p) => p + 1)
     try {
-      await updateDoc(doc(db, 'videos', item.id), { likes: increment(1), likedBy: arrayUnion(user.uid) })
+      await setDoc(doc(db, 'videos', item.id, 'likes', user.uid), { createdAt: Date.now() })
+      await updateDoc(doc(db, 'videos', item.id), { likes: increment(1) })
       createNotification({ userId: item.userId, type: 'like', fromUserId: user.uid, videoId: item.id })
     } catch (e) { captureException(e instanceof Error ? e : new Error(String(e)), { context: 'doubleTapLike' }); setLiked(false); setLikeCount((p) => Math.max(0, p - 1)) }
   }, [liked, item.id, item.userId])
@@ -223,17 +230,29 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
     isDirty.current = true
     const user = auth.currentUser
     if (!user) return
-    const ref = doc(db, 'videos', item.id)
+    const videoRef = doc(db, 'videos', item.id)
+    const saveRef = doc(db, 'videos', item.id, 'saves', user.uid)
+
     if (saved) {
       setSaved(false)
       setSaveCount((p) => Math.max(0, p - 1))
-      try { await updateDoc(ref, { saves: increment(-1), savedBy: arrayRemove(user.uid) }) }
-      catch (e) { captureException(e instanceof Error ? e : new Error(String(e)), { context: 'unsave' }); setSaved(true); setSaveCount((p) => p + 1) }
+      try {
+        await deleteDoc(saveRef)
+        await updateDoc(videoRef, { saves: increment(-1) })
+      } catch (e) {
+        captureException(e instanceof Error ? e : new Error(String(e)), { context: 'unsave' })
+        setSaved(true); setSaveCount((p) => p + 1)
+      }
     } else {
       setSaved(true)
       setSaveCount((p) => p + 1)
-      try { await updateDoc(ref, { saves: increment(1), savedBy: arrayUnion(user.uid) }) }
-      catch (e) { captureException(e instanceof Error ? e : new Error(String(e)), { context: 'save' }); setSaved(false); setSaveCount((p) => Math.max(0, p - 1)) }
+      try {
+        await setDoc(saveRef, { createdAt: Date.now() })
+        await updateDoc(videoRef, { saves: increment(1) })
+      } catch (e) {
+        captureException(e instanceof Error ? e : new Error(String(e)), { context: 'save' })
+        setSaved(false); setSaveCount((p) => Math.max(0, p - 1))
+      }
     }
   }, [saved, item.id])
 
@@ -393,29 +412,21 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
   }, [handleLongPressAction])
 
   const handleTouchEnd = useCallback(() => {
-    if (seekGestureTakenRef.current) {
-      seekGestureTakenRef.current = false
-      return
-    }
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current)
-      longPressTimerRef.current = undefined
-      const now = Date.now()
-      if (now - lastTapRef.current < 300) {
-        const cx = Dimensions.get('window').width / 2
-        handleDoubleTapLike()
-        showLikeHeart()
-        animateLikeIcon()
-        lastTapRef.current = 0
-      } else {
-        lastTapRef.current = now
-        setTimeout(() => {
-          if (lastTapRef.current !== 0 && Date.now() - lastTapRef.current >= 280) {
-            lastTapRef.current = 0
-            handleTogglePlay()
-          }
-        }, 300)
-      }
+    if (seekGestureTakenRef.current) { seekGestureTakenRef.current = false; return }
+    if (!longPressTimerRef.current) return
+    clearTimeout(longPressTimerRef.current)
+    longPressTimerRef.current = undefined
+
+    const now = Date.now()
+    if (now - lastTapRef.current < 300) {
+      handleTogglePlay()
+      handleDoubleTapLike()
+      showLikeHeart()
+      animateLikeIcon()
+      lastTapRef.current = 0
+    } else {
+      lastTapRef.current = now
+      handleTogglePlay()
     }
   }, [handleTogglePlay, handleDoubleTapLike, showLikeHeart, animateLikeIcon])
 
@@ -716,7 +727,6 @@ export const FeedItem = memo(FeedItemComponent, (prev, next) => {
   if (prev.item.latestRepostedBy?.userId !== next.item.latestRepostedBy?.userId) return false
   if (prev.username !== next.username) return false
   if (prev.isActive !== next.isActive) return false
-  if (prev.currentIndex !== next.currentIndex) return false
   return true
 })
 
