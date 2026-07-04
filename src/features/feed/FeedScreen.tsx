@@ -210,7 +210,7 @@ export default function FeedScreen({ feedType = 'forYou', isActive = true }: Fee
 
       {commentTarget && (
         <CommentSheet
-          key={commentTarget.videoId}
+          key={`comment-${commentTarget.videoId}`}
           videoId={commentTarget.videoId}
           videoOwnerId={commentTarget.videoOwnerId}
           isOwner={commentTarget.isOwner}
@@ -222,7 +222,7 @@ export default function FeedScreen({ feedType = 'forYou', isActive = true }: Fee
 
       {videoOptionsTarget && (
         <VideoOptionsSheet
-          key={videoOptionsTarget.videoId}
+          key={`options-${videoOptionsTarget.videoId}`}
           videoId={videoOptionsTarget.videoId}
           isOwner={videoOptionsTarget.isOwner}
           onClose={() => setVideoOptionsTarget(null)}

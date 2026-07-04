@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import type { EventSubscription } from 'expo-modules-core'
 import { auth } from '../../../lib/firebase'
-import { updateDoc, doc, increment, setDoc, deleteDoc, getDoc } from 'firebase/firestore'
+import { updateDoc, doc, increment, setDoc, deleteDoc, getDoc, onSnapshot } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
 import { createNotification } from '../../../lib/notifications'
 import { captureException } from '../../../lib/sentry'
@@ -48,6 +48,7 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
   const [saved, setSaved] = useState(false)
   const [likeCount, setLikeCount] = useState(item.likes)
   const [saveCount, setSaveCount] = useState(item.saves)
+  const [commentCount, setCommentCount] = useState(item.comments)
   const [showFullDesc, setShowFullDesc] = useState(false)
   const [gestureIcon, setGestureIcon] = useState<'play' | 'pause'>('play')
   const [isPlaying, setIsPlaying] = useState(true)
@@ -83,6 +84,16 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
     getDoc(doc(db, 'videos', item.id, 'likes', uid)).then((s) => { if (!cancelled) setLiked(s.exists()) })
     getDoc(doc(db, 'videos', item.id, 'saves', uid)).then((s) => { if (!cancelled) setSaved(s.exists()) })
     return () => { cancelled = true }
+  }, [item.id])
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'videos', item.id), (snap) => {
+      if (snap.exists()) {
+        const d = snap.data()
+        if (typeof d.comments === 'number') setCommentCount(d.comments)
+      }
+    })
+    return () => unsub()
   }, [item.id])
 
   useEffect(() => {
@@ -167,6 +178,8 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
   }, [])
 
   const handleLike = useCallback(async () => {
+    const now = Date.now()
+    if (now - lastTapRef.current < 350) return
     isDirty.current = true
     const user = auth.currentUser
     if (!user) return
@@ -447,52 +460,42 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
   const formatCount = (count: number) => count >= 1000 ? (count / 1000).toFixed(1) + 'k' : count
 
   return (
-    <>
-    <View style={{ width: SCREEN_WIDTH, height: SCREEN_HEIGHT }}>
+    <View style={{ flex: 1, height: SCREEN_HEIGHT - insets.bottom, backgroundColor: '#000' }}>
+
+      {/* 1. Vidéo — fond, aucun zIndex */}
       <View style={StyleSheet.absoluteFill}>
-        <VideoPlayerSlot videoId={item.id} thumbnailURL={item.thumbnailURL} instanceId={instanceId} />
+        <VideoPlayerSlot videoId={item.id} instanceId={instanceId} thumbnailURL={item.thumbnailURL} />
       </View>
 
+      {/* 2. Calque gestes — DERRIÈRE, trimmé à droite ET en bas */}
       <Pressable
+        style={[StyleSheet.absoluteFill, { right: 80, bottom: BOTTOM_PADDING + insets.bottom, zIndex: 0 }]}
         onPressIn={handleTouchStart}
         onPressOut={handleTouchEnd}
-        style={[StyleSheet.absoluteFill, { right: 80 }]}
-        pointerEvents="auto"
       />
 
-      <Animated.View
-        pointerEvents="none"
-        style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', opacity: likeHeartOpacity }]}
-      >
+      {/* 3. Overlays visuels — transparents aux touches */}
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', opacity: likeHeartOpacity }]}>
         <Animated.View style={{ transform: [{ scale: likeHeartScale }] }}>
-          <Ionicons name="heart" size={80} color="#FFD700" />
+          <Ionicons name="heart" size={100} color="#FFD700" />
         </Animated.View>
       </Animated.View>
 
-      <Animated.View
-        pointerEvents="none"
-        style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', opacity: gesturePlayOpacity }]}
-      >
-        <Ionicons name={gestureIcon} size={64} color="rgba(255,255,255,0.9)" />
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', opacity: gesturePlayOpacity }]}>
+        <Ionicons name={gestureIcon} size={70} color="rgba(255,255,255,0.85)" />
       </Animated.View>
 
-      <Animated.View
-        pointerEvents="none"
-        style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'flex-start', paddingLeft: 60, opacity: gestureSeekLeftOpacity }]}
-      >
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'flex-start', paddingLeft: 60, opacity: gestureSeekLeftOpacity }]}>
         <View style={{ alignItems: 'center' }}>
-          <Ionicons name="play-back" size={48} color="rgba(255,255,255,0.9)" />
-          <Text style={{ color: '#FFF', fontSize: 14, marginTop: 4 }}>−5s</Text>
+          <Ionicons name="play-back" size={40} color="#fff" />
+          <Text style={{ color: '#fff', fontWeight: '700' }}>−5s</Text>
         </View>
       </Animated.View>
 
-      <Animated.View
-        pointerEvents="none"
-        style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'flex-end', paddingRight: 60, opacity: gestureSeekRightOpacity }]}
-      >
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'flex-end', paddingRight: 60, opacity: gestureSeekRightOpacity }]}>
         <View style={{ alignItems: 'center' }}>
-          <Ionicons name="play-forward" size={48} color="rgba(255,255,255,0.9)" />
-          <Text style={{ color: '#FFF', fontSize: 14, marginTop: 4 }}>+5s</Text>
+          <Ionicons name="play-forward" size={40} color="#fff" />
+          <Text style={{ color: '#fff', fontWeight: '700' }}>+5s</Text>
         </View>
       </Animated.View>
 
@@ -505,131 +508,124 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
         />
       )}
 
+      {/* 4. Bloc contenu — zIndex: 20, box-none */}
       <LinearGradient
         pointerEvents="box-none"
-        colors={['transparent', 'rgba(0,0,0,0.75)']}
-        locations={[0.4, 1]}
-        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: SCREEN_HEIGHT * 0.55 }}
+        colors={['transparent', 'rgba(0,0,0,0.6)']}
+        style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingBottom: BOTTOM_PADDING + insets.bottom, paddingHorizontal: 12, zIndex: 20 }}
       >
-        <View style={{ flex: 1, justifyContent: 'flex-end' }} pointerEvents="box-none">
-          <View style={{ paddingHorizontal: 12, paddingBottom: BOTTOM_PADDING + insets.bottom, paddingRight: 66 }}>
-            <View style={styles.userRow}>
-              <View style={styles.avatarWrapper}>
-                {!isOwn && !isFollowing && followState !== 'hidden' && (
-                  <TouchableOpacity
-                    onPress={handleFollow}
-                    style={[
-                      styles.followBtn,
-                      followState === 'done' && {
-                        backgroundColor: '#00C853',
-                        borderColor: '#00C853',
-                      },
-                    ]}
-                  >
-                    <Ionicons name={followState === 'done' ? 'checkmark' : 'add'} size={followState === 'done' ? 16 : 18} color="#FFFFFF" />
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity onPress={() => router.push({ pathname: '/(tabs)/user/[userId]', params: { userId: item.userId } })}>
-                  {avatarURL ? (
-                    <Image source={{ uri: avatarURL }} style={styles.avatar} />
-                  ) : (
-                    <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                      <Text style={styles.avatarInitial}>{displayName.charAt(0).toUpperCase()}</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              </View>
-              <View style={styles.userNameBlock}>
-                {repostToast && (
-                  <View style={{ alignSelf: 'flex-start', backgroundColor: '#00C853', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8, marginBottom: 4 }}>
-                    <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '600' }}>{repostToast}</Text>
-                  </View>
-                )}
-                <TouchableOpacity onPress={() => router.push({ pathname: '/(tabs)/user/[userId]', params: { userId: item.userId } })}>
-                  <Text style={styles.username}><Text style={{ color: '#FFD700', fontSize: 20, fontWeight: '800' }}> | </Text>{displayName}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+        {/* Toast republié */}
+        {repostToast && (
+          <View style={{ backgroundColor: '#00C853', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, marginBottom: 6, alignSelf: 'flex-start' }}>
+            <Text style={{ color: '#fff', fontSize: 12 }}>{repostToast}</Text>
+          </View>
+        )}
 
-            {item.description ? (
-              <TouchableOpacity onPress={() => setShowFullDesc((p) => !p)}>
-                <Text style={styles.description} numberOfLines={showFullDesc ? undefined : 3}>
-                  {item.description}
-                </Text>
+        {/* Ligne user + follow */}
+        <View style={styles.userRow}>
+          <View style={styles.avatarWrapper}>
+            {!isOwn && !isFollowing && followState !== 'hidden' && (
+              <TouchableOpacity style={styles.followBtn} onPress={handleFollow}>
+                <Ionicons name={followState === 'done' ? 'checkmark' : 'add'} size={16} color="#FFD700" />
               </TouchableOpacity>
-            ) : null}
-
-            {item.hashtags?.length > 0 ? (
-              <Text style={styles.hashtags}>
-                {item.hashtags.map((t) => '#' + t).join(' ')}
-              </Text>
-            ) : null}
-
-            {item.previewComments && item.previewComments.length > 0 && (
-              <View style={{ marginBottom: 6 }}>
-                {item.previewComments.slice(0, 2).map((pc, i) => (
-                  <Text key={i} style={{ color: 'rgba(255,255,255,0.75)', fontSize: 13, lineHeight: 18 }} numberOfLines={2}>
-                    <Text style={{ color: 'rgba(255,255,255,0.95)', fontWeight: '600' }}>{pc.authorName}</Text>
-                    {' '}{pc.text}
-                  </Text>
-                ))}
-                {item.comments > (item.previewComments?.length ?? 0) && (
-                  <TouchableOpacity onPress={onPressComment ? () => onPressComment(item.id) : undefined}>
-                    <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: '500', marginTop: 2 }}>
-                      Voir les {item.comments} commentaire{item.comments > 1 ? 's' : ''}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
             )}
-
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <TouchableOpacity onPress={() => router.push({ pathname: '/(tabs)/user/[userId]', params: { userId: item.userId } })}>
               {avatarURL ? (
-                <View style={{ width: 24, height: 24 }}>
-                  <Animated.Image
-                    source={{ uri: avatarURL }}
-                    style={{ width: '100%', height: '100%', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)', transform: [{ rotate: discRotation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }}
-                  />
-                  <LinearGradient
-                    colors={['rgba(255,255,255,0.3)', 'transparent', 'transparent']}
-                    start={{ x: 0.1, y: 0 }}
-                    end={{ x: 0.9, y: 1 }}
-                    style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 12 }}
-                    pointerEvents="none"
-                  />
-                  <View style={{ position: 'absolute', top: 8, left: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(0,0,0,0.5)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)' }} />
-                </View>
+                <Image source={{ uri: avatarURL }} style={styles.avatar} />
               ) : (
-                <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' }}>
-                  <Ionicons name="musical-notes" size={12} color="#FFF" />
+                <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                  <Text style={styles.avatarInitial}>{displayName.charAt(0).toUpperCase()}</Text>
                 </View>
               )}
-              <Text style={styles.sound}>Son original · {displayName}</Text>
-            </View>
+            </TouchableOpacity>
           </View>
+
+          <TouchableOpacity
+            style={styles.userNameBlock}
+            onPress={() => router.push({ pathname: '/(tabs)/user/[userId]', params: { userId: item.userId } })}
+          >
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>@{displayName}</Text>
+          </TouchableOpacity>
         </View>
 
+        {/* Description */}
+        {item.description ? (
+          <TouchableOpacity activeOpacity={0.9} onPress={() => setShowFullDesc((p) => !p)}>
+            <Text numberOfLines={showFullDesc ? undefined : 2} style={{ color: '#fff', fontSize: 14, marginTop: 6 }}>
+              {item.description}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+
+        {/* Hashtags */}
+        {item.hashtags?.length > 0 ? (
+          <Text style={{ color: '#4EA1FF', fontSize: 14, marginTop: 4 }}>
+            {item.hashtags.map((t) => '#' + t).join(' ')}
+          </Text>
+        ) : null}
+
+        {/* Aperçu commentaires */}
+        {item.previewComments && item.previewComments.length > 0 && (
+          <View style={{ marginTop: 8 }}>
+            {item.previewComments.slice(0, 2).map((pc, i) => (
+              <Text key={i} numberOfLines={1} style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13 }}>
+                <Text style={{ fontWeight: '700' }}>{pc.authorName}</Text> {pc.text}
+              </Text>
+            ))}
+            {commentCount > (item.previewComments?.length ?? 0) && (
+              <TouchableOpacity onPress={onPressComment ? () => onPressComment(item.id) : undefined}>
+                <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, marginTop: 2 }}>
+                    Voir les {commentCount} commentaire{commentCount > 1 ? 's' : ''}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {/* Son original */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+          {avatarURL ? (
+            <View style={{ width: 24, height: 24 }}>
+              <Animated.Image
+                source={{ uri: avatarURL }}
+                style={{ width: '100%', height: '100%', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)', transform: [{ rotate: discRotation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }}
+              />
+              <View style={{ position: 'absolute', top: 8, left: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(0,0,0,0.5)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)' }} />
+            </View>
+          ) : (
+            <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' }}>
+              <Ionicons name="musical-notes" size={12} color="#FFF" />
+            </View>
+          )}
+          <Text style={{ color: '#fff', fontSize: 13, marginLeft: 8 }} numberOfLines={1}>
+            Son original · {displayName}
+          </Text>
+        </View>
       </LinearGradient>
 
-        <View style={[styles.actionsColumn, { bottom: BOTTOM_ACTIONS + insets.bottom }]}>
-          <TouchableOpacity style={styles.actionBtn} onPress={() => { handleLike(); animateLikeIcon() }}>
-            <Ionicons name={liked ? 'heart' : 'heart-outline'} size={32} color={liked ? '#FFD700' : '#FFF'} />
-            <Text style={styles.actionLabel}>{formatCount(likeCount)}</Text>
-          </TouchableOpacity>
+      {/* 5. Colonne actions — DEVANT tout (zIndex + elevation pour Android) */}
+      <View style={{ position: 'absolute', right: 8, bottom: BOTTOM_PADDING + insets.bottom + 20, alignItems: 'center', zIndex: 30, elevation: 30 }} pointerEvents="auto">
+        <TouchableOpacity style={{ alignItems: 'center', marginBottom: 16 }} onPress={() => { handleLike(); animateLikeIcon() }}>
+          <Animated.View style={{ transform: [{ scale: likeIconScale }] }}>
+            <Ionicons name={liked ? 'heart' : 'heart-outline'} size={34} color="#FFD700" />
+          </Animated.View>
+          <Text style={{ color: '#fff', fontSize: 12 }}>{likeCount > 0 ? formatCount(likeCount) : "J'aime"}</Text>
+        </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionBtn} onPress={onPressComment ? () => onPressComment(item.id) : undefined}>
-            <Ionicons name="chatbubble-outline" size={28} color="#FFF" />
-            <Text style={styles.actionLabel}>{formatCount(item.comments)}</Text>
-          </TouchableOpacity>
+        <TouchableOpacity style={{ alignItems: 'center', marginBottom: 16 }} onPress={onPressComment ? () => onPressComment(item.id) : undefined}>
+          <Ionicons name="chatbubble-outline" size={32} color="#FFD700" />
+          <Text style={{ color: '#fff', fontSize: 12 }}>{commentCount > 0 ? formatCount(commentCount) : 'Écrire'}</Text>
+        </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionBtn} onPress={handleSave}>
-            <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={28} color={saved ? '#FFD700' : '#FFF'} />
-            <Text style={styles.actionLabel}>{formatCount(saveCount)}</Text>
-          </TouchableOpacity>
+        <TouchableOpacity style={{ alignItems: 'center', marginBottom: 16 }} onPress={handleSave}>
+          <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={30} color="#FFD700" />
+          <Text style={{ color: '#fff', fontSize: 12 }} numberOfLines={1}>{saveCount > 0 ? formatCount(saveCount) : 'Sauve'}</Text>
+        </TouchableOpacity>
 
+        <View style={{ alignItems: 'center', marginBottom: 16 }}>
           <RepostButton
             video={item}
-            size={28}
+            size={30}
             showLabel
             onRepost={(reposted) => {
               const msg = reposted ? 'Vidéo republiée' : 'Republication retirée'
@@ -638,80 +634,55 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
               repostToastTimer.current = setTimeout(() => setRepostToast(null), 2000)
             }}
           />
-
-          <ShareButton onPress={handleShare} size={28} count={item.shares} />
-
-          <TouchableOpacity style={styles.actionBtn} onPress={handleMore}>
-            <Ionicons name="ellipsis-horizontal" size={24} color="#FFF" />
-          </TouchableOpacity>
-        </View>
-    </View>
-
-    {player && (
-      <Animated.View
-        {...seekPanResponder.panHandlers}
-        onLayout={(e) => { barWidthRef.current = e.nativeEvent.layout.width }}
-        style={{
-          position: 'absolute',
-          bottom: BOTTOM_PROGRESS + insets.bottom,
-          left: 0,
-          right: 0,
-          height: 60,
-          justifyContent: 'flex-end',
-          opacity: barOpacity,
-        }}
-      >
-        {/* Track background */}
-        <View style={{ height: isPlaying ? 2 : 6, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 3, marginHorizontal: 16 }}>
-          {/* Filled track */}
-          <Animated.View style={{ height: '100%', backgroundColor: '#00C853', borderRadius: 3, width: progressAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }} />
         </View>
 
-        {/* Thumb + time label (visible when paused or seeking) */}
-        {(!isPlaying || isSeeking) && (
-          <>
-            {/* Thumb */}
-            <Animated.View
-              style={{
-                position: 'absolute',
-                bottom: 60 / 2 - 8,
-                left: progressAnim.interpolate({ inputRange: [0, 1], outputRange: [16, SCREEN_WIDTH - 16] }),
-                width: 16,
-                height: 16,
-                borderRadius: 8,
-                backgroundColor: '#00C853',
-                borderWidth: 2,
-                borderColor: '#FFF',
-                transform: [{ translateX: -8 }],
-                elevation: 3,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.3,
-                shadowRadius: 2,
-              }}
-            />
+        <View style={{ alignItems: 'center', marginBottom: 16 }}>
+          <ShareButton onPress={handleShare} size={30} />
+        </View>
 
-            {/* Time label */}
-            {seekInfo && (
-              <View
+        <TouchableOpacity style={{ alignItems: 'center', marginTop: 18 }} onPress={handleMore}>
+          <Ionicons name="ellipsis-horizontal" size={30} color="#FFD700" />
+        </TouchableOpacity>
+      </View>
+
+      {/* 6. Barre de seek — zIndex: 10, coupée à right: 80 */}
+      {player && (
+        <Animated.View
+          {...seekPanResponder.panHandlers}
+          onLayout={(e) => { barWidthRef.current = e.nativeEvent.layout.width }}
+          style={{ position: 'absolute', bottom: BOTTOM_PROGRESS + insets.bottom, left: 0, right: 0, height: 60, justifyContent: 'flex-end', opacity: barOpacity, zIndex: 10 }}
+        >
+          {/* Track background */}
+          <View style={{ height: isPlaying ? 2 : 6, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 3, marginHorizontal: 16 }}>
+            <Animated.View style={{ height: '100%', backgroundColor: '#00C853', borderRadius: 3, width: progressAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }} />
+          </View>
+
+          {/* Thumb + time label */}
+          {(!isPlaying || isSeeking) && (
+            <>
+              <Animated.View
                 style={{
                   position: 'absolute',
-                  bottom: 24,
-                  left: seekInfo.x,
-                  transform: [{ translateX: -30 }],
-                  alignItems: 'center',
+                  bottom: 60 / 2 - 8,
+                  left: progressAnim.interpolate({ inputRange: [0, 1], outputRange: [16, SCREEN_WIDTH - 16] }),
+                  width: 16, height: 16, borderRadius: 8,
+                  backgroundColor: '#00C853', borderWidth: 2, borderColor: '#FFF',
+                  transform: [{ translateX: -8 }],
+                  elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.3, shadowRadius: 2,
                 }}
-              >
-                <View style={{ backgroundColor: 'rgba(0,0,0,0.8)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4 }}>
-                  <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{seekInfo.label}</Text>
+              />
+              {seekInfo && (
+                <View style={{ position: 'absolute', bottom: 24, left: seekInfo.x, transform: [{ translateX: -30 }], alignItems: 'center' }}>
+                  <View style={{ backgroundColor: 'rgba(0,0,0,0.8)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4 }}>
+                    <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{seekInfo.label}</Text>
+                  </View>
                 </View>
-              </View>
-            )}
-          </>
-        )}
-      </Animated.View>
-    )}
-    </>
+              )}
+            </>
+          )}
+        </Animated.View>
+      )}
+    </View>
   )
 }
 
@@ -735,10 +706,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
+    overflow: 'visible',
   },
   avatarWrapper: {
     alignItems: 'center',
     position: 'relative',
+    overflow: 'visible',
   },
   avatar: {
     width: 44,
@@ -757,15 +730,15 @@ const styles = StyleSheet.create({
   },
   followBtn: {
     position: 'absolute',
-    top: -32,
-    alignSelf: 'center',
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: 'transparent',
+    bottom: -4,
+    right: -4,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#000',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: '#FFD700',
     zIndex: 1,
   },
@@ -774,59 +747,5 @@ const styles = StyleSheet.create({
     height: 44,
     justifyContent: 'flex-end',
     marginLeft: 10,
-  },
-  username: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
-    textShadowColor: 'rgba(0,0,0,0.6)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  description: {
-    color: 'rgba(255,255,255,0.95)',
-    fontSize: 13,
-    fontWeight: '400',
-    lineHeight: 18,
-    marginBottom: 8,
-    textShadowColor: 'rgba(0,0,0,0.6)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  hashtags: {
-    color: '#00C853',
-    fontSize: 13,
-    fontWeight: '500',
-    marginBottom: 10,
-    textShadowColor: 'rgba(0,0,0,0.6)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  sound: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '400',
-    textShadowColor: 'rgba(0,0,0,0.6)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  actionBtn: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionLabel: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '500',
-    marginTop: 4,
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  actionsColumn: {
-    position: 'absolute',
-    right: 10,
-    alignItems: 'center',
-    gap: 16,
   },
 })

@@ -101,8 +101,15 @@ export default function CommentSheet({ videoId, videoOwnerId, isOwner, previewCo
     sheetRef.current?.close()
   }, [sheetRef])
 
+  const [sheetOpen, setSheetOpen] = useState(false)
+
   const handleSheetChange = useCallback((index: number) => {
-    if (index === -1) onClose()
+    if (index === -1) {
+      setSheetOpen(false)
+      onClose()
+    } else {
+      setSheetOpen(true)
+    }
   }, [onClose])
 
   const renderBackdrop = useCallback(
@@ -228,9 +235,7 @@ export default function CommentSheet({ videoId, videoOwnerId, isOwner, previewCo
       onChange={handleSheetChange}
     >
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>
-          {formatCommentCount(liveCommentCount)} commentaire{liveCommentCount !== 1 ? 's' : ''}
-        </Text>
+        <Text style={styles.headerTitle}>Commentaires</Text>
         <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
           <Ionicons name="close" size={20} color="#FFF" />
         </TouchableOpacity>
@@ -251,21 +256,29 @@ export default function CommentSheet({ videoId, videoOwnerId, isOwner, previewCo
         </TouchableOpacity>
       </View>
 
-      <BottomSheetFlatList
-        data={sortedComments}
-        renderItem={renderItem}
-        keyExtractor={keyExtractor}
-        ListEmptyComponent={renderEmpty}
-        ListFooterComponent={renderFooter}
-        contentContainerStyle={{ flexGrow: 1 }}
-        keyboardShouldPersistTaps="never"
-        keyboardDismissMode="on-drag"
-        showsVerticalScrollIndicator={false}
-        onEndReached={loadMoreComments}
-        onEndReachedThreshold={0.5}
-      />
+      {sortedComments.length === 0 && !loading ? (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="chatbubble-ellipses-outline" size={48} color="rgba(255,255,255,0.15)" />
+          <Text style={styles.emptyText}>Aucun commentaire</Text>
+          <Text style={styles.emptySubtext}>Soyez le premier à commenter</Text>
+        </View>
+      ) : (
+        <BottomSheetFlatList
+          data={sortedComments}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
+          ListFooterComponent={renderFooter}
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="never"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
+          onEndReached={loadMoreComments}
+          onEndReachedThreshold={0.5}
+        />
+      )}
     </BottomSheet>
 
+    {sheetOpen && (
     <Animated.View
       style={[styles.inputBarOverlay, { bottom: insets.bottom }, inputBarStyle]}
       pointerEvents="box-none"
@@ -280,6 +293,7 @@ export default function CommentSheet({ videoId, videoOwnerId, isOwner, previewCo
         onPostReply={handlePostReply}
       />
     </Animated.View>
+    )}
     </>
   )
 }
@@ -289,7 +303,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#121212',
   },
   handleIndicator: {
-    backgroundColor: '#555',
+    backgroundColor: '#00C853',
     width: 36,
   },
   handleBar: {
@@ -333,7 +347,7 @@ const styles = StyleSheet.create({
   },
   sortTabActive: {
     borderBottomWidth: 2,
-    borderBottomColor: '#FFF',
+    borderBottomColor: '#00C853',
   },
   sortTabText: {
     color: 'rgba(255,255,255,0.4)',
@@ -344,10 +358,9 @@ const styles = StyleSheet.create({
     color: '#FFF',
   },
   emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 60,
+    paddingTop: 16,
+    paddingBottom: 60,
     gap: 8,
   },
   emptyText: {

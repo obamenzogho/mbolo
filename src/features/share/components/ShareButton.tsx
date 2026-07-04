@@ -8,9 +8,10 @@ interface ShareButtonProps {
   size?: number
   showLabel?: boolean
   count?: number
+  color?: string
 }
 
-function ShareButtonComponent({ onPress, size = 28, showLabel = true, count }: ShareButtonProps) {
+function ShareButtonComponent({ onPress, size = 28, showLabel = true, count, color = '#FFD700' }: ShareButtonProps) {
   const { lightImpact } = useHaptics()
   const scaleAnim = useRef(new Animated.Value(1)).current
 
@@ -29,11 +30,11 @@ function ShareButtonComponent({ onPress, size = 28, showLabel = true, count }: S
       style={{ alignItems: 'center', justifyContent: 'center' }}
     >
       <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-        <Ionicons name="paper-plane-outline" size={size} color="#FFF" />
+        <Ionicons name="paper-plane-outline" size={size} color={color} />
       </Animated.View>
       {showLabel && (
         <Text style={{
-          color: '#FFFFFF',
+          color: color,
           fontSize: 12,
           fontWeight: '500',
           marginTop: 4,

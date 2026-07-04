@@ -8,6 +8,7 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useIsFocused } from '@react-navigation/native'
 import { CameraView, useCameraPermissions } from 'expo-camera'
 import * as Haptics from 'expo-haptics'
 import { Ionicons } from '@expo/vector-icons'
@@ -26,6 +27,7 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 export default function CameraScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
+  const isFocused = useIsFocused()
   const cameraRef = useRef<CameraView>(null)
 
   const [permission, requestPermission] = useCameraPermissions()
@@ -51,6 +53,10 @@ export default function CameraScreen() {
       if (blinkRef.current) clearInterval(blinkRef.current)
     }
   }, [])
+
+  useEffect(() => {
+    if (!isFocused && isRecording) stopRecording()
+  }, [isFocused])
 
   useEffect(() => {
     if (isRecording && recordingTime >= maxDuration - 3 && recordingTime < maxDuration) {
@@ -180,13 +186,15 @@ export default function CameraScreen() {
 
   return (
     <View style={styles.container}>
-      <CameraView
-        ref={cameraRef}
-        style={StyleSheet.absoluteFill}
-        facing={facing}
-        mode="video"
-        flash={flash}
-      />
+      {isFocused && permission?.granted && (
+        <CameraView
+          ref={cameraRef}
+          style={StyleSheet.absoluteFill}
+          facing={facing}
+          mode="video"
+          flash={flash}
+        />
+      )}
 
       {/* TOP BAR */}
       <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>

@@ -64,13 +64,13 @@ function RepostButtonComponent({ video, size = 28, showLabel = true, onRepost }:
         <Ionicons
           name={reposted ? 'repeat' : 'repeat-outline'}
           size={size}
-          color={reposted ? '#00C853' : '#FFF'}
+          color="#FFD700"
         />
       </Animated.View>
       {showLabel && (
         <Text
           style={{
-            color: reposted ? '#00C853' : '#FFF',
+            color: '#FFD700',
             fontSize: 12,
             fontWeight: '500',
             marginTop: 4,

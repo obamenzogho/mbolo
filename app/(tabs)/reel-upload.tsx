@@ -10,6 +10,7 @@ import * as ImagePicker from 'expo-image-picker'
 import { collection, addDoc, doc, increment, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore'
 import { auth, db } from '../../src/lib/firebase'
 import { uploadToCloudinary, generateThumbnailURL } from '../../src/lib/cloudinary'
+import { captureException } from '../../src/lib/sentry'
 import OrbitLoader from '../../src/components/OrbitLoader'
 import { BackButton } from '../../src/components/ui/BackButton'
 import { colors } from '../../src/lib/theme'
@@ -109,7 +110,7 @@ export default function ReelUploadScreen() {
         { text: 'OK', onPress: () => router.replace('/(tabs)/feed') },
       ])
     } catch (e) {
-      console.error(e)
+      captureException(e instanceof Error ? e : new Error(String(e)), { context: 'publishReel' })
       Alert.alert('Erreur', 'Impossible de publier le reel')
       setStep('edit')
     }

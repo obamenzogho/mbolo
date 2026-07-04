@@ -3,7 +3,8 @@
    Signaler, Ne plus voir, Copier le lien, Supprimer, Modifier. */
 
 import { useCallback, useState, useMemo, useRef } from 'react'
-import { View, Text, TouchableOpacity, Alert, StyleSheet } from 'react-native'
+import { View, Text, Alert, StyleSheet } from 'react-native'
+import { TouchableOpacity } from 'react-native-gesture-handler'
 import BottomSheet, { BottomSheetBackdrop } from '@gorhom/bottom-sheet'
 import { Ionicons } from '@expo/vector-icons'
 import * as Clipboard from 'expo-clipboard'
@@ -181,10 +182,10 @@ export default function VideoOptionsSheet({ videoId, isOwner, onClose, sheetRef 
       handleStyle={styles.handleBar}
       onChange={handleSheetChange}
     >
-      <View style={styles.optionRow} onStartShouldSetResponder={() => true} onResponderRelease={handleCopyLink}>
+      <TouchableOpacity style={styles.optionRow} onPress={handleCopyLink}>
         <Ionicons name="link-outline" size={22} color="rgba(255,255,255,0.7)" />
         <Text style={styles.optionText}>Copier le lien</Text>
-      </View>
+      </TouchableOpacity>
 
       <View style={styles.separator} />
 
