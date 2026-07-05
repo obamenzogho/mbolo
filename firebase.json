@@ -6,6 +6,9 @@
   "storage": {
     "rules": "storage.rules"
   },
+  "functions": {
+    "source": "functions"
+  },
   "emulators": {
     "auth": {
       "enabled": true

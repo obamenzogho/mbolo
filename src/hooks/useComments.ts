@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   collection, query, orderBy, onSnapshot, addDoc, startAfter,
   doc, increment, arrayUnion, arrayRemove, serverTimestamp, updateDoc,
-  getDoc, getDocs, limit, runTransaction, type QueryDocumentSnapshot,
+  getDoc, getDocs, limit, runTransaction, deleteDoc, type QueryDocumentSnapshot,
 } from 'firebase/firestore'
 import { db, auth } from '../lib/firebase'
 import { batchFetchAuthors, type AuthorInfo } from '../lib/firestore'

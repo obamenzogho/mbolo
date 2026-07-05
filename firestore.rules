@@ -51,6 +51,10 @@ service cloud.firestore {
       allow create: if request.auth != null;
     }
 
+    // SECURITY WARNING: counters (likes, saves, views, shares, reposts, comments)
+    // are written by the client via increment(). Firestore rules cannot enforce
+    // increment-only semantics — a malicious client can set likes: 999999 directly.
+    // TODO: move to Cloud Functions once project is on Blaze plan.
     match /videos/{videoId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
@@ -70,6 +74,12 @@ service cloud.firestore {
         allow read: if request.auth != null;
         allow create: if request.auth != null && request.auth.uid == userId;
         allow delete: if request.auth != null && request.auth.uid == userId;
+      }
+
+      match /views/{userId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null && request.auth.uid == userId;
+        allow update, delete: if false;
       }
 
       match /comments/{commentId} {
