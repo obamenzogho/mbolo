@@ -40,6 +40,7 @@ interface CommentItemProps {
   onLoadMoreReplies?: (commentId: string) => void
   onEdit?: (commentId: string, newText: string) => void
   onPin?: (commentId: string, pinned: boolean) => void
+  onHide?: (commentId: string, hidden: boolean) => void
   repliesExpanded: boolean
   replies: ReplyData[]
   hasMoreReplies?: boolean
@@ -60,13 +61,14 @@ function formatTimeAgo(date: unknown): string {
 
 function CommentItemComponent({
   comment, videoId, isVideoOwner, videoOwnerId, currentUserId, onLike, onDelete, onReport, onReply,
-  onToggleReplies, onReplyLike, onReplyDelete, onLoadMoreReplies, onEdit, onPin,
+  onToggleReplies, onReplyLike, onReplyDelete, onLoadMoreReplies, onEdit, onPin, onHide,
   repliesExpanded, replies, hasMoreReplies, isLoadingMoreReplies,
 }: CommentItemProps) {
   const displayName = comment.authorName || comment.userName || 'Utilisateur'
   const photoURL = comment.authorPhoto || comment.userPhotoURL || null
   const isOwn = currentUserId === comment.userId
   const isCreator = comment.userId === videoOwnerId
+  const creatorLiked = videoOwnerId ? (comment.likedBy?.includes(videoOwnerId) ?? false) : false
   const [liked, setLiked] = useState(comment.likedBy?.includes(currentUserId ?? '') ?? false)
   const [likeCount, setLikeCount] = useState(comment.likes ?? 0)
   const [editing, setEditing] = useState(false)
@@ -109,14 +111,18 @@ function CommentItemComponent({
         text: (comment as any).pinned ? 'Désépingler' : 'Épingler',
         onPress: () => onPin?.(comment.id, !(comment as any).pinned),
       })
+      options.push({
+        text: (comment as any).hidden ? 'Réafficher' : 'Masquer',
+        onPress: () => onHide?.(comment.id, !(comment as any).hidden),
+      })
     }
     options.push({ text: 'Annuler', style: 'cancel', onPress: () => {} })
     Alert.alert('Options', undefined, options)
-  }, [isOwn, isVideoOwner, comment, onDelete, onReport, onPin])
+  }, [isOwn, isVideoOwner, comment, onDelete, onReport, onPin, onHide])
 
   return (
     <TouchableOpacity onLongPress={handleLongPress} activeOpacity={0.9}>
-      <View style={styles.container}>
+      <View style={[styles.container, (comment as any).hidden && { opacity: 0.45 }]}>
         <TouchableOpacity onPress={() => router.push({ pathname: '/(tabs)/user/[userId]', params: { userId: comment.userId } })}>
           {photoURL ? (
             <Image source={{ uri: photoURL }} style={styles.avatar} />
@@ -156,6 +162,7 @@ function CommentItemComponent({
             </TouchableOpacity>
           )}
           {comment.edited && !editing && <Text style={{ color: colors.textMuted, fontSize: 11 }}> (modifié)</Text>}
+          {(comment as any).hidden && isVideoOwner && <Text style={{ color: colors.textMuted, fontSize: 11 }}> (masqué)</Text>}
           <View style={styles.commentActions}>
             <TouchableOpacity onPress={() => onReply(comment.id, displayName)}>
               <Text style={styles.actionText}>Répondre</Text>
@@ -197,7 +204,11 @@ function CommentItemComponent({
         <TouchableOpacity onPress={handleLike} style={styles.likeSection}>
           <Ionicons name={liked ? 'heart' : 'heart-outline'} size={14} color={liked ? colors.like : 'rgba(255,255,255,0.5)'} />
           {likeCount > 0 && <Text style={styles.likeCount}>{likeCount}</Text>}
+          {creatorLiked && <Ionicons name="heart" size={10} color="#FF4444" style={{ marginLeft: 4 }} />}
         </TouchableOpacity>
+        {(comment as any).hidden && (
+          <Text style={{ color: colors.textFaint, fontSize: 11, fontStyle: 'italic', marginTop: 4 }}>Masqué</Text>
+        )}
       </View>
     </TouchableOpacity>
   )

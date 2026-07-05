@@ -106,6 +106,18 @@ export default function Settings() {
       ],
     },
     {
+      title: 'Confidentialité',
+      items: [
+        {
+          icon: 'shield-outline',
+          label: 'Mots bloqués',
+          type: 'action' as const,
+          action: () => router.push('/settings/blocked-words'),
+          description: 'Gérer les mots masqués dans les commentaires',
+        },
+      ],
+    },
+    {
       title: 'Données',
       items: [
         {

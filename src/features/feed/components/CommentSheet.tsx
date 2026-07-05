@@ -8,7 +8,7 @@ import BottomSheet, { BottomSheetFlatList, BottomSheetBackdrop } from '@gorhom/b
 import { Ionicons } from '@expo/vector-icons'
 import { doc, getDoc } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
-import { useComments } from '../../../hooks/useComments'
+import { useComments, matchesBlockedWords } from '../../../hooks/useComments'
 import { CommentItem, type CommentData } from '../comments/CommentItem'
 import { CommentInput } from '../comments/CommentInput'
 import OrbitLoader from '../../../components/OrbitLoader'
@@ -39,6 +39,7 @@ export default function CommentSheet({ videoId, videoOwnerId, isOwner, previewCo
     deleteComment: hookDeleteComment,
     toggleReplies, currentUser,
     addComment, addReply, reportComment, deleteReply, pinComment, editComment,
+    hideComment, blockedWords,
     loadMoreComments, loadMoreReplies,
   } = useComments(videoId, true, previewComments, videoOwnerId)
 
@@ -55,11 +56,24 @@ export default function CommentSheet({ videoId, videoOwnerId, isOwner, previewCo
     transform: [{ translateY: -keyboard.height.value }],
   }))
 
+  const isCreator = currentUser?.uid === videoOwnerId
+
+  const visibleComments = useMemo(() => {
+    return (comments as CommentData[]).filter((c: any) => {
+      const isHidden = c.hidden || matchesBlockedWords(c.text ?? '', blockedWords)
+      return isCreator || !isHidden
+    })
+  }, [comments, blockedWords, isCreator])
+
   const sortedComments = useMemo(() => {
-    const arr = [...(comments as CommentData[])]
+    const arr = [...visibleComments]
     arr.sort((a, b) => {
       if ((a as any).pinned && !(b as any).pinned) return -1
       if (!(a as any).pinned && (b as any).pinned) return 1
+      const aCreatorLiked = videoOwnerId ? (a.likedBy?.includes(videoOwnerId) ?? false) : false
+      const bCreatorLiked = videoOwnerId ? (b.likedBy?.includes(videoOwnerId) ?? false) : false
+      if (aCreatorLiked && !bCreatorLiked) return -1
+      if (!aCreatorLiked && bCreatorLiked) return 1
       if (sortMode === 'top') return (b.likes ?? 0) - (a.likes ?? 0)
       const toMs = (v: unknown): number => {
         if (!v) return 0
@@ -69,7 +83,7 @@ export default function CommentSheet({ videoId, videoOwnerId, isOwner, previewCo
       return toMs(b.createdAt) - toMs(a.createdAt)
     })
     return arr
-  }, [comments, sortMode])
+  }, [visibleComments, sortMode, videoOwnerId])
 
   useEffect(() => {
     setLoading(true)
@@ -169,12 +183,13 @@ export default function CommentSheet({ videoId, videoOwnerId, isOwner, previewCo
       onLoadMoreReplies={loadMoreReplies}
       onEdit={editComment}
       onPin={pinComment}
+      onHide={hideComment}
       repliesExpanded={expandedReplies[item.id] ?? false}
       replies={repliesData[item.id] ?? []}
       hasMoreReplies={hasMoreReplies[item.id] ?? false}
       isLoadingMoreReplies={loadingMoreReplies[item.id] ?? false}
     />
-  ), [videoId, isOwner, currentUser, hookLikeComment, hookDeleteComment, reportComment, handleReply, toggleReplies, hookLikeReply, deleteReply, loadMoreReplies, editComment, pinComment, expandedReplies, repliesData, hasMoreReplies, loadingMoreReplies])
+  ), [videoId, isOwner, currentUser, hookLikeComment, hookDeleteComment, reportComment, handleReply, toggleReplies, hookLikeReply, deleteReply, loadMoreReplies, editComment, pinComment, hideComment, expandedReplies, repliesData, hasMoreReplies, loadingMoreReplies])
 
   const keyExtractor = useCallback((item: CommentData) => item.id, [])
 

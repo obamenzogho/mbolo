@@ -13,6 +13,12 @@ import { extractMentions, resolveMentions } from '../features/feed/comments/ment
 const COMMENTS_PAGE = 20
 const REPLIES_PAGE = 20
 
+export function matchesBlockedWords(text: string, blocked: string[]): boolean {
+  if (blocked.length === 0) return false
+  const lower = text.toLowerCase()
+  return blocked.some((w) => w && new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(lower))
+}
+
 export function formatCount(n: number | undefined | null): string {
   if (!n || n === 0) return '0'
   if (n >= 1000000) return (n / 1000000).toFixed(1) + ' M'
@@ -59,6 +65,7 @@ export function useComments(videoId: string, visible: boolean, initialPreviews?:
   const [hasMoreReplies, setHasMoreReplies] = useState<Record<string, boolean>>({})
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadingMoreReplies, setLoadingMoreReplies] = useState<Record<string, boolean>>({})
+  const [blockedWords, setBlockedWords] = useState<string[]>([])
   const currentUser = auth.currentUser
   const authorCacheRef = useRef<Map<string, AuthorInfo>>(new Map())
   const lastDocRef = useRef<QueryDocumentSnapshot | null>(null)
@@ -138,6 +145,18 @@ export function useComments(videoId: string, visible: boolean, initialPreviews?:
       replyUnsubsRef.current.clear()
     }
   }, [])
+
+  // Load blocked words from creator's profile
+  useEffect(() => {
+    if (!videoOwnerId) return
+    let cancelled = false
+    getDoc(doc(db, 'users', videoOwnerId)).then((snap) => {
+      if (cancelled || !snap.exists()) return
+      const words = snap.data()?.blockedWords
+      if (Array.isArray(words)) setBlockedWords(words.map((w: string) => w.toLowerCase()))
+    })
+    return () => { cancelled = true }
+  }, [videoOwnerId])
 
   const loadReplies = useCallback((commentId: string) => {
     const existingUnsub = replyUnsubsRef.current.get(commentId)
@@ -239,6 +258,16 @@ export function useComments(videoId: string, visible: boolean, initialPreviews?:
           }
           if (wasDisliked) updates.dislikes = increment(-1)
           transaction.update(ref, updates)
+
+          // Notify comment author when creator likes their comment
+          if (uid === videoOwnerId && data.userId !== uid) {
+            createNotification({
+              userId: data.userId,
+              type: 'like',
+              fromUserId: uid,
+              videoId,
+            }).catch((e) => captureException(e instanceof Error ? e : new Error(String(e)), { context: 'likeComment:notification' }))
+          }
         } else if (!liked && wasLiked) {
           transaction.update(ref, {
             likes: increment(-1),
@@ -247,7 +276,7 @@ export function useComments(videoId: string, visible: boolean, initialPreviews?:
         }
       })
     } catch (e) { captureException(e instanceof Error ? e : new Error(String(e)), { context: 'likeComment' }) }
-  }, [currentUser, videoId])
+  }, [currentUser, videoId, videoOwnerId])
 
   const likeReply = useCallback(async (commentId: string, replyId: string, liked: boolean) => {
     if (!currentUser) return
@@ -432,6 +461,13 @@ export function useComments(videoId: string, visible: boolean, initialPreviews?:
     } catch (e) { captureException(e instanceof Error ? e : new Error(String(e)), { context: 'pinComment' }) }
   }, [currentUser, videoOwnerId, videoId, comments])
 
+  const hideComment = useCallback(async (commentId: string, hidden: boolean) => {
+    if (!currentUser || currentUser.uid !== videoOwnerId) return
+    try {
+      await updateDoc(doc(db, 'videos', videoId, 'comments', commentId), { hidden })
+    } catch (e) { captureException(e instanceof Error ? e : new Error(String(e)), { context: 'hideComment' }) }
+  }, [currentUser, videoOwnerId, videoId])
+
   const editComment = useCallback(async (commentId: string, newText: string) => {
     if (!currentUser) return
     const trimmed = newText.trim()
@@ -466,6 +502,8 @@ export function useComments(videoId: string, visible: boolean, initialPreviews?:
     addReply,
     pinComment,
     editComment,
+    hideComment,
+    blockedWords,
     loadMoreComments,
     loadMoreReplies,
   }
