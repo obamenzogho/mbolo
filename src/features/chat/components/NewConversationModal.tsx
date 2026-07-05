@@ -65,11 +65,12 @@ export function NewConversationModal({
       return
     }
     try {
+      const termLower = q.toLowerCase()
       const snap = await getDocs(
         query(
           collection(db, 'users'),
-          where('pseudo', '>=', q),
-          where('pseudo', '<=', q + '\uf8ff'),
+          where('pseudoLower', '>=', termLower),
+          where('pseudoLower', '<=', termLower + '\uf8ff'),
           limit(20),
         ),
       )

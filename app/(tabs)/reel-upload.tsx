@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { collection, addDoc, doc, increment, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore'
+import { extractHashtags } from '../../src/lib/hashtags'
 import { auth, db } from '../../src/lib/firebase'
 import { uploadToCloudinary, generateThumbnailURL } from '../../src/lib/cloudinary'
 import { captureException } from '../../src/lib/sentry'
@@ -97,7 +98,7 @@ export default function ReelUploadScreen() {
         thumbnailURL: generateThumbnailURL(videoUrl),
         coverURL: coverUri || generateThumbnailURL(videoUrl) || '',
         description: description.trim(),
-        hashtags: [],
+        hashtags: extractHashtags(description),
         likes: 0,
         comments: 0,
         shares: 0,

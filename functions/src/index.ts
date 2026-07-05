@@ -1,5 +1,6 @@
 import { onDocumentCreated, onDocumentDeleted } from 'firebase-functions/v2/firestore'
 import { onCall, HttpsError } from 'firebase-functions/v2/https'
+import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { initializeApp } from 'firebase-admin/app'
 import { getFirestore, FieldValue } from 'firebase-admin/firestore'
 import { defineSecret } from 'firebase-functions/params'
@@ -87,3 +88,97 @@ export const signCloudinaryUpload = onCall(
     return { signature, timestamp, folder, apiKey }
   },
 )
+
+/* ---------- PUSH NOTIFICATIONS : on notification doc created ---------- */
+const PUSH_MESSAGES: Record<string, (name: string) => { title: string; body: string }> = {
+  follow: (n) => ({ title: '👤 Nouvel abonné', body: `${n} s'est abonné à toi` }),
+  follow_request: (n) => ({ title: '📩 Demande', body: `${n} veut te suivre` }),
+  follow_accept: (n) => ({ title: '✅ Demande acceptée', body: `${n} a accepté ta demande` }),
+  like: (n) => ({ title: '❤️ Like', body: `${n} a aimé ta vidéo` }),
+  comment: (n) => ({ title: '💬 Commentaire', body: `${n} a commenté ta vidéo` }),
+  reply: (n) => ({ title: '↩️ Réponse', body: `${n} a répondu à ton commentaire` }),
+  repost: (n) => ({ title: '🔄 Republication', body: `${n} a republié ta vidéo` }),
+  mention: (n) => ({ title: '🏷️ Mention', body: `${n} t'a mentionné` }),
+}
+
+export const onNotificationCreate = onDocumentCreated('notifications/{notifId}', async (event) => {
+  const notif = event.data?.data()
+  if (!notif) return
+
+  const { userId, fromUserId, type } = notif
+  if (!userId || userId === fromUserId) return
+
+  const [targetSnap, fromSnap] = await Promise.all([
+    db.doc(`users/${userId}`).get(),
+    fromUserId ? db.doc(`users/${fromUserId}`).get() : Promise.resolve(null),
+  ])
+
+  const target = targetSnap.data()
+  const pushToken: string | undefined = target?.pushToken
+  if (!pushToken || target?.notifications === false) return
+
+  const fromName = fromSnap?.data()?.pseudo || 'Quelqu\'un'
+  const builder = PUSH_MESSAGES[type]
+  if (!builder) return
+  const { title, body } = builder(fromName)
+
+  await fetch('https://exp.host/--/api/v2/push/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      to: pushToken,
+      title,
+      body,
+      sound: 'default',
+      data: { type, fromUserId, ...notif.data },
+    }),
+  }).catch((e) => console.warn('push send failed:', e?.message ?? e))
+})
+
+/* ---------- HASHTAGS : trending counters + decay ---------- */
+const TRENDING_HALFLIFE_DAYS = 3
+
+export const onVideoCreateHashtags = onDocumentCreated('videos/{videoId}', async (event) => {
+  const video = event.data?.data()
+  const tags: string[] = video?.hashtags ?? []
+  if (!tags.length) return
+
+  const now = Date.now()
+  const batch = db.batch()
+  for (const tag of tags) {
+    const ref = db.doc(`hashtags/${tag}`)
+    batch.set(ref, {
+      tag,
+      videoCount: FieldValue.increment(1),
+      trendingScore: FieldValue.increment(1),
+      lastUsedAt: now,
+    }, { merge: true })
+  }
+  await batch.commit().catch((e) => console.warn('hashtag create failed:', e?.message ?? e))
+})
+
+export const onVideoDeleteHashtags = onDocumentDeleted('videos/{videoId}', async (event) => {
+  const video = event.data?.data()
+  const tags: string[] = video?.hashtags ?? []
+  if (!tags.length) return
+
+  const batch = db.batch()
+  for (const tag of tags) {
+    batch.set(db.doc(`hashtags/${tag}`), {
+      videoCount: FieldValue.increment(-1),
+    }, { merge: true })
+  }
+  await batch.commit().catch((e) => console.warn('hashtag delete failed:', e?.message ?? e))
+})
+
+export const decayTrendingScores = onSchedule('every 24 hours', async () => {
+  const decay = Math.pow(0.5, 1 / TRENDING_HALFLIFE_DAYS)
+  const snap = await db.collection('hashtags').where('trendingScore', '>', 0.1).get()
+
+  const batch = db.batch()
+  snap.docs.forEach((d) => {
+    const score = (d.data().trendingScore ?? 0) * decay
+    batch.update(d.ref, { trendingScore: score < 0.1 ? 0 : score })
+  })
+  await batch.commit().catch((e) => console.warn('decay failed:', e?.message ?? e))
+})

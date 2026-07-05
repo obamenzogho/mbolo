@@ -31,7 +31,7 @@ export async function resolveMentions(pseudos: string[]): Promise<Record<string,
   const map: Record<string, string> = {}
   await Promise.all(pseudos.map(async (pseudo) => {
     try {
-      const q = query(collection(db, 'users'), where('pseudo', '==', pseudo), limit(1))
+      const q = query(collection(db, 'users'), where('pseudoLower', '==', pseudo.toLowerCase()), limit(1))
       const snap = await getDocs(q)
       if (!snap.empty) map[pseudo] = snap.docs[0].id
     } catch {}

@@ -78,6 +78,7 @@ export default function EditProfile() {
       await updateDoc(doc(db, 'users', user.uid), {
         nom: nom.trim(),
         pseudo: pseudo.trim().toLowerCase(),
+        pseudoLower: pseudo.trim().toLowerCase(),
         bio: bio.trim(),
         photoURL,
         showAge,

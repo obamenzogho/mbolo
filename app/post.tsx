@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { collection, addDoc, doc, increment, updateDoc, serverTimestamp } from 'firebase/firestore'
 import { auth, db } from '../src/lib/firebase'
 import { uploadToCloudinary, generateThumbnailURL } from '../src/lib/cloudinary'
+import { normalizeTag } from '../src/lib/hashtags'
 import { colors } from '../src/lib/theme'
 import OrbitLoader from '../src/components/OrbitLoader'
 import { BackButton } from '../src/components/ui/BackButton'
@@ -82,7 +83,7 @@ export default function PostScreen() {
         thumbnailURL: generateThumbnailURL(mediaUrl),
         coverURL: generateThumbnailURL(mediaUrl) ?? '',
         description: description.trim(),
-        hashtags: selectedHashtags,
+        hashtags: selectedHashtags.map(t => normalizeTag(t.replace(/^#/, ''))),
         filter,
         filterIntensity,
         speed,

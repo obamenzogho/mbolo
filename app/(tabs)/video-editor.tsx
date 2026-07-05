@@ -18,6 +18,7 @@ import { collection, addDoc, serverTimestamp, doc, updateDoc, increment, getDoc 
 import { auth, db } from '../../src/lib/firebase'
 import { colors } from '../../src/lib/theme'
 import { uploadToCloudinary, generateThumbnailURL } from '../../src/lib/cloudinary'
+import { normalizeTag } from '../../src/lib/hashtags'
 import OrbitLoader from '../../src/components/OrbitLoader'
 import { BackButton } from '../../src/components/ui/BackButton'
 
@@ -122,7 +123,7 @@ export default function VideoEditorScreen() {
         thumbnailURL,
         coverURL: coverUri || thumbnailURL || '',
         description: description.trim(),
-        hashtags: selectedHashtags,
+        hashtags: selectedHashtags.map(t => normalizeTag(t.replace(/^#/, ''))),
         visibility,
         commentsEnabled,
         likes: 0,

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { View, Text, TouchableOpacity, Alert, Image } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, Alert, Image } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
@@ -7,10 +7,12 @@ import { collection, addDoc, doc, increment, updateDoc, serverTimestamp, getDoc 
 import { auth, db } from '../../src/lib/firebase'
 import { uploadVideo as uploadToStorage } from '../../src/lib/storage'
 import { generateThumbnailURL } from '../../src/lib/cloudinary'
+import { extractHashtags } from '../../src/lib/hashtags'
 import { colors } from '../../src/lib/theme'
 
 export default function Upload() {
   const [video, setVideo] = useState<any>(null)
+  const [description, setDescription] = useState('')
   const [uploading, setUploading] = useState(false)
 
   const pickVideo = async () => {
@@ -65,8 +67,8 @@ export default function Upload() {
         userPhotoURL: firestorePhotoURL,
         videoURL: result.uri,
         thumbnailURL: generateThumbnailURL(result.uri),
-        description: '',
-        hashtags: ['Gabon'],
+        description,
+        hashtags: extractHashtags(description),
         likes: 0,
         comments: 0,
         shares: 0,
@@ -111,7 +113,20 @@ export default function Upload() {
               source={{ uri: video.uri }}
               style={{
                 width: 200, height: 350, borderRadius: 12,
-                backgroundColor: colors.surface, marginBottom: 24,
+                backgroundColor: colors.surface, marginBottom: 16,
+              }}
+            />
+            <TextInput
+              value={description}
+              onChangeText={setDescription}
+              placeholder="Ajoute une légende avec #hashtags..."
+              placeholderTextColor={colors.textSecondary}
+              multiline
+              maxLength={500}
+              style={{
+                width: '100%', color: colors.text, backgroundColor: colors.surface,
+                borderRadius: 12, padding: 14, fontSize: 15, marginBottom: 16,
+                borderWidth: 1, borderColor: colors.border, maxHeight: 100,
               }}
             />
             <View style={{ flexDirection: 'row', gap: 12 }}>

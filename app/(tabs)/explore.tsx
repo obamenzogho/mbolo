@@ -10,14 +10,11 @@ import { collection, query, where, getDocs, orderBy, limit } from 'firebase/fire
 import { db, auth } from '../../src/lib/firebase'
 import { colors } from '../../src/lib/theme'
 import { getTranslation } from '../../src/i18n/translations'
+import { useTrendingHashtags } from '../../src/hooks/useTrendingHashtags'
+import { getVideosByHashtag } from '../../src/services/hashtagService'
 import OrbitLoader from '../../src/components/OrbitLoader'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
-
-const TRENDING_TAGS = [
-  '#Gabon', '#Libreville', '#PortGentil', '#Nzebi',
-  '#Fang', '#Punu', '#Afrique', '#CultureGabonaise',
-]
 
 interface SearchResult {
   id: string
@@ -36,6 +33,7 @@ export default function Explore() {
   const [searching, setSearching] = useState(false)
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   const t = getTranslation('fr')
+  const { tags: trendingTags } = useTrendingHashtags(8)
 
   const performSearch = useCallback(async (term: string) => {
     if (!term.trim()) { setResults([]); setSearching(false); return }
@@ -44,10 +42,11 @@ export default function Explore() {
     try {
       const resultsArr: SearchResult[] = []
 
+      const termLower = term.trim().toLowerCase()
       const usersQ = query(
         collection(db, 'users'),
-        where('pseudo', '>=', term.trim()),
-        where('pseudo', '<=', term.trim() + '\uf8ff'),
+        where('pseudoLower', '>=', termLower),
+        where('pseudoLower', '<=', termLower + '\uf8ff'),
         limit(10)
       )
       const usersSnap = await getDocs(usersQ)
@@ -63,24 +62,14 @@ export default function Explore() {
       }
 
       if (term.startsWith('#')) {
-        const tag = term.slice(1).toLowerCase()
-        const videosQ = query(
-          collection(db, 'videos'),
-          orderBy('createdAt', 'desc'),
-          limit(20)
-        )
-        const videosSnap = await getDocs(videosQ)
-        for (const doc of videosSnap.docs) {
-          const data = doc.data()
-          const hashtags: string[] = (data.hashtags || []).map((h: string) => h.toLowerCase())
-          if (hashtags.some(h => h.includes(tag))) {
-            resultsArr.push({
-              id: doc.id,
-              type: 'video',
-              description: data.description,
-              videoURL: data.videoURL,
-            })
-          }
+        const vids = await getVideosByHashtag(term)
+        for (const v of vids) {
+          resultsArr.push({
+            id: v.id,
+            type: 'video',
+            description: v.description,
+            videoURL: v.videoURL,
+          })
         }
       }
 
@@ -205,17 +194,17 @@ export default function Explore() {
               {t.explore?.trending || 'Tendances au Gabon'} 🇬🇦
             </Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {TRENDING_TAGS.map((tag) => (
+              {trendingTags.map((t) => (
                 <TouchableOpacity
-                  key={tag}
-                  onPress={() => handleTagPress(tag)}
+                  key={t.tag}
+                  onPress={() => router.push({ pathname: '/hashtag/[tag]', params: { tag: t.tag } })}
                   style={{
                     backgroundColor: colors.surfaceLight,
                     paddingHorizontal: 16, paddingVertical: 8,
                     borderRadius: 20, borderWidth: 1, borderColor: colors.border,
                   }}
                 >
-                  <Text style={{ color: colors.primary, fontWeight: '600' }}>{tag}</Text>
+                  <Text style={{ color: colors.primary, fontWeight: '600' }}>#{t.tag}</Text>
                 </TouchableOpacity>
               ))}
             </View>

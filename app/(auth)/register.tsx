@@ -227,6 +227,7 @@ export default function Register() {
       await setDoc(doc(db, 'users', cred.user.uid), {
         nom,
         pseudo: usernameKey,
+        pseudoLower: usernameKey.toLowerCase(),
         email: emailTrimmed,
         dateOfBirth: dateStr,
         photoURL: '',

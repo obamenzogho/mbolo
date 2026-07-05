@@ -115,11 +115,12 @@ export async function searchUsers(
 ): Promise<{ id: string; pseudo: string; nom?: string; photoURL?: string }[]> {
   if (queryText.length < 1) return []
   try {
+    const termLower = queryText.toLowerCase()
     const snap = await getDocs(
       query(
         collection(db, 'users'),
-        where('pseudo', '>=', queryText),
-        where('pseudo', '<=', queryText + '\uf8ff'),
+        where('pseudoLower', '>=', termLower),
+        where('pseudoLower', '<=', termLower + '\uf8ff'),
         limit(max),
       ),
     )
