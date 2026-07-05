@@ -6,7 +6,7 @@ import { doc, getDoc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firest
 import { db, auth } from '../../src/lib/firebase'
 import { colors } from '../../src/lib/theme'
 import { BackButton } from '../../src/components/ui/BackButton'
-import { OrbitLoader } from '../../src/components/ui/OrbitLoader'
+import OrbitLoader from '../../src/components/OrbitLoader'
 import { captureException } from '../../src/lib/sentry'
 
 export default function BlockedWords() {
