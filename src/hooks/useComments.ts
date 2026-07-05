@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   collection, query, orderBy, onSnapshot, addDoc, startAfter,
-  doc, increment, arrayUnion, arrayRemove, serverTimestamp,
+  doc, increment, arrayUnion, arrayRemove, serverTimestamp, updateDoc,
   getDoc, getDocs, limit, runTransaction, type QueryDocumentSnapshot,
 } from 'firebase/firestore'
 import { db, auth } from '../lib/firebase'
 import { batchFetchAuthors, type AuthorInfo } from '../lib/firestore'
 import { createNotification } from '../lib/notifications'
 import { captureException } from '../lib/sentry'
+import { extractMentions, resolveMentions } from '../features/feed/comments/mentions'
 
 const COMMENTS_PAGE = 20
 const REPLIES_PAGE = 20
@@ -354,6 +355,15 @@ export function useComments(videoId: string, visible: boolean, initialPreviews?:
       if (videoOwnerId && videoOwnerId !== currentUser.uid) {
         createNotification({ userId: videoOwnerId, type: 'comment', fromUserId: currentUser.uid, videoId })
       }
+      const pseudos = extractMentions(trimmed)
+      if (pseudos.length > 0) {
+        const map = await resolveMentions(pseudos)
+        for (const uid of Object.values(map)) {
+          if (uid !== currentUser.uid && uid !== videoOwnerId) {
+            createNotification({ userId: uid, type: 'mention', fromUserId: currentUser.uid, videoId })
+          }
+        }
+      }
       return trimmed
     } catch (e) { captureException(e instanceof Error ? e : new Error(String(e)), { context: 'addComment' }) }
     return ''
@@ -395,10 +405,46 @@ export function useComments(videoId: string, visible: boolean, initialPreviews?:
         captureException(e instanceof Error ? e : new Error(String(e)), { context: 'addReply-parent-fetch' })
       }
 
+      const pseudos = extractMentions(trimmed)
+      if (pseudos.length > 0) {
+        const map = await resolveMentions(pseudos)
+        for (const uid of Object.values(map)) {
+          if (uid !== currentUser.uid && uid !== videoOwnerId) {
+            createNotification({ userId: uid, type: 'mention', fromUserId: currentUser.uid, videoId })
+          }
+        }
+      }
+
       return trimmed
     } catch (e) { captureException(e instanceof Error ? e : new Error(String(e)), { context: 'addReply' }) }
     return ''
   }, [currentUser, videoId, videoOwnerId])
+
+  const pinComment = useCallback(async (commentId: string, pinned: boolean) => {
+    if (!currentUser || currentUser.uid !== videoOwnerId) return
+    try {
+      if (pinned) {
+        const prev = comments.filter((c: any) => c.pinned && c.id !== commentId)
+        await Promise.all(prev.map((c: any) =>
+          updateDoc(doc(db, 'videos', videoId, 'comments', c.id), { pinned: false })))
+      }
+      await updateDoc(doc(db, 'videos', videoId, 'comments', commentId), { pinned })
+    } catch (e) { captureException(e instanceof Error ? e : new Error(String(e)), { context: 'pinComment' }) }
+  }, [currentUser, videoOwnerId, videoId, comments])
+
+  const editComment = useCallback(async (commentId: string, newText: string) => {
+    if (!currentUser) return
+    const trimmed = newText.trim()
+    if (!trimmed) return
+    const ref = doc(db, 'videos', videoId, 'comments', commentId)
+    try {
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(ref)
+        if (!snap.exists() || snap.data().userId !== currentUser.uid) return
+        tx.update(ref, { text: trimmed, edited: true, editedAt: serverTimestamp() })
+      })
+    } catch (e) { captureException(e instanceof Error ? e : new Error(String(e)), { context: 'editComment' }) }
+  }, [currentUser, videoId])
 
   return {
     comments,
@@ -418,6 +464,8 @@ export function useComments(videoId: string, visible: boolean, initialPreviews?:
     reportComment,
     addComment,
     addReply,
+    pinComment,
+    editComment,
     loadMoreComments,
     loadMoreReplies,
   }

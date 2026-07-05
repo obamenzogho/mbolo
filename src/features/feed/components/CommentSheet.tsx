@@ -38,7 +38,7 @@ export default function CommentSheet({ videoId, videoOwnerId, isOwner, previewCo
     likeComment: hookLikeComment, likeReply: hookLikeReply,
     deleteComment: hookDeleteComment,
     toggleReplies, currentUser,
-    addComment, addReply, reportComment, deleteReply,
+    addComment, addReply, reportComment, deleteReply, pinComment,
     loadMoreComments, loadMoreReplies,
   } = useComments(videoId, true, previewComments, videoOwnerId)
 
@@ -57,18 +57,17 @@ export default function CommentSheet({ videoId, videoOwnerId, isOwner, previewCo
 
   const sortedComments = useMemo(() => {
     const arr = [...(comments as CommentData[])]
-    if (sortMode === 'top') {
-      arr.sort((a, b) => (b.likes ?? 0) - (a.likes ?? 0))
-    } else {
-      arr.sort((a, b) => {
-        const toMs = (v: unknown): number => {
-          if (!v) return 0
-          const d = (v as { toDate?: () => Date }).toDate ? (v as { toDate: () => Date }).toDate() : new Date(v as string | number)
-          return isNaN(d.getTime()) ? 0 : d.getTime()
-        }
-        return toMs(b.createdAt) - toMs(a.createdAt)
-      })
-    }
+    arr.sort((a, b) => {
+      if ((a as any).pinned && !(b as any).pinned) return -1
+      if (!(a as any).pinned && (b as any).pinned) return 1
+      if (sortMode === 'top') return (b.likes ?? 0) - (a.likes ?? 0)
+      const toMs = (v: unknown): number => {
+        if (!v) return 0
+        const d = (v as any).toDate ? (v as any).toDate() : new Date(v as any)
+        return isNaN(d.getTime()) ? 0 : d.getTime()
+      }
+      return toMs(b.createdAt) - toMs(a.createdAt)
+    })
     return arr
   }, [comments, sortMode])
 
@@ -158,6 +157,7 @@ export default function CommentSheet({ videoId, videoOwnerId, isOwner, previewCo
       comment={item}
       videoId={videoId}
       isVideoOwner={isOwner}
+      videoOwnerId={videoOwnerId}
       currentUserId={currentUser?.uid}
       onLike={(commentId, liked) => hookLikeComment(commentId, liked)}
       onDelete={(commentId) => hookDeleteComment(commentId)}
@@ -167,12 +167,14 @@ export default function CommentSheet({ videoId, videoOwnerId, isOwner, previewCo
       onReplyLike={(commentId, replyId, liked) => hookLikeReply(commentId, replyId, liked)}
       onReplyDelete={(commentId, replyId) => deleteReply(commentId, replyId)}
       onLoadMoreReplies={loadMoreReplies}
+      onEdit={editComment}
+      onPin={pinComment}
       repliesExpanded={expandedReplies[item.id] ?? false}
       replies={repliesData[item.id] ?? []}
       hasMoreReplies={hasMoreReplies[item.id] ?? false}
       isLoadingMoreReplies={loadingMoreReplies[item.id] ?? false}
     />
-  ), [videoId, isOwner, currentUser, hookLikeComment, hookDeleteComment, reportComment, handleReply, toggleReplies, hookLikeReply, deleteReply, loadMoreReplies, expandedReplies, repliesData, hasMoreReplies, loadingMoreReplies])
+  ), [videoId, isOwner, currentUser, hookLikeComment, hookDeleteComment, reportComment, handleReply, toggleReplies, hookLikeReply, deleteReply, loadMoreReplies, editComment, pinComment, expandedReplies, repliesData, hasMoreReplies, loadingMoreReplies])
 
   const keyExtractor = useCallback((item: CommentData) => item.id, [])
 

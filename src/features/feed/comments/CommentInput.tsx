@@ -2,6 +2,9 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { View, Text, TextInput, TouchableOpacity, Image, Alert, Keyboard, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { captureException } from '../../../lib/sentry'
+import { colors } from '../../../lib/theme'
+import { collection, query, where, orderBy, startAt, endAt, getDocs, limit } from 'firebase/firestore'
+import { db } from '../../../lib/firebase'
 import OrbitLoader from '../../../components/OrbitLoader'
 import type { CommentData } from './CommentItem'
 
@@ -23,13 +26,48 @@ function CommentInputComponent({
 }: CommentInputProps) {
   const [text, setText] = useState('')
   const [isPosting, setIsPosting] = useState(false)
+  const [suggestions, setSuggestions] = useState<{ uid: string; pseudo: string; photoURL?: string }[]>([])
   const inputRef = useRef<TextInput>(null)
+  const mentionQueryRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (replyingTo) {
       inputRef.current?.focus()
     }
   }, [replyingTo])
+
+  const searchUsers = useCallback(async (prefix: string) => {
+    if (prefix.length < 1) return
+    try {
+      const q = query(
+        collection(db, 'users'),
+        orderBy('pseudo'),
+        startAt(prefix),
+        endAt(prefix + '\uf8ff'),
+        limit(6),
+      )
+      const snap = await getDocs(q)
+      setSuggestions(snap.docs.map((d) => ({ uid: d.id, pseudo: d.data().pseudo, photoURL: d.data().photoURL })))
+    } catch { setSuggestions([]) }
+  }, [])
+
+  const onChangeText = useCallback((val: string) => {
+    setText(val)
+    const match = /@([a-zA-Z0-9_]{1,30})$/.exec(val)
+    if (match) {
+      mentionQueryRef.current = match[1].toLowerCase()
+      searchUsers(match[1].toLowerCase())
+    } else {
+      mentionQueryRef.current = null
+      setSuggestions([])
+    }
+  }, [searchUsers])
+
+  const pickSuggestion = useCallback((pseudo: string) => {
+    setText((t) => t.replace(/@[a-zA-Z0-9_]{1,30}$/, `@${pseudo} `))
+    setSuggestions([])
+    mentionQueryRef.current = null
+  }, [])
 
   const handlePost = useCallback(async () => {
     const trimmed = text.trim()
@@ -63,7 +101,7 @@ function CommentInputComponent({
             </Text>
           </Text>
           <TouchableOpacity onPress={onCancelReply}>
-            <Ionicons name="close" size={16} color="rgba(255,255,255,0.6)" />
+            <Ionicons name="close" size={16} color={colors.textMuted} />
           </TouchableOpacity>
         </View>
       )}
@@ -72,17 +110,31 @@ function CommentInputComponent({
           <Image source={{ uri: currentUserPhotoURL }} style={styles.userAvatar} />
         ) : (
           <View style={[styles.userAvatar, styles.avatarPlaceholder]}>
-            <Ionicons name="person" size={16} color="#FFF" />
+            <Ionicons name="person" size={16} color={colors.white} />
           </View>
         )}
+        <View style={{ flex: 1 }}>
+          {suggestions.length > 0 && (
+            <View style={{ maxHeight: 180, backgroundColor: colors.surface, borderRadius: 8, marginBottom: 4, overflow: 'hidden' }}>
+              {suggestions.map((s) => (
+                <TouchableOpacity key={s.uid} onPress={() => pickSuggestion(s.pseudo)}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 8 }}>
+                  {s.photoURL
+                    ? <Image source={{ uri: s.photoURL }} style={{ width: 28, height: 28, borderRadius: 14 }} />
+                    : <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors.surfaceLight }} />}
+                  <Text style={{ color: colors.text }}>@{s.pseudo}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         <View style={styles.inputContainer}>
           <TextInput
             ref={inputRef}
             style={styles.textInput}
             placeholder={replyingTo ? `Répondre à ${replyingTo.authorName || replyingTo.userName || 'Utilisateur'}…` : 'Ajouter un commentaire…'}
-            placeholderTextColor="rgba(255,255,255,0.4)"
+            placeholderTextColor={colors.textFaint}
             value={text}
-            onChangeText={setText}
+            onChangeText={onChangeText}
             multiline
             maxLength={500}
             returnKeyType="default"
@@ -95,6 +147,7 @@ function CommentInputComponent({
               </TouchableOpacity>
             ))}
           </View>
+        </View>
         </View>
         <TouchableOpacity
           style={[styles.postBtn, { opacity: text.trim() && !isPosting ? 1 : 0.4 }]}
@@ -117,8 +170,8 @@ export const CommentInput = CommentInputComponent
 const styles = StyleSheet.create({
   wrapper: {
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: '#1a1a1a',
+    borderTopColor: colors.hairline,
+    backgroundColor: colors.surface,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
@@ -131,11 +184,11 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   replyBannerText: {
-    color: 'rgba(255,255,255,0.6)',
+    color: colors.textMuted,
     fontSize: 12,
   },
   replyBannerName: {
-    color: '#00C853',
+    color: colors.primary,
     fontWeight: '600',
   },
   inputRow: {
@@ -149,20 +202,20 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   avatarPlaceholder: {
-    backgroundColor: '#333',
+    backgroundColor: colors.surfaceLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
   inputContainer: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: colors.surfaceLight,
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 8,
     maxHeight: 100,
   },
   textInput: {
-    color: '#FFF',
+    color: colors.white,
     fontSize: 14,
     lineHeight: 20,
     maxHeight: 60,
@@ -180,7 +233,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   postBtnText: {
-    color: '#00C853',
+    color: colors.primary,
     fontSize: 14,
     fontWeight: '700',
   },

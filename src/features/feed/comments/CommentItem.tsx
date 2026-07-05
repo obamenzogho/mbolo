@@ -1,9 +1,10 @@
 import { memo, useState, useCallback, useRef } from 'react'
-import { View, Text, TouchableOpacity, Alert, Image, StyleSheet } from 'react-native'
+import { View, Text, TouchableOpacity, Alert, Image, TextInput, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { captureException } from '../../../lib/sentry'
 import { colors } from '../../../lib/theme'
+import { CommentText } from './CommentText'
 import { ReplyItem, type ReplyData } from './ReplyItem'
 
 export interface CommentData {
@@ -20,12 +21,14 @@ export interface CommentData {
   userName?: string
   userPhotoURL?: string
   createdAt?: unknown
+  edited?: boolean
 }
 
 interface CommentItemProps {
   comment: CommentData
   videoId: string
   isVideoOwner: boolean
+  videoOwnerId?: string
   currentUserId?: string
   onLike: (commentId: string, liked: boolean) => void
   onDelete: (commentId: string) => void
@@ -35,6 +38,8 @@ interface CommentItemProps {
   onReplyLike: (commentId: string, replyId: string, liked: boolean) => void
   onReplyDelete: (commentId: string, replyId: string) => void
   onLoadMoreReplies?: (commentId: string) => void
+  onEdit?: (commentId: string, newText: string) => void
+  onPin?: (commentId: string, pinned: boolean) => void
   repliesExpanded: boolean
   replies: ReplyData[]
   hasMoreReplies?: boolean
@@ -54,15 +59,18 @@ function formatTimeAgo(date: unknown): string {
 }
 
 function CommentItemComponent({
-  comment, videoId, isVideoOwner, currentUserId, onLike, onDelete, onReport, onReply,
-  onToggleReplies, onReplyLike, onReplyDelete, onLoadMoreReplies,
+  comment, videoId, isVideoOwner, videoOwnerId, currentUserId, onLike, onDelete, onReport, onReply,
+  onToggleReplies, onReplyLike, onReplyDelete, onLoadMoreReplies, onEdit, onPin,
   repliesExpanded, replies, hasMoreReplies, isLoadingMoreReplies,
 }: CommentItemProps) {
   const displayName = comment.authorName || comment.userName || 'Utilisateur'
   const photoURL = comment.authorPhoto || comment.userPhotoURL || null
   const isOwn = currentUserId === comment.userId
+  const isCreator = comment.userId === videoOwnerId
   const [liked, setLiked] = useState(comment.likedBy?.includes(currentUserId ?? '') ?? false)
   const [likeCount, setLikeCount] = useState(comment.likes ?? 0)
+  const [editing, setEditing] = useState(false)
+  const [editText, setEditText] = useState(comment.text)
   const lastTapRef = useRef(0)
 
   const handleLike = useCallback(() => {
@@ -89,19 +97,22 @@ function CommentItemComponent({
           { text: 'Supprimer', style: 'destructive', onPress: () => onDelete(comment.id) },
         ])
       }, style: 'destructive' })
-      options.push({ text: 'Modifier', onPress: () => Alert.alert('Info', 'Modification bientôt disponible') })
+      options.push({ text: 'Modifier', onPress: () => { setEditText(comment.text); setEditing(true) } })
     } else {
       options.push({ text: 'Signaler', onPress: async () => {
         onReport(comment.id)
         Alert.alert('Signalé', 'Ce commentaire a été signalé.')
       } })
     }
-    if (isOwn) {
-      options.push({ text: 'Épingler', onPress: () => Alert.alert('Info', 'Épinglage bientôt disponible') })
+    if (isVideoOwner) {
+      options.push({
+        text: (comment as any).pinned ? 'Désépingler' : 'Épingler',
+        onPress: () => onPin?.(comment.id, !(comment as any).pinned),
+      })
     }
     options.push({ text: 'Annuler', style: 'cancel', onPress: () => {} })
     Alert.alert('Options', undefined, options)
-  }, [isOwn, comment.id, onDelete, onReport])
+  }, [isOwn, isVideoOwner, comment, onDelete, onReport, onPin])
 
   return (
     <TouchableOpacity onLongPress={handleLongPress} activeOpacity={0.9}>
@@ -118,11 +129,33 @@ function CommentItemComponent({
         <View style={styles.body}>
           <View style={styles.header}>
             <Text style={styles.username}>{displayName}</Text>
+            {isCreator && (
+              <View style={{ backgroundColor: colors.primary, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1, marginLeft: 6 }}>
+                <Text style={{ color: colors.white, fontSize: 10, fontWeight: '700' }}>Créateur</Text>
+              </View>
+            )}
+            {(comment as any).pinned && <Ionicons name="pin" size={12} color={colors.textMuted} style={{ marginLeft: 4 }} />}
             <Text style={styles.timestamp}>{formatTimeAgo(comment.createdAt)}</Text>
           </View>
-          <TouchableOpacity onPress={handleDoubleTap} activeOpacity={1}>
-            <Text style={styles.text}>{comment.text}</Text>
-          </TouchableOpacity>
+          {editing ? (
+            <View>
+              <TextInput value={editText} onChangeText={setEditText} multiline autoFocus
+                style={[styles.text, { backgroundColor: colors.surfaceLight, borderRadius: 8, padding: 8 }]} />
+              <View style={{ flexDirection: 'row', gap: 16, marginTop: 4 }}>
+                <TouchableOpacity onPress={() => setEditing(false)}>
+                  <Text style={styles.actionText}>Annuler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => { onEdit?.(comment.id, editText); setEditing(false) }}>
+                  <Text style={[styles.actionText, { color: colors.primary }]}>Enregistrer</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <TouchableOpacity onPress={handleDoubleTap} activeOpacity={1}>
+              <CommentText text={comment.text} mentionMap={(comment as any).mentionMap} style={styles.text} />
+            </TouchableOpacity>
+          )}
+          {comment.edited && !editing && <Text style={{ color: colors.textMuted, fontSize: 11 }}> (modifié)</Text>}
           <View style={styles.commentActions}>
             <TouchableOpacity onPress={() => onReply(comment.id, displayName)}>
               <Text style={styles.actionText}>Répondre</Text>
