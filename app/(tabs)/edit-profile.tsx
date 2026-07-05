@@ -11,9 +11,7 @@ import { colors } from '../../src/lib/theme'
 import { router } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import OrbitLoader from '../../src/components/OrbitLoader'
-
-const CLOUD_NAME = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME
-const UPLOAD_PRESET = process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET
+import { uploadToCloudinary } from '../../src/lib/cloudinary'
 
 export default function EditProfile() {
   const user = auth.currentUser
@@ -60,24 +58,9 @@ export default function EditProfile() {
     setUploadingPhoto(true)
     try {
       const uri = result.assets[0].uri
-      const formData = new FormData()
-      formData.append('file', {
-        uri,
-        type: 'image/jpeg',
-        name: 'profile.jpg',
-      } as any)
-      formData.append('upload_preset', UPLOAD_PRESET || '')
-      formData.append('folder', 'profile_photos')
-
-      const res = await fetch(
-        `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
-        { method: 'POST', body: formData }
-      )
-      const data = await res.json()
-      if (data.secure_url) {
-        await updateDoc(doc(db, 'users', user!.uid), { photoURL: data.secure_url })
-        setPhotoURL(data.secure_url)
-      }
+      const url = await uploadToCloudinary(uri, 'image', { compress: true, quality: 0.8 })
+      await updateDoc(doc(db, 'users', user!.uid), { photoURL: url })
+      setPhotoURL(url)
     } catch {
       Alert.alert('Erreur', "Impossible d'uploader la photo")
     }

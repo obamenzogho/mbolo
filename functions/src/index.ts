@@ -1,6 +1,12 @@
 import { onDocumentCreated, onDocumentDeleted } from 'firebase-functions/v2/firestore'
+import { onCall, HttpsError } from 'firebase-functions/v2/https'
 import { initializeApp } from 'firebase-admin/app'
 import { getFirestore, FieldValue } from 'firebase-admin/firestore'
+import { defineSecret } from 'firebase-functions/params'
+import * as crypto from 'crypto'
+
+const CLOUDINARY_API_SECRET = defineSecret('CLOUDINARY_API_SECRET')
+const CLOUDINARY_API_KEY = defineSecret('CLOUDINARY_API_KEY')
 
 initializeApp()
 const db = getFirestore()
@@ -58,3 +64,26 @@ export const onShareDelete = onDocumentDeleted('shares/{shareId}', (e) => {
   const videoId = e.data?.get('postId')
   return videoId ? bump(`videos/${videoId}`, 'shares', -1) : null
 })
+
+/* ---------- CLOUDINARY SIGNATURE : callable ---------- */
+export const signCloudinaryUpload = onCall(
+  { secrets: [CLOUDINARY_API_SECRET, CLOUDINARY_API_KEY] },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'Must be signed in')
+    }
+
+    const uid = request.auth.uid
+    const resourceType = request.data?.resourceType === 'video' ? 'video' : 'image'
+    const folder = resourceType === 'video' ? `reels/${uid}` : `profile/${uid}`
+
+    const timestamp = Math.floor(Date.now() / 1000)
+    const apiSecret = CLOUDINARY_API_SECRET.value()
+    const apiKey = CLOUDINARY_API_KEY.value()
+
+    const toSign = `folder=${folder}&timestamp=${timestamp}${apiSecret}`
+    const signature = crypto.createHash('sha256').update(toSign).digest('hex')
+
+    return { signature, timestamp, folder, apiKey }
+  },
+)

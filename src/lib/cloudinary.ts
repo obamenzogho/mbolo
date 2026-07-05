@@ -1,7 +1,7 @@
 import { captureUploadError, startTransaction } from './sentry'
+import { getFunctions, httpsCallable } from 'firebase/functions'
 
 const CLOUD_NAME = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME || ''
-const UPLOAD_PRESET = process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET || ''
 
 async function compressImage(uri: string, quality: number): Promise<string> {
   try {
@@ -9,7 +9,7 @@ async function compressImage(uri: string, quality: number): Promise<string> {
     const result = await ImageManipulator.manipulateAsync(
       uri,
       [{ resize: { maxWidth: 1920, maxHeight: 1920 } }],
-      { compress: quality, format: ImageManipulator.SaveFormat.JPEG }
+      { compress: quality, format: ImageManipulator.SaveFormat.JPEG },
     )
     return result.uri
   } catch {
@@ -37,7 +37,7 @@ interface CloudinaryResponse {
 }
 
 export function isCloudinaryConfigured(): boolean {
-  return !!(CLOUD_NAME && UPLOAD_PRESET)
+  return !!CLOUD_NAME
 }
 
 function getFileUri(uri: string): string {
@@ -50,15 +50,15 @@ function getFileUri(uri: string): string {
 function detectResourceType(uri: string): 'video' | 'image' {
   const videoExts = ['.mp4', '.mov', '.mkv', '.avi', '.webm']
   const lower = uri.toLowerCase()
-  return videoExts.some(ext => lower.includes(ext)) ? 'video' : 'image'
+  return videoExts.some((ext) => lower.includes(ext)) ? 'video' : 'image'
 }
 
 export async function uploadToCloudinary(
   uri: string,
   resourceType?: 'video' | 'image',
-  options: UploadOptions = {}
+  options: UploadOptions = {},
 ): Promise<string> {
-  if (!CLOUD_NAME || !UPLOAD_PRESET) {
+  if (!CLOUD_NAME) {
     throw new Error('Cloudinary non configuré. Vérifie ton fichier .env')
   }
 
@@ -66,11 +66,16 @@ export async function uploadToCloudinary(
   const ext = type === 'video' ? 'mp4' : 'jpg'
   const filename = `upload_${Date.now()}.${ext}`
   const endpoint = type === 'video' ? 'video/upload' : 'image/upload'
-  const folder = options.folder || (type === 'video' ? 'reels' : 'images')
 
   let finalUri = uri
   if (options.compress && type === 'image') {
     finalUri = await compressImage(uri, options.quality || 0.8)
+  }
+
+  const functions = getFunctions()
+  const signUpload = httpsCallable(functions, 'signCloudinaryUpload')
+  const { data } = (await signUpload({ resourceType: type })) as {
+    data: { signature: string; timestamp: number; folder: string; apiKey: string }
   }
 
   const formData = new FormData()
@@ -79,11 +84,12 @@ export async function uploadToCloudinary(
     type: type === 'video' ? 'video/mp4' : 'image/jpeg',
     name: filename,
   } as any)
-  formData.append('upload_preset', UPLOAD_PRESET)
-  formData.append('folder', folder)
+  formData.append('api_key', data.apiKey)
+  formData.append('timestamp', String(data.timestamp))
+  formData.append('signature', data.signature)
+  formData.append('folder', data.folder)
 
   const timeout = options.timeout || 180000
-
   const uploadSpan = startTransaction('upload.cloudinary', type)
 
   return new Promise((resolve, reject) => {
@@ -100,13 +106,13 @@ export async function uploadToCloudinary(
 
     xhr.onload = () => {
       try {
-        const data: CloudinaryResponse = JSON.parse(xhr.responseText)
-        if (data.secure_url) {
+        const resp: CloudinaryResponse = JSON.parse(xhr.responseText)
+        if (resp.secure_url) {
           uploadSpan?.finish()
-          resolve(data.secure_url)
+          resolve(resp.secure_url)
         } else {
-          const err = new Error(data.error?.message || 'Upload failed')
-          captureUploadError(err, { type, size: data.bytes })
+          const err = new Error(resp.error?.message || 'Upload failed')
+          captureUploadError(err, { type, size: resp.bytes })
           uploadSpan?.finish()
           reject(err)
         }
@@ -140,18 +146,13 @@ export function getCloudinaryConfig() {
 
 const CLOUDINARY_BASE = 'res.cloudinary.com'
 
-export function generateThumbnailURL(
-  videoURL: string | null | undefined
-): string | null {
+export function generateThumbnailURL(videoURL: string | null | undefined): string | null {
   if (!videoURL) return null
   if (videoURL.startsWith('file://')) return null
   if (!videoURL.includes(CLOUDINARY_BASE)) return null
   try {
     return videoURL
-      .replace(
-        '/upload/',
-        '/upload/so_0,f_jpg,w_400,h_711,c_fill/'
-      )
+      .replace('/upload/', '/upload/so_0,f_jpg,w_400,h_711,c_fill/')
       .replace(/\.(mp4|mov|webm|avi)(\?.*)?$/, '.jpg')
   } catch {
     return null

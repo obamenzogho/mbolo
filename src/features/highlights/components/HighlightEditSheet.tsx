@@ -11,6 +11,7 @@ import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom
 import { auth } from '@/lib/firebase'
 import { captureException } from '@/lib/sentry'
 import { colors } from '@/lib/theme'
+import { uploadToCloudinary } from '@/lib/cloudinary'
 import {
   createHighlight,
   updateHighlight,
@@ -19,8 +20,6 @@ import {
 import type { Highlight } from '@/features/highlights/services/highlightService'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
-const CLOUD_NAME = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME
-const UPLOAD_PRESET = process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET
 
 interface HighlightEditSheetProps {
   visible: boolean
@@ -119,38 +118,8 @@ export default function HighlightEditSheet({ visible, onClose, onSaved, highligh
   const uploadToCloudinary = async (uri: string): Promise<string | null> => {
     try {
       const isVideo = uri.includes('.mp4') || uri.includes('.mov') || uri.includes('.mkv') || uri.includes('.avi')
-      const ext = isVideo ? (uri.includes('.mov') ? 'mov' : 'mp4') : 'jpg'
-      const filename = `highlight_${Date.now()}.${ext}`
-      const endpoint = isVideo ? 'video/upload' : 'image/upload'
-
-      let fileUri = uri
-      if (!fileUri.startsWith('file://') && !fileUri.startsWith('http') && !fileUri.startsWith('content://')) {
-        fileUri = 'file://' + fileUri
-      }
-
-      const formData = new FormData()
-      formData.append('file', { uri: fileUri, type: isVideo ? 'video/mp4' : 'image/jpeg', name: filename } as any)
-      formData.append('upload_preset', UPLOAD_PRESET || 'ml_default')
-      formData.append('folder', 'highlights')
-
-      return new Promise((resolve) => {
-        const xhr = new XMLHttpRequest()
-        xhr.open('POST', `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${endpoint}`)
-        xhr.onload = () => {
-          try {
-            const data = JSON.parse(xhr.responseText)
-            if (data.secure_url) resolve(data.secure_url)
-            else {
-              console.error('Cloudinary response:', data)
-              resolve(null)
-            }
-          } catch { resolve(null) }
-        }
-        xhr.onerror = () => { console.error('XHR error'); resolve(null) }
-        xhr.ontimeout = () => { console.error('XHR timeout'); resolve(null) }
-        xhr.timeout = 120000
-        xhr.send(formData)
-      })
+      const resourceType = isVideo ? 'video' : 'image'
+      return await uploadToCloudinary(uri, resourceType)
     } catch (e) {
       console.error('Upload failed:', e)
       return null
