@@ -38,7 +38,7 @@ export default function CommentSheet({ videoId, videoOwnerId, isOwner, previewCo
     likeComment: hookLikeComment, likeReply: hookLikeReply,
     deleteComment: hookDeleteComment,
     toggleReplies, currentUser,
-    addComment, addReply, reportComment, deleteReply, pinComment,
+    addComment, addReply, reportComment, deleteReply, pinComment, editComment,
     loadMoreComments, loadMoreReplies,
   } = useComments(videoId, true, previewComments, videoOwnerId)
 
