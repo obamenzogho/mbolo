@@ -2,6 +2,7 @@ import { memo, useCallback, useRef } from 'react'
 import { TouchableOpacity, Text, Animated, Alert } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { captureException } from '@/lib/sentry'
+import { colors } from '@/lib/theme'
 import { useRepost } from '../hooks/useRepost'
 import type { Video } from '@/types'
 
@@ -64,13 +65,13 @@ function RepostButtonComponent({ video, size = 28, showLabel = true, onRepost }:
         <Ionicons
           name={reposted ? 'repeat' : 'repeat-outline'}
           size={size}
-          color="#FFD700"
+          color={reposted ? colors.save : colors.white}
         />
       </Animated.View>
       {showLabel && (
         <Text
           style={{
-            color: '#FFD700',
+            color: reposted ? colors.save : colors.white,
             fontSize: 12,
             fontWeight: '500',
             marginTop: 4,

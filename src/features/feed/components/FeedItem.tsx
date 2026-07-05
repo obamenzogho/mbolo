@@ -505,14 +505,14 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'flex-start', paddingLeft: 60, opacity: gestureSeekLeftOpacity }]}>
         <View style={{ alignItems: 'center' }}>
           <Ionicons name="play-back" size={40} color="#fff" />
-          <Text style={{ color: '#fff', fontWeight: '700' }}>−5s</Text>
+          <Text style={{ color: colors.white, fontWeight: '700' }}>−5s</Text>
         </View>
       </Animated.View>
 
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'flex-end', paddingRight: 60, opacity: gestureSeekRightOpacity }]}>
         <View style={{ alignItems: 'center' }}>
           <Ionicons name="play-forward" size={40} color="#fff" />
-          <Text style={{ color: '#fff', fontWeight: '700' }}>+5s</Text>
+          <Text style={{ color: colors.white, fontWeight: '700' }}>+5s</Text>
         </View>
       </Animated.View>
 
@@ -534,7 +534,7 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
         {/* Toast republié */}
         {repostToast && (
           <View style={{ backgroundColor: '#00C853', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, marginBottom: 6, alignSelf: 'flex-start' }}>
-            <Text style={{ color: '#fff', fontSize: 12 }}>{repostToast}</Text>
+            <Text style={{ color: colors.white, fontSize: 12 }}>{repostToast}</Text>
           </View>
         )}
 
@@ -561,14 +561,14 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
             style={styles.userNameBlock}
             onPress={() => router.push({ pathname: '/(tabs)/user/[userId]', params: { userId: item.userId } })}
           >
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>@{displayName}</Text>
+            <Text style={{ color: colors.white, fontWeight: '700', fontSize: 15 }}>@{displayName}</Text>
           </TouchableOpacity>
         </View>
 
         {/* Description */}
         {item.description ? (
           <TouchableOpacity activeOpacity={0.9} onPress={() => setShowFullDesc((p) => !p)}>
-            <Text numberOfLines={showFullDesc ? undefined : 2} style={{ color: '#fff', fontSize: 14, marginTop: 6 }}>
+            <Text numberOfLines={showFullDesc ? undefined : 2} style={{ color: colors.white, fontSize: 14, marginTop: 6 }}>
               {item.description}
             </Text>
           </TouchableOpacity>
@@ -614,7 +614,7 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
               <Ionicons name="musical-notes" size={12} color="#FFF" />
             </View>
           )}
-          <Text style={{ color: '#fff', fontSize: 13, marginLeft: 8 }} numberOfLines={1}>
+          <Text style={{ color: colors.white, fontSize: 13, marginLeft: 8 }} numberOfLines={1}>
             Son original · {displayName}
           </Text>
         </View>
@@ -626,17 +626,17 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
           <Animated.View style={{ transform: [{ scale: likeIconScale }] }}>
             <Ionicons name={liked ? 'heart' : 'heart-outline'} size={34} color={liked ? colors.like : colors.white} />
           </Animated.View>
-          <Text style={{ color: '#fff', fontSize: 12 }}>{likeCount > 0 ? formatCount(likeCount) : "J'aime"}</Text>
+          <Text style={{ color: colors.white, fontSize: 12 }}>{likeCount > 0 ? formatCount(likeCount) : "J'aime"}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={{ alignItems: 'center', marginBottom: 16 }} onPress={onPressComment ? () => onPressComment(item.id) : undefined}>
           <Ionicons name="chatbubble-outline" size={32} color={colors.white} />
-          <Text style={{ color: '#fff', fontSize: 12 }}>{commentCount > 0 ? formatCount(commentCount) : 'Écrire'}</Text>
+          <Text style={{ color: colors.white, fontSize: 12 }}>{commentCount > 0 ? formatCount(commentCount) : 'Écrire'}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={{ alignItems: 'center', marginBottom: 16 }} onPress={handleSave}>
           <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={30} color={saved ? colors.save : colors.white} />
-          <Text style={{ color: '#fff', fontSize: 12 }} numberOfLines={1}>{saveCount > 0 ? formatCount(saveCount) : 'Sauve'}</Text>
+          <Text style={{ color: colors.white, fontSize: 12 }} numberOfLines={1}>{saveCount > 0 ? formatCount(saveCount) : 'Sauve'}</Text>
         </TouchableOpacity>
 
         <View style={{ alignItems: 'center', marginBottom: 16 }}>
@@ -683,7 +683,7 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
                   bottom: 60 / 2 - 8,
                   left: progressAnim.interpolate({ inputRange: [0, 1], outputRange: [16, SCREEN_WIDTH - 16] }),
                   width: 16, height: 16, borderRadius: 8,
-                  backgroundColor: colors.progress, borderWidth: 2, borderColor: '#FFF',
+                  backgroundColor: colors.progress, borderWidth: 2, borderColor: colors.white,
                   transform: [{ translateX: -8 }],
                   elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.3, shadowRadius: 2,
                 }}
@@ -691,7 +691,7 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
               {seekInfo && (
                 <View style={{ position: 'absolute', bottom: 24, left: seekInfo.x, transform: [{ translateX: -30 }], alignItems: 'center' }}>
                   <View style={{ backgroundColor: 'rgba(0,0,0,0.8)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4 }}>
-                    <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{seekInfo.label}</Text>
+                    <Text style={{ color: colors.white, fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{seekInfo.label}</Text>
                   </View>
                 </View>
               )}

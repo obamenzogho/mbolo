@@ -2,6 +2,7 @@ import { memo, useCallback, useRef } from 'react'
 import { TouchableOpacity, Text, Animated } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useHaptics } from '@/hooks/useHaptics'
+import { colors } from '@/lib/theme'
 
 interface ShareButtonProps {
   onPress: () => void
@@ -11,7 +12,7 @@ interface ShareButtonProps {
   color?: string
 }
 
-function ShareButtonComponent({ onPress, size = 28, showLabel = true, count, color = '#FFD700' }: ShareButtonProps) {
+function ShareButtonComponent({ onPress, size = 28, showLabel = true, count, color = colors.white }: ShareButtonProps) {
   const { lightImpact } = useHaptics()
   const scaleAnim = useRef(new Animated.Value(1)).current
 

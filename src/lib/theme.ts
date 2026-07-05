@@ -20,7 +20,7 @@ export const colors = {
   success: '#3FB950',
 
   // Actions du feed
-  like: '#FF2D55',
+  like: '#FFD700',
   save: '#FFD700',
   progress: '#00C853',
 

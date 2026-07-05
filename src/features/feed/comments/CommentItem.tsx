@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, Alert, Image, StyleSheet } from 'react-na
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { captureException } from '../../../lib/sentry'
+import { colors } from '../../../lib/theme'
 import { ReplyItem, type ReplyData } from './ReplyItem'
 
 export interface CommentData {
@@ -161,7 +162,7 @@ function CommentItemComponent({
           )}
         </View>
         <TouchableOpacity onPress={handleLike} style={styles.likeSection}>
-          <Ionicons name={liked ? 'heart' : 'heart-outline'} size={14} color={liked ? '#FF2D55' : 'rgba(255,255,255,0.5)'} />
+          <Ionicons name={liked ? 'heart' : 'heart-outline'} size={14} color={liked ? colors.like : 'rgba(255,255,255,0.5)'} />
           {likeCount > 0 && <Text style={styles.likeCount}>{likeCount}</Text>}
         </TouchableOpacity>
       </View>
