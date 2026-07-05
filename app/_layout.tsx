@@ -21,6 +21,7 @@ import { auth } from '../src/lib/firebase'
 import ErrorBoundary from '../src/components/ErrorBoundary'
 import { I18nProvider } from '../src/i18n/index'
 import { DataSaverProvider } from '../src/contexts/DataSaverContext'
+import { colors } from '../src/lib/theme'
 
 import notificationService from '../src/services/notificationService'
 import { usePresence } from '../src/hooks/usePresence'
@@ -99,7 +100,7 @@ function RootContent() {
 
   return (
     <Stack
-      screenOptions={{ headerShown: false }}
+      screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}
       screenListeners={{
         state: (e: any) => {
           if (useStartupStore.getState().phase !== 'ready') return
@@ -141,7 +142,7 @@ export default function RootLayout() {
         <I18nProvider>
           <DataSaverProvider>
           <ErrorBoundary>
-            <StatusBar style="light" />
+            <StatusBar style="light" backgroundColor={colors.background} />
             <NavigationHistoryProvider>
               <RootContent />
             </NavigationHistoryProvider>

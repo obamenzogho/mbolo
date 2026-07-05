@@ -13,6 +13,7 @@ import { CommentItem, type CommentData } from '../comments/CommentItem'
 import { CommentInput } from '../comments/CommentInput'
 import OrbitLoader from '../../../components/OrbitLoader'
 import type { PreviewComment } from '../../../types'
+import { colors } from '../../../lib/theme'
 
 type SortMode = 'top' | 'new'
 
@@ -212,7 +213,7 @@ export default function CommentSheet({ videoId, videoOwnerId, isOwner, previewCo
       </View>
     ) : (
       <View style={styles.emptyContainer}>
-        <Ionicons name="chatbubble-ellipses-outline" size={48} color="rgba(255,255,255,0.15)" />
+        <Ionicons name="chatbubble-ellipses-outline" size={48} color={colors.textFaint} />
         <Text style={styles.emptyText}>Aucun commentaire</Text>
         <Text style={styles.emptySubtext}>Soyez le premier à commenter</Text>
       </View>
@@ -237,7 +238,7 @@ export default function CommentSheet({ videoId, videoOwnerId, isOwner, previewCo
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Commentaires</Text>
         <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
-          <Ionicons name="close" size={20} color="#FFF" />
+          <Ionicons name="close" size={20} color={colors.text} />
         </TouchableOpacity>
       </View>
 
@@ -258,7 +259,7 @@ export default function CommentSheet({ videoId, videoOwnerId, isOwner, previewCo
 
       {sortedComments.length === 0 && !loading ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="chatbubble-ellipses-outline" size={48} color="rgba(255,255,255,0.15)" />
+          <Ionicons name="chatbubble-ellipses-outline" size={48} color={colors.textFaint} />
           <Text style={styles.emptyText}>Aucun commentaire</Text>
           <Text style={styles.emptySubtext}>Soyez le premier à commenter</Text>
         </View>
@@ -300,14 +301,14 @@ export default function CommentSheet({ videoId, videoOwnerId, isOwner, previewCo
 
 const styles = StyleSheet.create({
   background: {
-    backgroundColor: '#121212',
+    backgroundColor: colors.surface,
   },
   handleIndicator: {
-    backgroundColor: '#00C853',
+    backgroundColor: colors.progress,
     width: 36,
   },
   handleBar: {
-    backgroundColor: '#121212',
+    backgroundColor: colors.surface,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
   },
@@ -319,7 +320,7 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   headerTitle: {
-    color: '#FFF',
+    color: colors.text,
     fontSize: 15,
     fontWeight: '700',
   },
@@ -330,7 +331,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: colors.hairline,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -340,22 +341,22 @@ const styles = StyleSheet.create({
     gap: 24,
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
+    borderBottomColor: colors.hairline,
   },
   sortTab: {
     paddingVertical: 4,
   },
   sortTabActive: {
     borderBottomWidth: 2,
-    borderBottomColor: '#00C853',
+    borderBottomColor: colors.progress,
   },
   sortTabText: {
-    color: 'rgba(255,255,255,0.4)',
+    color: colors.textFaint,
     fontSize: 14,
     fontWeight: '600',
   },
   sortTabTextActive: {
-    color: '#FFF',
+    color: colors.text,
   },
   emptyContainer: {
     alignItems: 'center',
@@ -364,16 +365,16 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   emptyText: {
-    color: 'rgba(255,255,255,0.4)',
+    color: colors.textFaint,
     fontSize: 15,
     fontWeight: '600',
   },
   emptySubtext: {
-    color: 'rgba(255,255,255,0.25)',
+    color: colors.textMuted,
     fontSize: 13,
   },
   endOfListText: {
-    color: 'rgba(255,255,255,0.2)',
+    color: colors.textMuted,
     fontSize: 12,
     fontWeight: '500',
   },
@@ -385,7 +386,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    backgroundColor: '#121212',
+    backgroundColor: colors.surface,
     paddingHorizontal: 8,
     paddingBottom: 8,
     zIndex: 10,

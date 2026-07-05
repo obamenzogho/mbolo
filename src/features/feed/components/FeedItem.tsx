@@ -10,6 +10,7 @@ import { db } from '../../../lib/firebase'
 import { createNotification } from '../../../lib/notifications'
 import { captureException } from '../../../lib/sentry'
 import { recordWatch } from '../services/watchTracker'
+import { colors } from '../../../lib/theme'
 
 import { VideoPlayerSlot, usePlayerForVideo } from './VideoPlayerSlot'
 import { RepostButton } from '@/features/repost/components/RepostButton'
@@ -498,7 +499,7 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
       </Animated.View>
 
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', opacity: gesturePlayOpacity }]}>
-        <Ionicons name={gestureIcon} size={70} color="rgba(255,255,255,0.85)" />
+        <Ionicons name={gestureIcon} size={70} color={colors.textOnMedia} />
       </Animated.View>
 
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'flex-start', paddingLeft: 60, opacity: gestureSeekLeftOpacity }]}>
@@ -542,7 +543,7 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
           <View style={styles.avatarWrapper}>
             {!isOwn && !isFollowing && followState !== 'hidden' && (
               <TouchableOpacity style={styles.followBtn} onPress={handleFollow}>
-                <Ionicons name={followState === 'done' ? 'checkmark' : 'add'} size={16} color="#FFD700" />
+                <Ionicons name={followState === 'done' ? 'checkmark' : 'add'} size={16} color={colors.save} />
               </TouchableOpacity>
             )}
             <TouchableOpacity onPress={() => router.push({ pathname: '/(tabs)/user/[userId]', params: { userId: item.userId } })}>
@@ -575,7 +576,7 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
 
         {/* Hashtags */}
         {item.hashtags?.length > 0 ? (
-          <Text style={{ color: '#4EA1FF', fontSize: 14, marginTop: 4 }}>
+          <Text style={{ color: colors.secondary, fontSize: 14, marginTop: 4 }}>
             {item.hashtags.map((t) => '#' + t).join(' ')}
           </Text>
         ) : null}
@@ -584,13 +585,13 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
         {item.previewComments && item.previewComments.length > 0 && (
           <View style={{ marginTop: 8 }}>
             {item.previewComments.slice(0, 2).map((pc, i) => (
-              <Text key={i} numberOfLines={1} style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13 }}>
+              <Text key={i} numberOfLines={1} style={{ color: colors.textOnMedia, fontSize: 13 }}>
                 <Text style={{ fontWeight: '700' }}>{pc.authorName}</Text> {pc.text}
               </Text>
             ))}
             {commentCount > (item.previewComments?.length ?? 0) && (
               <TouchableOpacity onPress={onPressComment ? () => onPressComment(item.id) : undefined}>
-                <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, marginTop: 2 }}>
+                <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 2 }}>
                     Voir les {commentCount} commentaire{commentCount > 1 ? 's' : ''}
                 </Text>
               </TouchableOpacity>
@@ -623,18 +624,18 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
       <View style={{ position: 'absolute', right: 8, bottom: BOTTOM_PADDING + insets.bottom + 20, alignItems: 'center', zIndex: 30, elevation: 30 }} pointerEvents="auto">
         <TouchableOpacity style={{ alignItems: 'center', marginBottom: 16 }} onPress={() => { handleLike(); animateLikeIcon() }}>
           <Animated.View style={{ transform: [{ scale: likeIconScale }] }}>
-            <Ionicons name={liked ? 'heart' : 'heart-outline'} size={34} color="#FFD700" />
+            <Ionicons name={liked ? 'heart' : 'heart-outline'} size={34} color={liked ? colors.like : colors.white} />
           </Animated.View>
           <Text style={{ color: '#fff', fontSize: 12 }}>{likeCount > 0 ? formatCount(likeCount) : "J'aime"}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={{ alignItems: 'center', marginBottom: 16 }} onPress={onPressComment ? () => onPressComment(item.id) : undefined}>
-          <Ionicons name="chatbubble-outline" size={32} color="#FFD700" />
+          <Ionicons name="chatbubble-outline" size={32} color={colors.white} />
           <Text style={{ color: '#fff', fontSize: 12 }}>{commentCount > 0 ? formatCount(commentCount) : 'Écrire'}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={{ alignItems: 'center', marginBottom: 16 }} onPress={handleSave}>
-          <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={30} color="#FFD700" />
+          <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={30} color={saved ? colors.save : colors.white} />
           <Text style={{ color: '#fff', fontSize: 12 }} numberOfLines={1}>{saveCount > 0 ? formatCount(saveCount) : 'Sauve'}</Text>
         </TouchableOpacity>
 
@@ -657,7 +658,7 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
         </View>
 
         <TouchableOpacity style={{ alignItems: 'center', marginTop: 18 }} onPress={handleMore}>
-          <Ionicons name="ellipsis-horizontal" size={30} color="#FFD700" />
+          <Ionicons name="ellipsis-horizontal" size={30} color={colors.white} />
         </TouchableOpacity>
       </View>
 
@@ -670,7 +671,7 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
         >
           {/* Track background */}
           <View style={{ height: isPlaying ? 2 : 6, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 3, marginHorizontal: 16 }}>
-            <Animated.View style={{ height: '100%', backgroundColor: '#00C853', borderRadius: 3, width: progressAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }} />
+            <Animated.View style={{ height: '100%', backgroundColor: colors.progress, borderRadius: 3, width: progressAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }} />
           </View>
 
           {/* Thumb + time label */}
@@ -682,7 +683,7 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
                   bottom: 60 / 2 - 8,
                   left: progressAnim.interpolate({ inputRange: [0, 1], outputRange: [16, SCREEN_WIDTH - 16] }),
                   width: 16, height: 16, borderRadius: 8,
-                  backgroundColor: '#00C853', borderWidth: 2, borderColor: '#FFF',
+                  backgroundColor: colors.progress, borderWidth: 2, borderColor: '#FFF',
                   transform: [{ translateX: -8 }],
                   elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.3, shadowRadius: 2,
                 }}
@@ -755,7 +756,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: '#FFD700',
+    borderColor: colors.save,
     zIndex: 1,
   },
   userNameBlock: {

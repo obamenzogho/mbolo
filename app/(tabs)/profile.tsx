@@ -305,8 +305,8 @@ export default function Profile() {
 
   if (!ready) {
     return (
-      <PageWrapper type="fadeSlide" style={{ backgroundColor: '#000' }}>
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
+      <PageWrapper type="fadeSlide" style={{ backgroundColor: colors.black }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.black, justifyContent: 'center', alignItems: 'center' }}>
           <OrbitLoader size={80} />
         </SafeAreaView>
       </PageWrapper>
@@ -314,8 +314,8 @@ export default function Profile() {
   }
 
   return (
-    <PageWrapper type="fadeSlide" style={{ backgroundColor: '#000' }}>
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
+    <PageWrapper type="fadeSlide" style={{ backgroundColor: colors.black }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.black }}>
       <GestureDetector gesture={swipeGesture}>
         <VideoGrid
           videos={currentVideos}
@@ -345,21 +345,21 @@ export default function Profile() {
               </View>
 
               <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingTop: 8 }}>
-                <TouchableOpacity activeOpacity={0.8} onPress={() => profile?.photoURL && setPhotoViewerVisible(true)} style={{ width: 90, height: 90, borderRadius: 45, borderWidth: hasStory ? 3 : 0, borderColor: hasStory ? '#3A75C4' : 'transparent', justifyContent: 'center', alignItems: 'center' }}>
+                <TouchableOpacity activeOpacity={0.8} onPress={() => profile?.photoURL && setPhotoViewerVisible(true)} style={{ width: 90, height: 90, borderRadius: 45, borderWidth: hasStory ? 3 : 0, borderColor: hasStory ? colors.secondary : 'transparent', justifyContent: 'center', alignItems: 'center' }}>
                   {profile?.photoURL ? <Image source={{ uri: profile.photoURL }} style={{ width: 84, height: 84, borderRadius: 42 }} /> : <Ionicons name="person" size={40} color="#555" />}
                 </TouchableOpacity>
                 <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'center' }}>
                   <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => setActiveTab('grid')}>
                     <Text style={{ color: colors.white, fontSize: 18, fontWeight: '700' }}>{gridVideos.length}</Text>
-                    <Text style={{ color: '#888', fontSize: 12 }}>Vidéos</Text>
+                    <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Vidéos</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => openFollowList('followers')}>
                     <Text style={{ color: colors.white, fontSize: 18, fontWeight: '700' }}>{profile?.followerCount ?? profile?.followers?.length ?? 0}</Text>
-                    <Text style={{ color: '#888', fontSize: 12 }}>Abonnés</Text>
+                    <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Abonnés</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => openFollowList('following')}>
                     <Text style={{ color: colors.white, fontSize: 18, fontWeight: '700' }}>{profile?.followingCount ?? profile?.following?.length ?? 0}</Text>
-                    <Text style={{ color: '#888', fontSize: 12 }}>Abonnements</Text>
+                    <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Abonnements</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -367,21 +367,21 @@ export default function Profile() {
               <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingTop: 12 }}>
                 <View style={{ flex: 1 }}>
                   <Text style={{ color: colors.white, fontSize: 14, fontWeight: '700' }}>{profile?.nom || ''}</Text>
-                  <Text style={{ color: '#888', fontSize: 13, marginTop: 1 }}>@{profile?.pseudo || user?.displayName || ''}</Text>
+                  <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 1 }}>@{profile?.pseudo || user?.displayName || ''}</Text>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
                     {profile?.city ? (
                       <TouchableOpacity onPress={async () => { const cityName = await detectCity(); if (cityName) { await updateDoc(doc(db, 'users', user!.uid), { city: cityName }); setProfile(prev => prev ? { ...prev, city: cityName } : prev) } }} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                        <Ionicons name="location-outline" size={13} color="#888" />
-                        <Text style={{ color: '#888', fontSize: 12 }}>{profile.city}</Text>
-                        <Ionicons name="refresh-outline" size={12} color="#555" />
+                        <Ionicons name="location-outline" size={13} color={colors.textSecondary} />
+                        <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{profile.city}</Text>
+                        <Ionicons name="refresh-outline" size={12} color={colors.textFaint} />
                       </TouchableOpacity>
                     ) : (
                       <TouchableOpacity onPress={async () => { const cityName = await detectCity(); if (cityName) { await updateDoc(doc(db, 'users', user!.uid), { city: cityName }); setProfile(prev => prev ? { ...prev, city: cityName } : prev) } }} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                        <Ionicons name="location-outline" size={13} color="#555" />
-                        <Text style={{ color: '#555', fontSize: 12 }}>Détection...</Text>
+                        <Ionicons name="location-outline" size={13} color={colors.textFaint} />
+                        <Text style={{ color: colors.textFaint, fontSize: 12 }}>Détection...</Text>
                       </TouchableOpacity>
                     )}
-                    {(() => { const age = calcAge(profile?.dateOfBirth || ''); return age && profile?.showAge !== false ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}><Ionicons name="calendar-outline" size={13} color="#888" /><Text style={{ color: '#888', fontSize: 12 }}>{age} ans</Text></View> : null })()}
+                    {(() => { const age = calcAge(profile?.dateOfBirth || ''); return age && profile?.showAge !== false ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}><Ionicons name="calendar-outline" size={13} color={colors.textSecondary} /><Text style={{ color: colors.textSecondary, fontSize: 12 }}>{age} ans</Text></View> : null })()}
                   </View>
                   {profile?.bio ? <Text style={{ color: colors.white, fontSize: 13, marginTop: 4, lineHeight: 18 }}>{profile.bio}</Text> : null}
                   {(profile as any)?.externalLink ? (
@@ -400,10 +400,10 @@ export default function Profile() {
                   ) : null}
                 </View>
                 <View style={{ flexDirection: 'column', gap: 8, justifyContent: 'center', marginLeft: 12 }}>
-                  <TouchableOpacity onPress={() => router.push('/(tabs)/edit-profile')} style={{ width: 34, height: 34, borderRadius: 8, backgroundColor: '#222', borderWidth: 1, borderColor: '#444', justifyContent: 'center', alignItems: 'center' }}>
+                  <TouchableOpacity onPress={() => router.push('/(tabs)/edit-profile')} style={{ width: 34, height: 34, borderRadius: 8, backgroundColor: colors.surfaceLight, borderWidth: 1, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' }}>
                     <Ionicons name="pencil-outline" size={18} color={colors.white} />
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={shareProfile} style={{ width: 34, height: 34, borderRadius: 8, backgroundColor: '#222', borderWidth: 1, borderColor: '#444', justifyContent: 'center', alignItems: 'center' }}>
+                  <TouchableOpacity onPress={shareProfile} style={{ width: 34, height: 34, borderRadius: 8, backgroundColor: colors.surfaceLight, borderWidth: 1, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' }}>
                     <Ionicons name="share-outline" size={18} color={colors.white} />
                   </TouchableOpacity>
                 </View>
@@ -433,9 +433,9 @@ export default function Profile() {
     {/* MENU */}
     <Modal transparent visible={menuVisible} animationType="slide" onRequestClose={closeMenu}>
       <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-        <TouchableOpacity activeOpacity={1} onPress={closeMenu} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} />
-        <Animated.View style={{ backgroundColor: '#1a1a1a', borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingBottom: 34, transform: [{ translateY: menuAnim.interpolate({ inputRange: [0, 1], outputRange: [300, 0] }) }] }}>
-          <View style={{ paddingVertical: 12, alignItems: 'center' }}><View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: '#444' }} /></View>
+        <TouchableOpacity activeOpacity={1} onPress={closeMenu} style={{ flex: 1, backgroundColor: colors.overlay }} />
+        <Animated.View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingBottom: 34, transform: [{ translateY: menuAnim.interpolate({ inputRange: [0, 1], outputRange: [300, 0] }) }] }}>
+          <View style={{ paddingVertical: 12, alignItems: 'center' }}><View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border }} /></View>
           {[
             { icon: 'settings-outline', label: 'Paramètres', action: () => { closeMenu(); router.push('/settings') } },
             { icon: 'shield-checkmark-outline', label: 'Confidentialité', action: () => { closeMenu(); router.push('/settings') } },
@@ -451,7 +451,7 @@ export default function Profile() {
               <Text style={{ color: colors.white, fontSize: 15 }}>{item.label}</Text>
             </TouchableOpacity>
           ))}
-          <View style={{ height: 1, backgroundColor: '#222', marginVertical: 8 }} />
+          <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 8 }} />
           <TouchableOpacity onPress={() => { closeMenu(); handleLogout() }} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 20 }}>
             <Ionicons name="log-out-outline" size={22} color={colors.error} />
             <Text style={{ color: colors.error, fontSize: 15, fontWeight: '600' }}>Se déconnecter</Text>
@@ -463,24 +463,24 @@ export default function Profile() {
     {/* SHARE */}
     <Modal transparent visible={shareVisible} animationType="slide" onRequestClose={closeShare}>
       <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-        <TouchableOpacity activeOpacity={1} onPress={closeShare} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} />
-        <Animated.View style={{ backgroundColor: '#1a1a1a', borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingBottom: 34, transform: [{ translateY: shareAnim.interpolate({ inputRange: [0, 1], outputRange: [400, 0] }) }] }}>
-          <View style={{ paddingVertical: 12, alignItems: 'center' }}><View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: '#444' }} /></View>
+        <TouchableOpacity activeOpacity={1} onPress={closeShare} style={{ flex: 1, backgroundColor: colors.overlay }} />
+        <Animated.View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingBottom: 34, transform: [{ translateY: shareAnim.interpolate({ inputRange: [0, 1], outputRange: [400, 0] }) }] }}>
+          <View style={{ paddingVertical: 12, alignItems: 'center' }}><View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border }} /></View>
           <Text style={{ color: colors.white, fontSize: 16, fontWeight: '700', textAlign: 'center', marginBottom: 16 }}>Partager le profil</Text>
           <View style={{ marginHorizontal: 16, marginBottom: 16 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#111', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: '#333' }}>
-              <Ionicons name="link-outline" size={18} color="#888" style={{ marginRight: 8 }} />
-              <Text style={{ flex: 1, color: '#ccc', fontSize: 14 }} numberOfLines={1}>https://mbolo.app/@{profile?.pseudo || ''}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceLight, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: colors.border }}>
+              <Ionicons name="link-outline" size={18} color={colors.textSecondary} style={{ marginRight: 8 }} />
+              <Text style={{ flex: 1, color: colors.textOnMedia, fontSize: 14 }} numberOfLines={1}>https://mbolo.app/@{profile?.pseudo || ''}</Text>
               <TouchableOpacity onPress={async () => { try { await require('expo-clipboard').setStringAsync(`https://mbolo.app/@${profile?.pseudo || ''}`); Alert.alert('Lien copié', 'Le lien a été copié dans le presse-papiers') } catch {} }} style={{ marginLeft: 8, padding: 4 }}>
                 <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>Copier</Text>
               </TouchableOpacity>
             </View>
           </View>
-          <TouchableOpacity onPress={() => { setShareVisible(false); shareAnim.setValue(0); setTimeout(() => setShowQR(true), 100) }} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 14, marginHorizontal: 16, marginBottom: 16, backgroundColor: '#2a2a2a', borderRadius: 12 }}>
+          <TouchableOpacity onPress={() => { setShareVisible(false); shareAnim.setValue(0); setTimeout(() => setShowQR(true), 100) }} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 14, marginHorizontal: 16, marginBottom: 16, backgroundColor: colors.surfaceLight, borderRadius: 12 }}>
             <Ionicons name="qr-code-outline" size={20} color={colors.white} />
             <Text style={{ color: colors.white, fontSize: 15, fontWeight: '600' }}>Code QR</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={async () => { try { await Share.share({ message: `Découvre @${profile?.pseudo || ''} sur Mbolo ! 🇬🇦\nhttps://mbolo.app/@${profile?.pseudo || ''}` }) } catch {} }} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 14, marginHorizontal: 16, backgroundColor: '#2a2a2a', borderRadius: 12 }}>
+          <TouchableOpacity onPress={async () => { try { await Share.share({ message: `Découvre @${profile?.pseudo || ''} sur Mbolo ! 🇬🇦\nhttps://mbolo.app/@${profile?.pseudo || ''}` }) } catch {} }} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 14, marginHorizontal: 16, backgroundColor: colors.surfaceLight, borderRadius: 12 }}>
             <Ionicons name="ellipsis-horizontal" size={20} color={colors.white} />
             <Text style={{ color: colors.white, fontSize: 15, fontWeight: '600' }}>Plus d'options</Text>
           </TouchableOpacity>
@@ -501,8 +501,8 @@ export default function Profile() {
             foreground={colors.black}
             background={colors.white}
           />
-          <Text style={{ color: '#000', fontSize: 18, fontWeight: '700', marginTop: 16 }}>@{profile?.pseudo || ''}</Text>
-          <Text style={{ color: '#666', fontSize: 13, marginTop: 4, textAlign: 'center' }}>Scanne pour voir mon profil Mbolo 🇬🇦</Text>
+          <Text style={{ color: colors.black, fontSize: 18, fontWeight: '700', marginTop: 16 }}>@{profile?.pseudo || ''}</Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4, textAlign: 'center' }}>Scanne pour voir mon profil Mbolo 🇬🇦</Text>
           <TouchableOpacity
             onPress={async () => {
               try {
@@ -576,17 +576,17 @@ export default function Profile() {
     {/* FOLLOWERS/FOLLOWING MODAL */}
     <BottomSheet visible={followersModal} onClose={closeFollowModal} height={SCREEN_HEIGHT * 0.85}>
       {/* Tab bar */}
-      <View style={{ paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: '#222' }}>
+      <View style={{ paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: colors.border }}>
         <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 24 }}>
           <TouchableOpacity onLayout={(e) => { const { x, width } = e.nativeEvent.layout; setTabLayouts(prev => { const n = [...prev]; n[0] = { x, width }; return n }) }} onPress={() => { setPage(0); scrollRef.current?.scrollTo({ x: 0, animated: true }) }}>
-            <Text style={{ fontSize: 15, fontWeight: '700', color: page === 0 ? colors.white : '#666' }}>Abonnés</Text>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: page === 0 ? colors.white : colors.textSecondary }}>Abonnés</Text>
           </TouchableOpacity>
           <TouchableOpacity onLayout={(e) => { const { x, width } = e.nativeEvent.layout; setTabLayouts(prev => { const n = [...prev]; n[1] = { x, width }; return n }) }} onPress={() => { setPage(1); scrollRef.current?.scrollTo({ x: SCREEN_WIDTH, animated: true }) }}>
-            <Text style={{ fontSize: 15, fontWeight: '700', color: page === 1 ? colors.white : '#666' }}>Abonnements</Text>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: page === 1 ? colors.white : colors.textSecondary }}>Abonnements</Text>
           </TouchableOpacity>
                 {showRequestsTab && (
                   <TouchableOpacity onLayout={(e) => { const { x, width } = e.nativeEvent.layout; setTabLayouts(prev => { const n = [...prev]; n[2] = { x, width }; return n }) }} onPress={() => { setPage(2); scrollRef.current?.scrollTo({ x: SCREEN_WIDTH * 2, animated: true }) }}>
-                    <Text style={{ fontSize: 15, fontWeight: '700', color: page === 2 ? colors.white : '#666' }}>Demandes</Text>
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: page === 2 ? colors.white : colors.textSecondary }}>Demandes</Text>
                   </TouchableOpacity>
                 )}
                 <View style={{
@@ -623,8 +623,8 @@ export default function Profile() {
                       </View>
                     ) : (
                       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 40 }}>
-                        <Ionicons name="people-outline" size={48} color="#333" />
-                        <Text style={{ color: '#555', fontSize: 14, marginTop: 12 }}>Aucun abonné</Text>
+                        <Ionicons name="people-outline" size={48} color={colors.border} />
+                        <Text style={{ color: colors.textFaint, fontSize: 14, marginTop: 12 }}>Aucun abonné</Text>
                       </View>
                     )
                   }
@@ -646,7 +646,7 @@ export default function Profile() {
                             <Text style={{ color: colors.white, fontSize: 15, fontWeight: '600', height: 20, lineHeight: 20 }}>{item.nom || ''}</Text>
                             {item.verified && <Ionicons name="checkmark-circle" size={14} color={colors.secondary} />}
                           </View>
-                          <Text style={{ color: '#888', fontSize: 13, height: 18, lineHeight: 18 }}>@{item.pseudo || ''}</Text>
+                          <Text style={{ color: colors.textSecondary, fontSize: 13, height: 18, lineHeight: 18 }}>@{item.pseudo || ''}</Text>
                         </View>
                         {!isMe && <FollowButton targetUserId={item.id} size="sm" />}
                       </TouchableOpacity>
@@ -667,8 +667,8 @@ export default function Profile() {
                       </View>
                     ) : (
                       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 40 }}>
-                        <Ionicons name="people-outline" size={48} color="#333" />
-                        <Text style={{ color: '#555', fontSize: 14, marginTop: 12 }}>Aucun abonnement</Text>
+                        <Ionicons name="people-outline" size={48} color={colors.border} />
+                        <Text style={{ color: colors.textFaint, fontSize: 14, marginTop: 12 }}>Aucun abonnement</Text>
                       </View>
                     )
                   }
@@ -690,7 +690,7 @@ export default function Profile() {
                             <Text style={{ color: colors.white, fontSize: 15, fontWeight: '600', height: 20, lineHeight: 20 }}>{item.nom || ''}</Text>
                             {item.verified && <Ionicons name="checkmark-circle" size={14} color={colors.secondary} />}
                           </View>
-                          <Text style={{ color: '#888', fontSize: 13, height: 18, lineHeight: 18 }}>@{item.pseudo || ''}</Text>
+                          <Text style={{ color: colors.textSecondary, fontSize: 13, height: 18, lineHeight: 18 }}>@{item.pseudo || ''}</Text>
                         </View>
                         {!isMe && <FollowButton targetUserId={item.id} size="sm" />}
                       </TouchableOpacity>
@@ -711,8 +711,8 @@ export default function Profile() {
                       </View>
                     ) : (
                       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 40 }}>
-                        <Ionicons name="people-outline" size={48} color="#333" />
-                        <Text style={{ color: '#555', fontSize: 14, marginTop: 12 }}>Aucune demande</Text>
+                        <Ionicons name="people-outline" size={48} color={colors.border} />
+                        <Text style={{ color: colors.textFaint, fontSize: 14, marginTop: 12 }}>Aucune demande</Text>
                       </View>
                     )
                   }
@@ -724,7 +724,7 @@ export default function Profile() {
                           <Text style={{ color: colors.white, fontSize: 15, fontWeight: '600', height: 20, lineHeight: 20 }}>{item.nom || ''}</Text>
                           {item.verified && <Ionicons name="checkmark-circle" size={14} color={colors.secondary} />}
                         </View>
-                        <Text style={{ color: '#888', fontSize: 13, height: 18, lineHeight: 18 }}>@{item.pseudo || ''}</Text>
+                        <Text style={{ color: colors.textSecondary, fontSize: 13, height: 18, lineHeight: 18 }}>@{item.pseudo || ''}</Text>
                       </View>
                       <TouchableOpacity
                         onPress={async () => {
@@ -733,7 +733,7 @@ export default function Profile() {
                         }}
                         style={{ backgroundColor: colors.primary, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 6 }}
                       >
-                        <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>Accepter</Text>
+                        <Text style={{ color: colors.white, fontSize: 13, fontWeight: '700' }}>Accepter</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={async () => {
@@ -742,7 +742,7 @@ export default function Profile() {
                         }}
                         style={{ paddingHorizontal: 10, paddingVertical: 6 }}
                       >
-                        <Text style={{ color: '#888', fontSize: 13 }}>Refuser</Text>
+                        <Text style={{ color: colors.textSecondary, fontSize: 13 }}>Refuser</Text>
                       </TouchableOpacity>
                     </View>
                   )}

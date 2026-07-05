@@ -103,13 +103,6 @@ export default function FeedScreen({ feedType = 'forYou', isActive = true }: Fee
     setVideoOptionsTarget({ videoId, isOwner })
   }, [feedData.videos])
 
-  useEffect(() => {
-    if (videoOptionsTarget) {
-      const timer = setTimeout(() => videoOptionsSheetRef.current?.snapToIndex(0), 100)
-      return () => clearTimeout(timer)
-    }
-  }, [videoOptionsTarget])
-
   useFocusEffect(
     useCallback(() => {
       return () => {

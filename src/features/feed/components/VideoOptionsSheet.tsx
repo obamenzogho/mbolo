@@ -1,6 +1,4 @@
-/* VideoOptionsSheet — menu "plus d'options" style Instagram.
-   Bottom sheet avec options contextuelles (owner vs. autre).
-   Signaler, Ne plus voir, Copier le lien, Supprimer, Modifier. */
+/* VideoOptionsSheet — menu "plus d'options" style Instagram. */
 
 import { useCallback, useState, useMemo, useRef } from 'react'
 import { View, Text, Alert, StyleSheet } from 'react-native'
@@ -11,6 +9,7 @@ import * as Clipboard from 'expo-clipboard'
 import { doc, deleteDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore'
 import { db, auth } from '../../../lib/firebase'
 import { captureException } from '../../../lib/sentry'
+import { colors } from '../../../lib/theme'
 
 interface VideoOptionsSheetProps {
   videoId: string
@@ -49,13 +48,7 @@ export default function VideoOptionsSheet({ videoId, isOwner, onClose, sheetRef 
 
   const renderBackdrop = useCallback(
     (props: any) => (
-      <BottomSheetBackdrop
-        {...props}
-        disappearsOnIndex={-1}
-        appearsOnIndex={0}
-        opacity={0.5}
-        pressBehavior="close"
-      />
+      <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.5} pressBehavior="close" />
     ),
     [],
   )
@@ -70,76 +63,55 @@ export default function VideoOptionsSheet({ videoId, isOwner, onClose, sheetRef 
   }, [videoId, handleClose])
 
   const handleHide = useCallback(() => {
-    Alert.alert(
-      'Masquer cette vidéo',
-      'Vous ne verrez plus ce contenu.',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Confirmer',
-          onPress: () => {
-            handleClose()
-          },
-        },
-      ],
-    )
+    Alert.alert('Masquer cette vidéo', 'Vous ne verrez plus ce contenu.', [
+      { text: 'Annuler', style: 'cancel' },
+      { text: 'Confirmer', onPress: () => handleClose() },
+    ])
   }, [handleClose])
 
   const handleReport = useCallback((reason: string) => {
-    Alert.alert(
-      'Signaler cette vidéo',
-      'Merci de votre signalement.',
-      [
-        {
-          text: 'OK',
-          onPress: async () => {
-            try {
-              const currentUser = auth.currentUser
-              if (!currentUser) return
-              await addDoc(collection(db, 'reports'), {
-                type: 'video',
-                videoId,
-                reason,
-                reportedBy: currentUser.uid,
-                createdAt: serverTimestamp(),
-              })
-            } catch (e) {
-              captureException(e instanceof Error ? e : new Error(String(e)), { context: 'videoOptions:report' })
-            }
-            handleClose()
-          },
+    Alert.alert('Signaler cette vidéo', 'Merci de votre signalement.', [
+      {
+        text: 'OK',
+        onPress: async () => {
+          try {
+            const currentUser = auth.currentUser
+            if (!currentUser) return
+            await addDoc(collection(db, 'reports'), {
+              type: 'video', videoId, reason, reportedBy: currentUser.uid, createdAt: serverTimestamp(),
+            })
+          } catch (e) {
+            captureException(e instanceof Error ? e : new Error(String(e)), { context: 'videoOptions:report' })
+          }
+          handleClose()
         },
-      ],
-    )
+      },
+    ])
   }, [videoId, handleClose])
 
   const handleDelete = useCallback(() => {
-    Alert.alert(
-      'Supprimer la vidéo',
-      'Cette action est irréversible.',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Supprimer',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteDoc(doc(db, 'videos', videoId))
-            } catch (e) {
-              captureException(e instanceof Error ? e : new Error(String(e)), { context: 'videoOptions:delete' })
-            }
-            handleClose()
-          },
+    Alert.alert('Supprimer la vidéo', 'Cette action est irréversible.', [
+      { text: 'Annuler', style: 'cancel' },
+      {
+        text: 'Supprimer',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteDoc(doc(db, 'videos', videoId))
+          } catch (e) {
+            captureException(e instanceof Error ? e : new Error(String(e)), { context: 'videoOptions:delete' })
+          }
+          handleClose()
         },
-      ],
-    )
+      },
+    ])
   }, [videoId, handleClose])
 
   if (showReport) {
     return (
       <BottomSheet
         ref={sheetRef}
-        index={-1}
+        index={0}
         snapPoints={snapPoints}
         enablePanDownToClose
         backdropComponent={renderBackdrop}
@@ -150,19 +122,15 @@ export default function VideoOptionsSheet({ videoId, isOwner, onClose, sheetRef 
       >
         <View style={styles.header}>
           <TouchableOpacity onPress={() => setShowReport(false)} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={20} color="#FFF" />
+            <Ionicons name="arrow-back" size={20} color={colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Signaler</Text>
           <View style={{ width: 28 }} />
         </View>
 
         {REPORT_REASONS.map((reason) => (
-          <TouchableOpacity
-            key={reason.key}
-            style={styles.optionRow}
-            onPress={() => handleReport(reason.key)}
-          >
-            <Ionicons name={reason.icon} size={22} color="rgba(255,255,255,0.7)" />
+          <TouchableOpacity key={reason.key} style={styles.optionRow} onPress={() => handleReport(reason.key)}>
+            <Ionicons name={reason.icon} size={22} color={colors.textOnMedia} />
             <Text style={styles.optionText}>{reason.label}</Text>
           </TouchableOpacity>
         ))}
@@ -173,7 +141,7 @@ export default function VideoOptionsSheet({ videoId, isOwner, onClose, sheetRef 
   return (
     <BottomSheet
       ref={sheetRef}
-      index={-1}
+      index={0}
       snapPoints={snapPoints}
       enablePanDownToClose
       backdropComponent={renderBackdrop}
@@ -183,19 +151,19 @@ export default function VideoOptionsSheet({ videoId, isOwner, onClose, sheetRef 
       onChange={handleSheetChange}
     >
       <TouchableOpacity style={styles.optionRow} onPress={handleCopyLink}>
-        <Ionicons name="link-outline" size={22} color="rgba(255,255,255,0.7)" />
+        <Ionicons name="link-outline" size={22} color={colors.textOnMedia} />
         <Text style={styles.optionText}>Copier le lien</Text>
       </TouchableOpacity>
 
       <View style={styles.separator} />
 
       <TouchableOpacity style={styles.optionRow} onPress={handleHide}>
-        <Ionicons name="eye-off-outline" size={22} color="rgba(255,255,255,0.7)" />
+        <Ionicons name="eye-off-outline" size={22} color={colors.textOnMedia} />
         <Text style={styles.optionText}>Ne plus voir ce contenu</Text>
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.optionRow} onPress={() => setShowReport(true)}>
-        <Ionicons name="flag-outline" size={22} color="rgba(255,255,255,0.7)" />
+        <Ionicons name="flag-outline" size={22} color={colors.textOnMedia} />
         <Text style={styles.optionText}>Signaler</Text>
       </TouchableOpacity>
 
@@ -203,8 +171,8 @@ export default function VideoOptionsSheet({ videoId, isOwner, onClose, sheetRef 
         <>
           <View style={styles.separator} />
           <TouchableOpacity style={styles.optionRow} onPress={handleDelete}>
-            <Ionicons name="trash-outline" size={22} color="#FF4444" />
-            <Text style={[styles.optionText, { color: '#FF4444' }]}>Supprimer la vidéo</Text>
+            <Ionicons name="trash-outline" size={22} color={colors.error} />
+            <Text style={[styles.optionText, { color: colors.error }]}>Supprimer la vidéo</Text>
           </TouchableOpacity>
         </>
       )}
@@ -219,53 +187,13 @@ export default function VideoOptionsSheet({ videoId, isOwner, onClose, sheetRef 
 }
 
 const styles = StyleSheet.create({
-  background: {
-    backgroundColor: '#121212',
-  },
-  handleIndicator: {
-    backgroundColor: '#555',
-    width: 36,
-  },
-  handleBar: {
-    backgroundColor: '#121212',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-  },
-  headerTitle: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  backBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  optionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-  },
-  optionText: {
-    color: '#FFF',
-    fontSize: 15,
-    flex: 1,
-  },
-  separator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    marginLeft: 20,
-  },
+  background: { backgroundColor: colors.surface },
+  handleIndicator: { backgroundColor: colors.textSecondary, width: 36 },
+  handleBar: { backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 8 },
+  headerTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
+  backBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.hairline, justifyContent: 'center', alignItems: 'center' },
+  optionRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 20 },
+  optionText: { color: colors.text, fontSize: 15, flex: 1 },
+  separator: { height: StyleSheet.hairlineWidth, backgroundColor: colors.hairline, marginLeft: 20 },
 })

@@ -5,7 +5,12 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0D1117",
+    "androidStatusBar": {
+      "barStyle": "light-content",
+      "backgroundColor": "#0D1117"
+    },
     "scheme": "mbolo",
     "newArchEnabled": false,
     "developmentClient": {
@@ -17,6 +22,7 @@
       "backgroundColor": "#0D1117"
     },
     "ios": {
+      "userInterfaceStyle": "dark",
       "supportsTablet": true,
       "bundleIdentifier": "com.mbolo.app",
       "infoPlist": {
@@ -42,6 +48,7 @@
       }
     },
     "android": {
+      "userInterfaceStyle": "dark",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#3A75C4"
