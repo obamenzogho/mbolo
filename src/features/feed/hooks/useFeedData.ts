@@ -1,5 +1,6 @@
 /* useFeedData — pagination Firestore du feed.
-   Rôle : fetch par page de PAGE_SIZE=20, déclenché quand currentIndex >= videos.length - TRIGGER_OFFSET.
+   Rôle : fetch par page de PAGE_SIZE=60, déclenché quand currentIndex >= videos.length - TRIGGER_OFFSET.
+   Ranking par scoreVideo (engagement + fraîcheur + affinité + qualité).
    userName et userPhotoURL lus directement depuis le document vidéo (dénormalisation).
    Paramètre store : instance Zustand isolée (forYouFeedStore ou followingFeedStore). */
 
@@ -21,11 +22,13 @@ import { generateThumbnailURL } from '../../../lib/cloudinary'
 import { getSeenVideos } from '../../../lib/feed'
 import { getBlockedUserIds } from '../../../lib/blockService'
 import { FEED_DEBUG } from '../store/feedStore'
+import { rankVideos, EMPTY_TASTE, type UserTaste } from '../services/rankVideos'
+import { buildUserTaste } from '../services/userTaste'
 import type { Video } from '../../../types'
 import type { FeedState } from '../store/feedStore'
 
-const PAGE_SIZE = 20
-const TRIGGER_OFFSET = 10
+const PAGE_SIZE = 60
+const TRIGGER_OFFSET = 15
 const MIN_KEEP = 5
 const MAX_EXTRA_FETCHES = 3
 
@@ -37,6 +40,9 @@ export function useFeedData({ store }: { store: StoreApi<FeedState> }) {
   const seenVideosRef = useRef<Set<string>>(new Set())
   const seenLoadedRef = useRef(false)
   const extraFetchesRef = useRef(0)
+  const tasteRef = useRef<UserTaste>(EMPTY_TASTE)
+  const tasteLoadedRef = useRef(false)
+  const recentCreatorsRef = useRef<string[]>([])
   const videos = useStore(store, (s) => s.videos)
   const currentIndex = useStore(store, (s) => s.currentIndex)
   const isLoadingMore = useStore(store, (s) => s.isLoadingMore)
@@ -60,6 +66,11 @@ export function useFeedData({ store }: { store: StoreApi<FeedState> }) {
       }
 
       const blockedIds = await getBlockedUserIds()
+
+      if (!tasteLoadedRef.current) {
+        tasteRef.current = await buildUserTaste()
+        tasteLoadedRef.current = true
+      }
 
       const constraints = [orderBy('createdAt', 'desc'), limit(PAGE_SIZE)]
       if (lastDocRef.current) {
@@ -120,12 +131,16 @@ export function useFeedData({ store }: { store: StoreApi<FeedState> }) {
         return
       }
 
+      const ranked = rankVideos(videoList, tasteRef.current, recentCreatorsRef.current)
+
       if (isFirstFetch.current) {
         isFirstFetch.current = false
-        setVideos(videoList)
+        setVideos(ranked)
       } else {
-        appendVideos(videoList)
+        appendVideos(ranked)
       }
+
+      recentCreatorsRef.current = ranked.slice(-3).map((v) => v.userId)
 
       setHasMore(snap.docs.length >= PAGE_SIZE)
     } catch (e) {
@@ -159,6 +174,8 @@ export function useFeedData({ store }: { store: StoreApi<FeedState> }) {
     isFirstFetch.current = true
     fetchAttemptedRef.current = false
     seenLoadedRef.current = false
+    tasteLoadedRef.current = false
+    recentCreatorsRef.current = []
     extraFetchesRef.current = 0
     setHasMore(true)
     fetchVideos()

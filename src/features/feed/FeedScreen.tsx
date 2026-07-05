@@ -20,6 +20,7 @@ import { auth } from '../../lib/firebase'
 import { colors } from '../../lib/theme'
 import { captureException } from '../../lib/sentry'
 import { VideoCache } from './services/VideoCache'
+import { loadWatchCache } from './services/watchTracker'
 import CommentSheet from './components/CommentSheet'
 import VideoOptionsSheet from './components/VideoOptionsSheet'
 import ShareModal from '../share/components/ShareModal'
@@ -91,19 +92,15 @@ export default function FeedScreen({ feedType = 'forYou', isActive = true }: Fee
   const handleLongPress = useCallback((videoId: string) => {
     const video = feedData.videos.find((v) => v.id === videoId)
     if (!video) return
-    const ownerId = video.userId ?? ''
-    const isOwner = auth.currentUser?.uid === ownerId
-    setVideoOptionsTarget(null)
-    setTimeout(() => setVideoOptionsTarget({ videoId, isOwner }), 0)
+    const isOwner = auth.currentUser?.uid === (video.userId ?? '')
+    setVideoOptionsTarget({ videoId, isOwner })
   }, [feedData.videos])
 
   const handlePressMore = useCallback((videoId: string) => {
     const video = feedData.videos.find((v) => v.id === videoId)
     if (!video) return
-    const ownerId = video.userId ?? ''
-    const isOwner = auth.currentUser?.uid === ownerId
-    setVideoOptionsTarget(null)
-    setTimeout(() => setVideoOptionsTarget({ videoId, isOwner }), 0)
+    const isOwner = auth.currentUser?.uid === (video.userId ?? '')
+    setVideoOptionsTarget({ videoId, isOwner })
   }, [feedData.videos])
 
   useEffect(() => {
@@ -136,6 +133,7 @@ export default function FeedScreen({ feedType = 'forYou', isActive = true }: Fee
     VideoCache.warm().catch((e) => {
       captureException(e instanceof Error ? e : new Error(String(e)), { context: 'VideoCache.warm' })
     })
+    loadWatchCache()
   }, [])
 
   useEffect(() => {

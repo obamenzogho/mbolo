@@ -9,6 +9,7 @@ import { updateDoc, doc, increment, setDoc, deleteDoc, getDoc, onSnapshot } from
 import { db } from '../../../lib/firebase'
 import { createNotification } from '../../../lib/notifications'
 import { captureException } from '../../../lib/sentry'
+import { recordWatch } from '../services/watchTracker'
 
 import { VideoPlayerSlot, usePlayerForVideo } from './VideoPlayerSlot'
 import { RepostButton } from '@/features/repost/components/RepostButton'
@@ -76,6 +77,7 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
   const barWidthRef = useRef(SCREEN_WIDTH)
   const [seekInfo, setSeekInfo] = useState<{ label: string; x: number } | null>(null)
   const [discRotation] = useState(() => new Animated.Value(0))
+  const replayCountRef = useRef(0)
 
   useEffect(() => {
     const uid = auth.currentUser?.uid
@@ -139,6 +141,9 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
       player.addListener('sourceChange', () => {
         setProgress(0)
       }),
+      player.addListener('playToEnd', () => {
+        replayCountRef.current += 1
+      }),
     ]
 
     return () => {
@@ -147,6 +152,17 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
       setProgress(0)
     }
   }, [isActive, player, progressAnim, item.id])
+
+  useEffect(() => {
+    return () => {
+      if (!player) return
+      const dur = player.duration
+      if (dur > 0) {
+        const ratio = Math.min(1, player.currentTime / dur)
+        recordWatch(item.id, ratio, replayCountRef.current > 0)
+      }
+    }
+  }, [isActive, player, item.id])
 
   useEffect(() => {
     if (isPlaying && !isSeeking) {
@@ -645,12 +661,12 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
         </TouchableOpacity>
       </View>
 
-      {/* 6. Barre de seek — zIndex: 10, coupée à right: 80 */}
+      {/* 6. Barre de seek — zIndex: 10, coupée à right: 80 pour libérer la colonne actions */}
       {player && (
         <Animated.View
           {...seekPanResponder.panHandlers}
           onLayout={(e) => { barWidthRef.current = e.nativeEvent.layout.width }}
-          style={{ position: 'absolute', bottom: BOTTOM_PROGRESS + insets.bottom, left: 0, right: 0, height: 60, justifyContent: 'flex-end', opacity: barOpacity, zIndex: 10 }}
+          style={{ position: 'absolute', bottom: BOTTOM_PROGRESS + insets.bottom, left: 0, right: 80, height: 60, justifyContent: 'flex-end', opacity: barOpacity, zIndex: 10 }}
         >
           {/* Track background */}
           <View style={{ height: isPlaying ? 2 : 6, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 3, marginHorizontal: 16 }}>
