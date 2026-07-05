@@ -3,6 +3,7 @@ import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reani
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useStartupStore } from '../store/startupStore'
+import { colors } from '../../../lib/theme'
 
 const { width, height } = Dimensions.get('window')
 
@@ -46,7 +47,7 @@ export default function StartupScreen({
       {showSkeleton && (
         <View style={{
           ...StyleSheet.absoluteFillObject,
-          backgroundColor: '#0D1117',
+          backgroundColor: colors.background,
           justifyContent: 'center',
           alignItems: 'center',
           paddingTop: insets.top,
@@ -59,7 +60,7 @@ export default function StartupScreen({
                   width: width - 32,
                   height: height * 0.75,
                   borderRadius: 12,
-                  backgroundColor: '#1a1a2e',
+                  backgroundColor: colors.surface,
                   overflow: 'hidden',
                 }}
               >
@@ -81,7 +82,7 @@ export default function StartupScreen({
         style={[
           {
             ...StyleSheet.absoluteFillObject,
-            backgroundColor: '#0D1117',
+            backgroundColor: colors.background,
             justifyContent: 'center',
             alignItems: 'center',
           },
@@ -96,7 +97,7 @@ export default function StartupScreen({
             resizeMode="contain"
           />
           <Text style={{
-            color: '#00C853',
+            color: colors.primary,
             fontSize: 32,
             fontWeight: '700',
             letterSpacing: 1,
@@ -106,16 +107,16 @@ export default function StartupScreen({
           </Text>
         </View>
         <View style={{ position: 'absolute', bottom: 80, alignItems: 'center' }}>
-          <Text style={{ color: '#888', fontSize: 11, fontWeight: '400', letterSpacing: 0.3 }}>
+          <Text style={{ color: colors.textSecondary, fontSize: 11, fontWeight: '400', letterSpacing: 0.3 }}>
             Du
           </Text>
-          <Text style={{ color: '#3797F0', fontSize: 13, fontWeight: '600', marginTop: 2, letterSpacing: 0.2 }}>
+          <Text style={{ color: colors.secondary, fontSize: 13, fontWeight: '600', marginTop: 2, letterSpacing: 0.2 }}>
             Groupe NZOGHO
           </Text>
           {error && (
             <View style={{ alignItems: 'center', marginTop: 16 }}>
-              <Ionicons name="alert-circle-outline" size={18} color="#FF4444" />
-              <Text style={{ color: '#FF4444', fontSize: 12, marginTop: 4 }}>{error.message}</Text>
+              <Ionicons name="alert-circle-outline" size={18} color={colors.error} />
+              <Text style={{ color: colors.error, fontSize: 12, marginTop: 4 }}>{error.message}</Text>
             </View>
           )}
         </View>
