@@ -25,6 +25,18 @@ export const onLikeDelete = onDocumentDeleted('videos/{videoId}/likes/{userId}',
   bump(`videos/${e.params.videoId}`, 'likes', -1),
 )
 
+/* ---------- LIKES → CREATOR totalLikes ---------- */
+export const onLikeUpdateCreatorTotal = onDocumentCreated('videos/{videoId}/likes/{userId}', async (event) => {
+  const videoSnap = await db.doc(`videos/${event.params.videoId}`).get()
+  const creatorId = videoSnap.data()?.userId
+  if (creatorId) await db.doc(`users/${creatorId}`).update({ totalLikes: FieldValue.increment(1) })
+})
+export const onUnlikeUpdateCreatorTotal = onDocumentDeleted('videos/{videoId}/likes/{userId}', async (event) => {
+  const videoSnap = await db.doc(`videos/${event.params.videoId}`).get()
+  const creatorId = videoSnap.data()?.userId
+  if (creatorId) await db.doc(`users/${creatorId}`).update({ totalLikes: FieldValue.increment(-1) })
+})
+
 /* ---------- SAVES : videos/{videoId}/saves/{userId} ---------- */
 export const onSaveCreate = onDocumentCreated('videos/{videoId}/saves/{userId}', (e) =>
   bump(`videos/${e.params.videoId}`, 'saves', 1),
@@ -99,6 +111,7 @@ const PUSH_MESSAGES: Record<string, (name: string) => { title: string; body: str
   reply: (n) => ({ title: '↩️ Réponse', body: `${n} a répondu à ton commentaire` }),
   repost: (n) => ({ title: '🔄 Republication', body: `${n} a republié ta vidéo` }),
   mention: (n) => ({ title: '🏷️ Mention', body: `${n} t'a mentionné` }),
+  tag: (n) => ({ title: '🏷️ Identification', body: `${n} t'a identifié dans une vidéo` }),
 }
 
 export const onNotificationCreate = onDocumentCreated('notifications/{notifId}', async (event) => {
@@ -133,6 +146,28 @@ export const onNotificationCreate = onDocumentCreated('notifications/{notifId}',
       data: { type, fromUserId, ...notif.data },
     }),
   }).catch((e) => console.warn('push send failed:', e?.message ?? e))
+})
+
+/* ---------- TAGS : notifs when users are tagged in a video ---------- */
+export const onVideoTagPeople = onDocumentCreated('videos/{videoId}', async (event) => {
+  const video = event.data?.data()
+  const tagged: string[] = video?.taggedUsers ?? []
+  if (!tagged.length || !video) return
+
+  const batch = db.batch()
+  for (const uid of tagged) {
+    if (uid === video.userId) continue
+    const ref = db.collection('notifications').doc()
+    batch.set(ref, {
+      userId: uid,
+      fromUserId: video.userId,
+      type: 'tag',
+      postId: event.params.videoId,
+      createdAt: FieldValue.serverTimestamp(),
+      read: false,
+    })
+  }
+  await batch.commit().catch((e) => console.warn('tag notif failed:', e?.message ?? e))
 })
 
 /* ---------- HASHTAGS : trending counters + decay ---------- */
@@ -181,4 +216,64 @@ export const decayTrendingScores = onSchedule('every 24 hours', async () => {
     batch.update(d.ref, { trendingScore: score < 0.1 ? 0 : score })
   })
   await batch.commit().catch((e) => console.warn('decay failed:', e?.message ?? e))
+})
+
+/* ---------- MODERATION : auto-action on reports ---------- */
+const AUTO_HIDE_THRESHOLD = 5
+const CRITICAL_REASONS = ['nudity', 'violence', 'self_harm', 'hate']
+
+export const onReportCreate = onDocumentCreated('reports/{reportId}', async (event) => {
+  const report = event.data?.data()
+  if (!report) return
+
+  const { targetType, targetId, contentOwnerId, reason } = report
+  if (!targetId || !targetType) return
+
+  const reportsSnap = await db.collection('reports')
+    .where('targetId', '==', targetId)
+    .where('targetType', '==', targetType)
+    .get()
+
+  const uniqueReporters = new Set<string>()
+  const reasons: string[] = []
+  reportsSnap.docs.forEach((d) => {
+    const r = d.data()
+    if (r.reportedBy) uniqueReporters.add(r.reportedBy)
+    if (r.reason) reasons.push(r.reason)
+  })
+  const reportCount = uniqueReporters.size
+  const criticalCount = reasons.filter((r) => CRITICAL_REASONS.includes(r)).length
+
+  const shouldAutoHide =
+    reportCount >= AUTO_HIDE_THRESHOLD ||
+    (CRITICAL_REASONS.includes(reason) && criticalCount >= 2)
+
+  if (!shouldAutoHide) return
+
+  try {
+    if (targetType === 'video') {
+      await db.doc(`videos/${targetId}`).update({
+        moderationStatus: 'hidden',
+        hiddenAt: FieldValue.serverTimestamp(),
+        hiddenReason: 'auto_report_threshold',
+      })
+    } else if (targetType === 'comment') {
+      if (report.commentPath) {
+        await db.doc(report.commentPath).update({ moderationStatus: 'hidden' })
+      }
+    } else if (targetType === 'story') {
+      await db.doc(`stories/${targetId}`).update({ moderationStatus: 'hidden' })
+    } else if (targetType === 'user' && contentOwnerId) {
+      await db.doc(`users/${contentOwnerId}`).update({
+        moderationFlag: true,
+        moderationFlaggedAt: FieldValue.serverTimestamp(),
+      })
+    }
+
+    const batch = db.batch()
+    reportsSnap.docs.forEach((d) => batch.update(d.ref, { status: 'actioned' }))
+    await batch.commit()
+  } catch (e) {
+    console.warn('auto-moderation failed:', (e as any)?.message ?? e)
+  }
 })

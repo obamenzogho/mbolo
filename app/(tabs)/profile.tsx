@@ -46,8 +46,11 @@ import { HighlightViewer } from '@/features/highlights/components/HighlightViewe
 import HighlightEditSheet from '@/features/highlights/components/HighlightEditSheet'
 import { useProfileTabs } from '@/hooks/useProfileTabs'
 import { ProfileTabBar } from '@/components/ProfileTabBar'
+import { RichText } from '@/components/RichText'
 import { VideoGrid } from '@/components/VideoGrid'
 import { ProfileVideoViewer } from '@/features/feed/profile-viewer/ProfileVideoViewer'
+import { AvatarViewer } from '@/components/AvatarViewer'
+import { VerifiedBadge } from '@/components/VerifiedBadge'
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 
@@ -271,7 +274,7 @@ export default function Profile() {
     }
   }, [followersModal, page])
 
-  const tabConfig: ProfileTab[] = ['grid', 'reels', 'saved', 'liked', 'reposted']
+  const tabConfig: ProfileTab[] = ['grid', 'reels', 'saved', 'liked', 'reposted', 'tagged']
 
   const translateX = useSharedValue(0)
   const swipeOffsetPx = useDerivedValue(() => {
@@ -336,7 +339,7 @@ export default function Profile() {
                 <View style={{ flex: 1, alignItems: 'center' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                     <Text style={{ color: colors.white, fontSize: 17, fontWeight: '700' }}>{profile?.pseudo || user?.displayName || ''}</Text>
-                    {profile?.verified && <Ionicons name="checkmark-circle" size={16} color={colors.secondary} />}
+                    {profile?.verified && <VerifiedBadge />}
                   </View>
                 </View>
                 <TouchableOpacity onPress={openMenu} style={{ width: 36, height: 36, justifyContent: 'center', alignItems: 'flex-end' }}>
@@ -383,7 +386,7 @@ export default function Profile() {
                     )}
                     {(() => { const age = calcAge(profile?.dateOfBirth || ''); return age && profile?.showAge !== false ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}><Ionicons name="calendar-outline" size={13} color={colors.textSecondary} /><Text style={{ color: colors.textSecondary, fontSize: 12 }}>{age} ans</Text></View> : null })()}
                   </View>
-                  {profile?.bio ? <Text style={{ color: colors.white, fontSize: 13, marginTop: 4, lineHeight: 18 }}>{profile.bio}</Text> : null}
+                  {profile?.bio ? <RichText text={profile.bio} style={{ color: colors.white, fontSize: 13, marginTop: 4, lineHeight: 18 }} /> : null}
                   {(profile as any)?.externalLink ? (
                     <TouchableOpacity onPress={async () => { try { await require('expo-linking').openURLAsync((profile as any).externalLink) } catch {} }} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
                       <Ionicons name="link-outline" size={13} color={colors.secondary} />
@@ -400,6 +403,9 @@ export default function Profile() {
                   ) : null}
                 </View>
                 <View style={{ flexDirection: 'column', gap: 8, justifyContent: 'center', marginLeft: 12 }}>
+                  <TouchableOpacity onPress={() => router.push('/insights')} style={{ width: 34, height: 34, borderRadius: 8, backgroundColor: colors.surfaceLight, borderWidth: 1, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' }}>
+                    <Ionicons name="bar-chart-outline" size={18} color={colors.white} />
+                  </TouchableOpacity>
                   <TouchableOpacity onPress={() => router.push('/(tabs)/edit-profile')} style={{ width: 34, height: 34, borderRadius: 8, backgroundColor: colors.surfaceLight, borderWidth: 1, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' }}>
                     <Ionicons name="pencil-outline" size={18} color={colors.white} />
                   </TouchableOpacity>
@@ -520,14 +526,11 @@ export default function Profile() {
     </Modal>
 
     {/* PHOTO VIEWER */}
-    <Modal visible={photoViewerVisible} transparent animationType="fade">
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' }}>
-        <TouchableOpacity onPress={() => setPhotoViewerVisible(false)} style={{ position: 'absolute', top: 50, right: 20, zIndex: 10, padding: 8 }}>
-          <Ionicons name="close" size={30} color={colors.white} />
-        </TouchableOpacity>
-        <Image source={{ uri: profile?.photoURL || '' }} style={{ width: SCREEN_WIDTH * 0.8, height: SCREEN_WIDTH * 0.8, borderRadius: 20 }} resizeMode="contain" />
-      </View>
-    </Modal>
+    <AvatarViewer
+      uri={profile?.photoURL || ''}
+      visible={photoViewerVisible}
+      onClose={() => setPhotoViewerVisible(false)}
+    />
 
     <HighlightViewer
     highlight={viewerHighlight}

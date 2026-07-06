@@ -24,26 +24,31 @@ export function useProfileTabs({ userId, tabs: allowedTabs }: UseProfileTabsOpti
   const [savedVideos, setSavedVideos] = useState<VideoType[]>([])
   const [likedVideos, setLikedVideos] = useState<VideoType[]>([])
   const [repostedVideos, setRepostedVideos] = useState<VideoType[]>([])
+  const [taggedVideos, setTaggedVideos] = useState<VideoType[]>([])
 
   const ownLastDoc = useRef<QueryDocumentSnapshot<DocumentData> | null>(null)
   const savedLastDoc = useRef<QueryDocumentSnapshot<DocumentData> | null>(null)
   const likedLastDoc = useRef<QueryDocumentSnapshot<DocumentData> | null>(null)
   const repostedLastDoc = useRef<QueryDocumentSnapshot<DocumentData> | null>(null)
+  const taggedLastDoc = useRef<QueryDocumentSnapshot<DocumentData> | null>(null)
 
   const ownHasMore = useRef(true)
   const savedHasMore = useRef(true)
   const likedHasMore = useRef(true)
   const repostedHasMore = useRef(true)
+  const taggedHasMore = useRef(true)
 
   const ownLoaded = useRef(false)
   const savedLoaded = useRef(false)
   const likedLoaded = useRef(false)
   const repostedLoaded = useRef(false)
+  const taggedLoaded = useRef(false)
 
   const [ownLoading, setOwnLoading] = useState(false)
   const [savedLoading, setSavedLoading] = useState(false)
   const [likedLoading, setLikedLoading] = useState(false)
   const [repostedLoading, setRepostedLoading] = useState(false)
+  const [taggedLoading, setTaggedLoading] = useState(false)
 
   const [refreshing, setRefreshing] = useState(false)
 
@@ -58,7 +63,7 @@ export function useProfileTabs({ userId, tabs: allowedTabs }: UseProfileTabsOpti
         const result = await withFirestoreRetry(() => getDocs(q), { context: 'profileTabs/own' })
         if (!result.error) {
           const snap: any = result.data
-          const docs = snap.docs.map((d: any) => ({ id: d.id, ...d.data() } as VideoType))
+          const docs = snap.docs.map((d: any) => ({ id: d.id, ...d.data() } as VideoType)).filter((v: any) => v.moderationStatus !== 'hidden')
           ownLastDoc.current = snap.docs[snap.docs.length - 1] || null
           ownHasMore.current = snap.docs.length === PAGE_SIZE
           ownLoaded.current = true
@@ -79,7 +84,7 @@ export function useProfileTabs({ userId, tabs: allowedTabs }: UseProfileTabsOpti
         const result = await withFirestoreRetry(() => getDocs(q), { context: 'profileTabs/saved' })
         if (!result.error) {
           const snap: any = result.data
-          const docs = snap.docs.map((d: any) => ({ id: d.id, ...d.data() } as VideoType))
+          const docs = snap.docs.map((d: any) => ({ id: d.id, ...d.data() } as VideoType)).filter((v: any) => v.moderationStatus !== 'hidden')
           savedLastDoc.current = snap.docs[snap.docs.length - 1] || null
           savedHasMore.current = snap.docs.length === PAGE_SIZE
           savedLoaded.current = true
@@ -100,7 +105,7 @@ export function useProfileTabs({ userId, tabs: allowedTabs }: UseProfileTabsOpti
         const result = await withFirestoreRetry(() => getDocs(q), { context: 'profileTabs/liked' })
         if (!result.error) {
           const snap: any = result.data
-          const docs = snap.docs.map((d: any) => ({ id: d.id, ...d.data() } as VideoType))
+          const docs = snap.docs.map((d: any) => ({ id: d.id, ...d.data() } as VideoType)).filter((v: any) => v.moderationStatus !== 'hidden')
           likedLastDoc.current = snap.docs[snap.docs.length - 1] || null
           likedHasMore.current = snap.docs.length === PAGE_SIZE
           likedLoaded.current = true
@@ -123,6 +128,26 @@ export function useProfileTabs({ userId, tabs: allowedTabs }: UseProfileTabsOpti
       } catch (e) { captureException(e instanceof Error ? e : new Error(String(e)), { context: 'fetchReposted' }) }
       setRepostedLoading(false)
     }
+
+    if (tab === 'tagged') {
+      if (!isRefresh && (taggedLoading || (!taggedHasMore.current && taggedLoaded.current))) return
+      setTaggedLoading(true)
+      try {
+        const q = isRefresh || !taggedLastDoc.current
+          ? query(collection(db, 'videos'), where('taggedUsers', 'array-contains', userId), orderBy('createdAt', 'desc'), limit(PAGE_SIZE))
+          : query(collection(db, 'videos'), where('taggedUsers', 'array-contains', userId), orderBy('createdAt', 'desc'), startAfter(taggedLastDoc.current), limit(PAGE_SIZE))
+        const result = await withFirestoreRetry(() => getDocs(q), { context: 'profileTabs/tagged' })
+        if (!result.error) {
+          const snap: any = result.data
+          const docs = snap.docs.map((d: any) => ({ id: d.id, ...d.data() } as VideoType)).filter((v: any) => v.moderationStatus !== 'hidden')
+          taggedLastDoc.current = snap.docs[snap.docs.length - 1] || null
+          taggedHasMore.current = snap.docs.length === PAGE_SIZE
+          taggedLoaded.current = true
+          setTaggedVideos(prev => isRefresh ? docs : [...prev, ...docs])
+        }
+      } catch (e) { captureException(e instanceof Error ? e : new Error(String(e)), { context: 'fetchTagged' }) }
+      setTaggedLoading(false)
+    }
   }, [userId])
 
   useEffect(() => {
@@ -130,6 +155,7 @@ export function useProfileTabs({ userId, tabs: allowedTabs }: UseProfileTabsOpti
       : activeTab === 'saved' ? savedLoaded.current
       : activeTab === 'liked' ? likedLoaded.current
       : activeTab === 'reposted' ? repostedLoaded.current
+      : activeTab === 'tagged' ? taggedLoaded.current
       : false
     if (!loaded) fetchPage(activeTab)
   }, [activeTab, fetchPage])
@@ -143,17 +169,20 @@ export function useProfileTabs({ userId, tabs: allowedTabs }: UseProfileTabsOpti
     if (activeTab === 'saved') return savedVideos
     if (activeTab === 'liked') return likedVideos
     if (activeTab === 'reposted') return repostedVideos
+    if (activeTab === 'tagged') return taggedVideos
     return []
-  }, [activeTab, gridVideos, reelVideos, savedVideos, likedVideos, repostedVideos])
+  }, [activeTab, gridVideos, reelVideos, savedVideos, likedVideos, repostedVideos, taggedVideos])
 
   const loading = activeTab === 'grid' || activeTab === 'reels' ? ownLoading
     : activeTab === 'saved' ? savedLoading
     : activeTab === 'liked' ? likedLoading
+    : activeTab === 'tagged' ? taggedLoading
     : repostedLoading
 
   const hasMore = activeTab === 'grid' || activeTab === 'reels' ? ownHasMore.current
     : activeTab === 'saved' ? savedHasMore.current
     : activeTab === 'liked' ? likedHasMore.current
+    : activeTab === 'tagged' ? taggedHasMore.current
     : repostedHasMore.current
 
   const loadMore = useCallback(async () => {
@@ -167,6 +196,7 @@ export function useProfileTabs({ userId, tabs: allowedTabs }: UseProfileTabsOpti
     if (savedLoaded.current) promises.push(fetchPage('saved', true))
     if (likedLoaded.current) promises.push(fetchPage('liked', true))
     if (repostedLoaded.current) promises.push(fetchPage('reposted', true))
+    if (taggedLoaded.current) promises.push(fetchPage('tagged', true))
     await Promise.all(promises)
     setRefreshing(false)
   }, [fetchPage])
@@ -180,6 +210,7 @@ export function useProfileTabs({ userId, tabs: allowedTabs }: UseProfileTabsOpti
     savedVideos,
     likedVideos,
     repostedVideos,
+    taggedVideos,
     loading,
     refreshing,
     onRefresh,

@@ -9,11 +9,14 @@ import { uploadVideo as uploadToStorage } from '../../src/lib/storage'
 import { generateThumbnailURL } from '../../src/lib/cloudinary'
 import { extractHashtags } from '../../src/lib/hashtags'
 import { colors } from '../../src/lib/theme'
+import { TagPeopleSelector, type TaggableUser } from '../../src/components/TagPeopleSelector'
 
 export default function Upload() {
   const [video, setVideo] = useState<any>(null)
   const [description, setDescription] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [tagged, setTagged] = useState<TaggableUser[]>([])
+  const [tagOpen, setTagOpen] = useState(false)
 
   const pickVideo = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -69,6 +72,7 @@ export default function Upload() {
         thumbnailURL: generateThumbnailURL(result.uri),
         description,
         hashtags: extractHashtags(description),
+        taggedUsers: tagged.map((u) => u.id),
         likes: 0,
         comments: 0,
         shares: 0,
@@ -129,6 +133,15 @@ export default function Upload() {
                 borderWidth: 1, borderColor: colors.border, maxHeight: 100,
               }}
             />
+            <TouchableOpacity
+              onPress={() => setTagOpen(true)}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, marginBottom: 16 }}
+            >
+              <Ionicons name="person-add-outline" size={20} color={colors.text} />
+              <Text style={{ color: colors.text }}>
+                {tagged.length ? `${tagged.length} personne(s) identifiée(s)` : 'Identifier des personnes'}
+              </Text>
+            </TouchableOpacity>
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <TouchableOpacity
                 onPress={() => setVideo(null)}
@@ -197,6 +210,12 @@ export default function Upload() {
           </View>
         )}
       </View>
+      <TagPeopleSelector
+        visible={tagOpen}
+        selected={tagged}
+        onClose={() => setTagOpen(false)}
+        onChange={setTagged}
+      />
     </SafeAreaView>
   )
 }

@@ -31,6 +31,10 @@ import { useProfileTabs } from '@/hooks/useProfileTabs'
 import { ProfileTabBar } from '@/components/ProfileTabBar'
 import { VideoGrid } from '@/components/VideoGrid'
 import { ProfileVideoViewer } from '@/features/feed/profile-viewer/ProfileVideoViewer'
+import { RichText } from '@/components/RichText'
+import { VerifiedBadge } from '@/components/VerifiedBadge'
+import { AvatarViewer } from '@/components/AvatarViewer'
+import { ContentActionsSheet } from '@/components/ContentActionsSheet'
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 
@@ -50,6 +54,7 @@ export default function UserProfile() {
   const [profile, setProfile] = useState<UserType | null>(null)
   const [profileLoaded, setProfileLoaded] = useState(false)
   const [imgError, setImgError] = useState(false)
+  const [photoViewerVisible, setPhotoViewerVisible] = useState(false)
   const [ready, setReady] = useState(false)
   const tabsHook = useProfileTabs({ userId: userId || '', tabs: ['grid', 'reels'] })
   const { activeTab, setActiveTab, currentVideos, loading, refreshing, onRefresh: tabsRefresh, loadMore, hasMore } = tabsHook
@@ -77,6 +82,7 @@ export default function UserProfile() {
   const [followListLoading, setFollowListLoading] = useState(false)
   const [viewerIndex, setViewerIndex] = useState<number | null>(null)
   const [menuVisible, setMenuVisible] = useState(false)
+  const [actionsOpen, setActionsOpen] = useState(false)
 
   const { isFollowing, isFriend, followerCount, followingCount, loading: followLoading, toggleFollow } = useFollow(userId || '')
 
@@ -220,11 +226,11 @@ export default function UserProfile() {
               </View>
 
               <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingTop: 8 }}>
-                <View style={{ width: 90, height: 90, borderRadius: 45, justifyContent: 'center', alignItems: 'center' }}>
+                <TouchableOpacity onPress={() => profile?.photoURL && setPhotoViewerVisible(true)} style={{ width: 90, height: 90, borderRadius: 45, justifyContent: 'center', alignItems: 'center' }}>
                   {profile?.photoURL && !imgError ? (
                     <Image source={{ uri: profile.photoURL }} onError={() => setImgError(true)} style={{ width: 84, height: 84, borderRadius: 42 }} />
                   ) : <Ionicons name="person" size={40} color="#555" />}
-                </View>
+                </TouchableOpacity>
                 <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'center' }}>
                   <TouchableOpacity style={{ alignItems: 'center' }}>
                     <Text style={{ color: colors.white, fontSize: 18, fontWeight: '700' }}>{currentVideos.length}</Text>
@@ -245,7 +251,7 @@ export default function UserProfile() {
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                     <Text style={{ color: colors.white, fontSize: 14, fontWeight: '700' }}>{profile?.nom || ''}</Text>
-                    {profile?.verified && <Ionicons name="checkmark-circle" size={14} color={colors.secondary} />}
+                    {profile?.verified && <VerifiedBadge size={14} />}
                     {isFriend && (
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginLeft: 4, backgroundColor: colors.success + '20', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
                         <Ionicons name="people" size={12} color={colors.success} />
@@ -266,7 +272,7 @@ export default function UserProfile() {
                     )}
                     {(() => { const age = calcAge(profile?.dateOfBirth || ''); return age && profile?.showAge !== false ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}><Ionicons name="calendar-outline" size={13} color="#888" /><Text style={{ color: '#888', fontSize: 12 }}>{age} ans</Text></View> : null })()}
                   </View>
-                  {profile?.bio ? <Text style={{ color: colors.white, fontSize: 13, marginTop: 4, lineHeight: 18 }}>{profile.bio}</Text> : null}
+                    {profile?.bio ? <RichText text={profile.bio} style={{ color: colors.white, fontSize: 13, marginTop: 4, lineHeight: 18 }} /> : null}
                   {profile?.externalLinks && profile.externalLinks.length > 0 && (
                     <View style={{ marginTop: 6 }}>
                       {profile.externalLinks.map((link, i) => (
@@ -341,18 +347,7 @@ export default function UserProfile() {
               style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14 }}
               onPress={() => {
                 setMenuVisible(false)
-                Alert.alert(
-                  'Signaler',
-                  'Signaler ce profil ?',
-                  [
-                    { text: 'Annuler', style: 'cancel' },
-                    {
-                      text: 'Signaler',
-                      style: 'destructive',
-                      onPress: () => Alert.alert('Merci', 'Nous avons bien reçu ton signalement.'),
-                    },
-                  ],
-                )
+                setActionsOpen(true)
               }}
             >
               <Ionicons name="flag-outline" size={22} color="#ff4444" />
@@ -493,6 +488,19 @@ export default function UserProfile() {
           profileUser={{ nom: profile?.nom, photoURL: profile?.photoURL }}
         />
       )}
+      <AvatarViewer
+        uri={profile?.photoURL || ''}
+        visible={photoViewerVisible}
+        onClose={() => setPhotoViewerVisible(false)}
+      />
+      <ContentActionsSheet
+        visible={actionsOpen}
+        targetType="user"
+        targetId={userId || ''}
+        contentOwnerId={userId}
+        contentOwnerName={profile?.pseudo}
+        onClose={() => setActionsOpen(false)}
+      />
     </SafeAreaView>
   )
 }

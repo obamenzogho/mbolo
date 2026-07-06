@@ -20,6 +20,7 @@ import { useFollowAction } from '@/hooks/useFollowAction'
 import { ShareButton } from '@/features/share/components/ShareButton'
 import type { Video } from '../../../types'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { RichText } from '@/components/RichText'
 
 interface FeedItemProps {
   item: Video
@@ -568,17 +569,11 @@ function FeedItemComponent({ item, index, instanceId = 'feed', onPressComment, o
         {/* Description */}
         {item.description ? (
           <TouchableOpacity activeOpacity={0.9} onPress={() => setShowFullDesc((p) => !p)}>
-            <Text numberOfLines={showFullDesc ? undefined : 2} style={{ color: colors.white, fontSize: 14, marginTop: 6 }}>
-              {item.description}
-            </Text>
+            <RichText
+              text={item.description}
+              style={{ color: colors.white, fontSize: 14, marginTop: 6 }}
+            />
           </TouchableOpacity>
-        ) : null}
-
-        {/* Hashtags */}
-        {item.hashtags?.length > 0 ? (
-          <Text style={{ color: colors.secondary, fontSize: 14, marginTop: 4 }}>
-            {item.hashtags.map((t) => '#' + t).join(' ')}
-          </Text>
         ) : null}
 
         {/* Aperçu commentaires */}

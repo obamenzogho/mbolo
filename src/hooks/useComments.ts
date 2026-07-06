@@ -94,7 +94,7 @@ export function useComments(videoId: string, visible: boolean, initialPreviews?:
 
     const q = query(collection(db, 'videos', videoId, 'comments'), orderBy('createdAt', 'desc'), limit(COMMENTS_PAGE))
     const unsub = onSnapshot(q, async (snap: any) => {
-      const items = snap.docs.map((d: any) => ({ id: d.id, ...d.data() }))
+      const items = snap.docs.map((d: any) => ({ id: d.id, ...d.data() })).filter((c: any) => c.moderationStatus !== 'hidden')
       // Only set the cursor on the very first emission. Subsequent real-time
       // updates must NOT reset it, otherwise loadMoreComments would re-fetch
       // page 2 and produce duplicates.
@@ -168,7 +168,7 @@ export function useComments(videoId: string, visible: boolean, initialPreviews?:
       limit(REPLIES_PAGE)
     )
     const unsub = onSnapshot(q, async (snap: any) => {
-      const items = snap.docs.map((d: any) => ({ id: d.id, ...d.data() }))
+      const items = snap.docs.map((d: any) => ({ id: d.id, ...d.data() })).filter((c: any) => c.moderationStatus !== 'hidden')
       // Track cursor on first emission only (same rationale as comments).
       if (!lastReplyDocRef.current.has(commentId) && snap.docs.length > 0) {
         lastReplyDocRef.current.set(commentId, snap.docs[snap.docs.length - 1])

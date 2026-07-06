@@ -91,6 +91,7 @@ export function useFeedData({ store }: { store: StoreApi<FeedState> }) {
       for (const d of snap.docs) {
         const data = d.data()
         if (data.corrupted) continue
+        if (data.moderationStatus === 'hidden') continue
         if (seenVideosRef.current.has(d.id)) continue
         if (blockedIds.has(data.userId)) continue
         videoList.push({

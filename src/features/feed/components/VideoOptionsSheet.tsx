@@ -6,34 +6,30 @@ import { TouchableOpacity } from 'react-native-gesture-handler'
 import BottomSheet, { BottomSheetBackdrop } from '@gorhom/bottom-sheet'
 import { Ionicons } from '@expo/vector-icons'
 import * as Clipboard from 'expo-clipboard'
-import { doc, deleteDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore'
+import { doc, deleteDoc } from 'firebase/firestore'
 import { db, auth } from '../../../lib/firebase'
 import { captureException } from '../../../lib/sentry'
 import { colors } from '../../../lib/theme'
+import { ReportModal } from '../../../components/ReportModal'
+import { blockUser } from '../../../services/moderationService'
 
 interface VideoOptionsSheetProps {
   videoId: string
   isOwner: boolean
+  contentOwnerId?: string
+  contentOwnerName?: string
   onClose: () => void
   sheetRef: React.RefObject<BottomSheet | null>
 }
 
-const REPORT_REASONS = [
-  { key: 'inappropriate', label: 'Contenu inapproprié', icon: 'alert-circle-outline' as const },
-  { key: 'spam', label: 'Spam', icon: 'mail-unread-outline' as const },
-  { key: 'harassment', label: 'Harcèlement', icon: 'people-outline' as const },
-  { key: 'false_info', label: 'Faux contenu', icon: 'information-circle-outline' as const },
-  { key: 'other', label: 'Autre', icon: 'flag-outline' as const },
-]
-
-export default function VideoOptionsSheet({ videoId, isOwner, onClose, sheetRef }: VideoOptionsSheetProps) {
-  const [showReport, setShowReport] = useState(false)
+export default function VideoOptionsSheet({ videoId, isOwner, contentOwnerId, contentOwnerName, onClose, sheetRef }: VideoOptionsSheetProps) {
+  const [reportOpen, setReportOpen] = useState(false)
   const snapPoints = useMemo(() => ['40%', '70%'], [])
   const hasOpenedRef = useRef(false)
 
   const handleClose = useCallback(() => {
     hasOpenedRef.current = false
-    setShowReport(false)
+    setReportOpen(false)
     sheetRef.current?.close()
   }, [sheetRef])
 
@@ -41,7 +37,7 @@ export default function VideoOptionsSheet({ videoId, isOwner, onClose, sheetRef 
     if (index >= 0) hasOpenedRef.current = true
     if (index === -1 && hasOpenedRef.current) {
       hasOpenedRef.current = false
-      setShowReport(false)
+      setReportOpen(false)
       onClose()
     }
   }, [onClose])
@@ -69,26 +65,6 @@ export default function VideoOptionsSheet({ videoId, isOwner, onClose, sheetRef 
     ])
   }, [handleClose])
 
-  const handleReport = useCallback((reason: string) => {
-    Alert.alert('Signaler cette vidéo', 'Merci de votre signalement.', [
-      {
-        text: 'OK',
-        onPress: async () => {
-          try {
-            const currentUser = auth.currentUser
-            if (!currentUser) return
-            await addDoc(collection(db, 'reports'), {
-              type: 'video', videoId, reason, reportedBy: currentUser.uid, createdAt: serverTimestamp(),
-            })
-          } catch (e) {
-            captureException(e instanceof Error ? e : new Error(String(e)), { context: 'videoOptions:report' })
-          }
-          handleClose()
-        },
-      },
-    ])
-  }, [videoId, handleClose])
-
   const handleDelete = useCallback(() => {
     Alert.alert('Supprimer la vidéo', 'Cette action est irréversible.', [
       { text: 'Annuler', style: 'cancel' },
@@ -107,8 +83,32 @@ export default function VideoOptionsSheet({ videoId, isOwner, onClose, sheetRef 
     ])
   }, [videoId, handleClose])
 
-  if (showReport) {
-    return (
+  const handleBlock = useCallback(() => {
+    if (!contentOwnerId) return
+    Alert.alert(
+      `Bloquer @${contentOwnerName || 'cet utilisateur'} ?`,
+      'Vous ne verrez plus son contenu et il ne pourra plus voir le vôtre ni vous contacter.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Bloquer',
+          style: 'destructive',
+          onPress: async () => {
+            const ok = await blockUser(contentOwnerId)
+            handleClose()
+            if (ok) {
+              Alert.alert('Bloqué', 'Cet utilisateur a été bloqué.')
+            } else {
+              Alert.alert('Erreur', 'Impossible de bloquer. Réessaie.')
+            }
+          },
+        },
+      ],
+    )
+  }, [contentOwnerId, contentOwnerName, handleClose])
+
+  return (
+    <>
       <BottomSheet
         ref={sheetRef}
         index={0}
@@ -120,69 +120,55 @@ export default function VideoOptionsSheet({ videoId, isOwner, onClose, sheetRef 
         handleStyle={styles.handleBar}
         onChange={handleSheetChange}
       >
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => setShowReport(false)} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={20} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Signaler</Text>
-          <View style={{ width: 28 }} />
-        </View>
+        <TouchableOpacity style={styles.optionRow} onPress={handleCopyLink}>
+          <Ionicons name="link-outline" size={22} color={colors.textOnMedia} />
+          <Text style={styles.optionText}>Copier le lien</Text>
+        </TouchableOpacity>
 
-        {REPORT_REASONS.map((reason) => (
-          <TouchableOpacity key={reason.key} style={styles.optionRow} onPress={() => handleReport(reason.key)}>
-            <Ionicons name={reason.icon} size={22} color={colors.textOnMedia} />
-            <Text style={styles.optionText}>{reason.label}</Text>
+        <View style={styles.separator} />
+
+        <TouchableOpacity style={styles.optionRow} onPress={handleHide}>
+          <Ionicons name="eye-off-outline" size={22} color={colors.textOnMedia} />
+          <Text style={styles.optionText}>Ne plus voir ce contenu</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.optionRow} onPress={() => { setReportOpen(true) }}>
+          <Ionicons name="flag-outline" size={22} color={colors.textOnMedia} />
+          <Text style={styles.optionText}>Signaler</Text>
+        </TouchableOpacity>
+
+        {!isOwner && contentOwnerId && (
+          <TouchableOpacity style={styles.optionRow} onPress={handleBlock}>
+            <Ionicons name="ban-outline" size={22} color="#ef4444" />
+            <Text style={[styles.optionText, { color: '#ef4444' }]}>Bloquer @{contentOwnerName || ''}</Text>
           </TouchableOpacity>
-        ))}
+        )}
+
+        {isOwner && (
+          <>
+            <View style={styles.separator} />
+            <TouchableOpacity style={styles.optionRow} onPress={handleDelete}>
+              <Ionicons name="trash-outline" size={22} color={colors.error} />
+              <Text style={[styles.optionText, { color: colors.error }]}>Supprimer la vidéo</Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+        <View style={styles.separator} />
+
+        <TouchableOpacity style={styles.optionRow} onPress={handleClose}>
+          <Text style={[styles.optionText, { textAlign: 'center', flex: 0 }]}>Annuler</Text>
+        </TouchableOpacity>
       </BottomSheet>
-    )
-  }
 
-  return (
-    <BottomSheet
-      ref={sheetRef}
-      index={0}
-      snapPoints={snapPoints}
-      enablePanDownToClose
-      backdropComponent={renderBackdrop}
-      backgroundStyle={styles.background}
-      handleIndicatorStyle={styles.handleIndicator}
-      handleStyle={styles.handleBar}
-      onChange={handleSheetChange}
-    >
-      <TouchableOpacity style={styles.optionRow} onPress={handleCopyLink}>
-        <Ionicons name="link-outline" size={22} color={colors.textOnMedia} />
-        <Text style={styles.optionText}>Copier le lien</Text>
-      </TouchableOpacity>
-
-      <View style={styles.separator} />
-
-      <TouchableOpacity style={styles.optionRow} onPress={handleHide}>
-        <Ionicons name="eye-off-outline" size={22} color={colors.textOnMedia} />
-        <Text style={styles.optionText}>Ne plus voir ce contenu</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.optionRow} onPress={() => setShowReport(true)}>
-        <Ionicons name="flag-outline" size={22} color={colors.textOnMedia} />
-        <Text style={styles.optionText}>Signaler</Text>
-      </TouchableOpacity>
-
-      {isOwner && (
-        <>
-          <View style={styles.separator} />
-          <TouchableOpacity style={styles.optionRow} onPress={handleDelete}>
-            <Ionicons name="trash-outline" size={22} color={colors.error} />
-            <Text style={[styles.optionText, { color: colors.error }]}>Supprimer la vidéo</Text>
-          </TouchableOpacity>
-        </>
-      )}
-
-      <View style={styles.separator} />
-
-      <TouchableOpacity style={styles.optionRow} onPress={handleClose}>
-        <Text style={[styles.optionText, { textAlign: 'center', flex: 0 }]}>Annuler</Text>
-      </TouchableOpacity>
-    </BottomSheet>
+      <ReportModal
+        visible={reportOpen}
+        targetType="video"
+        targetId={videoId}
+        contentOwnerId={contentOwnerId}
+        onClose={() => { setReportOpen(false); handleClose() }}
+      />
+    </>
   )
 }
 

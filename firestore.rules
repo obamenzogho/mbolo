@@ -6,7 +6,9 @@ service cloud.firestore {
       allow read: if true;
       allow create: if request.auth != null && request.auth.uid == userId;
       allow update: if request.auth != null && (
-        request.auth.uid == userId ||
+        // Owner can update profile fields — but NOT verified
+        (request.auth.uid == userId &&
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['verified'])) ||
 
         // Follow public (ajout followers)
         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followers', 'followerCount']) &&
@@ -42,7 +44,17 @@ service cloud.firestore {
          (!('following' in resource.data) || !resource.data.following.hasAny([request.auth.uid])) &&
          'pendingFollowings' in resource.data &&
          resource.data.pendingFollowings.hasAny([request.auth.uid]) &&
-         !request.resource.data.pendingFollowings.hasAny([request.auth.uid]))
+         !request.resource.data.pendingFollowings.hasAny([request.auth.uid])) ||
+
+        // Quelqu'un me bloque : il peut ajouter/retirer MON blockedBy + se retirer de mes followers
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['blockedBy', 'followers', 'following']) &&
+         (
+           (request.resource.data.blockedBy.hasAny([request.auth.uid])
+            && (!('blockedBy' in resource.data) || !resource.data.blockedBy.hasAny([request.auth.uid])))
+           ||
+           ('blockedBy' in resource.data && resource.data.blockedBy.hasAny([request.auth.uid])
+            && !request.resource.data.blockedBy.hasAny([request.auth.uid]))
+         ))
       );
     }
 
@@ -55,12 +67,23 @@ service cloud.firestore {
     // are written by the client via increment(). Firestore rules cannot enforce
     // increment-only semantics — a malicious client can set likes: 999999 directly.
     // TODO: move to Cloud Functions once project is on Blaze plan.
+    //
+    // moderationStatus, hiddenAt, hiddenReason are SERVER-ONLY (Cloud Functions).
+    // No client can write these fields — enforced in create/update rules below.
     match /videos/{videoId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
+      allow read: if request.auth != null && (!resource.data.exists || resource.data.moderationStatus != 'hidden');
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid
+        && !('moderationStatus' in request.resource.data);
       allow update: if request.auth != null && (
-        request.auth.uid == resource.data.userId ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likedBy', 'comments', 'commentCount', 'previewComments', 'saves', 'savedBy', 'shares', 'views', 'reposts', 'repostedBy', 'latestRepostedBy'])
+        // Owner can edit their fields, but NEVER moderation fields
+        (request.auth.uid == resource.data.userId
+          && !request.resource.data.diff(resource.data).affectedKeys()
+               .hasAny(['moderationStatus', 'hiddenAt', 'hiddenReason']))
+        ||
+        // Counter updates reserved for Cloud Functions (temporarily client-side)
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['likes', 'likedBy', 'comments', 'commentCount', 'previewComments', 'saves', 'savedBy', 'shares', 'views', 'reposts', 'repostedBy', 'latestRepostedBy'])
       );
       allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
 
@@ -156,10 +179,12 @@ service cloud.firestore {
     }
 
     match /reports/{reportId} {
-      allow create: if request.auth != null && request.resource.data.reportedBy == request.auth.uid;
-      allow read: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create: if request.auth != null
+        && request.resource.data.reportedBy == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.reason is string
+        && request.resource.data.targetId is string;
+      allow read, update, delete: if false;
     }
 
     match /hashtags/{tag} {

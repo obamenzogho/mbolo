@@ -43,7 +43,7 @@ export default function FeedScreen({ feedType = 'forYou', isActive = true }: Fee
     videoId: string; videoOwnerId: string; isOwner: boolean; previewComments?: PreviewComment[]
   } | null>(null)
   const [videoOptionsTarget, setVideoOptionsTarget] = useState<{
-    videoId: string; isOwner: boolean
+    videoId: string; isOwner: boolean; contentOwnerId?: string; contentOwnerName?: string
   } | null>(null)
   const commentSheetRef = useRef<BottomSheet>(null)
   const videoOptionsSheetRef = useRef<BottomSheet>(null)
@@ -100,7 +100,7 @@ export default function FeedScreen({ feedType = 'forYou', isActive = true }: Fee
     const video = feedData.videos.find((v) => v.id === videoId)
     if (!video) return
     const isOwner = auth.currentUser?.uid === (video.userId ?? '')
-    setVideoOptionsTarget({ videoId, isOwner })
+    setVideoOptionsTarget({ videoId, isOwner, contentOwnerId: video.userId, contentOwnerName: video.userName })
   }, [feedData.videos])
 
   useFocusEffect(
@@ -216,6 +216,8 @@ export default function FeedScreen({ feedType = 'forYou', isActive = true }: Fee
           key={`options-${videoOptionsTarget.videoId}`}
           videoId={videoOptionsTarget.videoId}
           isOwner={videoOptionsTarget.isOwner}
+          contentOwnerId={videoOptionsTarget.contentOwnerId}
+          contentOwnerName={videoOptionsTarget.contentOwnerName}
           onClose={() => setVideoOptionsTarget(null)}
           sheetRef={videoOptionsSheetRef}
         />

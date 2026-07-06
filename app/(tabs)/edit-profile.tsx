@@ -5,13 +5,14 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { doc, getDoc, updateDoc } from 'firebase/firestore'
+import { doc, getDoc, runTransaction } from 'firebase/firestore'
 import { auth, db } from '../../src/lib/firebase'
 import { colors } from '../../src/lib/theme'
 import { router } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import OrbitLoader from '../../src/components/OrbitLoader'
 import { uploadToCloudinary } from '../../src/lib/cloudinary'
+import { useUsernameCheck } from '../../src/hooks/useUsernameCheck'
 
 export default function EditProfile() {
   const user = auth.currentUser
@@ -25,6 +26,8 @@ export default function EditProfile() {
   const [genre, setGenre] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [currentPseudo, setCurrentPseudo] = useState('')
+  const usernameStatus = useUsernameCheck(pseudo, currentPseudo)
 
   useEffect(() => {
     if (!user) return
@@ -33,6 +36,7 @@ export default function EditProfile() {
         const d = snap.data()
         setNom(d.nom || '')
         setPseudo(d.pseudo || '')
+        setCurrentPseudo(d.pseudo || '')
         setBio(d.bio || '')
         setPhotoURL(d.photoURL || '')
         setShowAge(d.showAge !== false)
@@ -73,24 +77,49 @@ export default function EditProfile() {
       Alert.alert('Erreur', 'Nom et pseudo sont obligatoires')
       return
     }
+    if (usernameStatus === 'taken') {
+      Alert.alert('Pseudo indisponible', 'Ce nom d\'utilisateur est déjà pris.')
+      return
+    }
+    const newPseudo = pseudo.trim().toLowerCase()
     setSaving(true)
     try {
-      await updateDoc(doc(db, 'users', user.uid), {
-        nom: nom.trim(),
-        pseudo: pseudo.trim().toLowerCase(),
-        pseudoLower: pseudo.trim().toLowerCase(),
-        bio: bio.trim(),
-        photoURL,
-        showAge,
-        privateAccount,
-        genre: genre || '',
-        externalLink: externalLink.trim(),
+      await runTransaction(db, async (tx) => {
+        const userRef = doc(db, 'users', user.uid)
+        const userSnap = await tx.get(userRef)
+        const oldPseudo = (userSnap.data()?.pseudo || '').toLowerCase()
+
+        if (newPseudo !== oldPseudo) {
+          const newRef = doc(db, 'usernames', newPseudo)
+          const newSnap = await tx.get(newRef)
+          if (newSnap.exists() && newSnap.data()?.uid !== user.uid) {
+            throw new Error('PSEUDO_TAKEN')
+          }
+          tx.set(newRef, { uid: user.uid })
+          if (oldPseudo) tx.delete(doc(db, 'usernames', oldPseudo))
+        }
+
+        tx.update(userRef, {
+          nom: nom.trim(),
+          pseudo: newPseudo,
+          pseudoLower: newPseudo,
+          bio: bio.trim(),
+          photoURL,
+          showAge,
+          privateAccount,
+          genre: genre || '',
+          externalLink: externalLink.trim(),
+        })
       })
       Alert.alert('Succès', 'Profil mis à jour', [
         { text: 'OK', onPress: () => router.replace('/(tabs)/profile') },
       ])
-    } catch {
-      Alert.alert('Erreur', 'Impossible de sauvegarder')
+    } catch (e: any) {
+      if (e?.message === 'PSEUDO_TAKEN') {
+        Alert.alert('Pseudo indisponible', 'Ce nom d\'utilisateur est déjà pris.')
+      } else {
+        Alert.alert('Erreur', 'Impossible de sauvegarder')
+      }
     }
     setSaving(false)
   }
@@ -212,6 +241,18 @@ export default function EditProfile() {
               onFocus={() => setFocusedField('pseudo')}
               onBlur={() => setFocusedField(null)}
             />
+            {usernameStatus === 'checking' && (
+              <Text style={{ color: '#888', fontSize: 12, marginTop: 4 }}>Vérification...</Text>
+            )}
+            {usernameStatus === 'available' && (
+              <Text style={{ color: '#4CAF50', fontSize: 12, marginTop: 4 }}>Disponible</Text>
+            )}
+            {usernameStatus === 'taken' && (
+              <Text style={{ color: '#F44336', fontSize: 12, marginTop: 4 }}>Ce pseudo est déjà pris</Text>
+            )}
+            {usernameStatus === 'invalid' && (
+              <Text style={{ color: '#FF9800', fontSize: 12, marginTop: 4 }}>Min. 3 caractères, lettres/chiffres/./_ uniquement</Text>
+            )}
           </View>
 
           {/* BIO */}

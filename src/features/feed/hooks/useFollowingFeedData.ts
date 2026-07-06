@@ -122,6 +122,7 @@ export function useFollowingFeedData({ store, isActive = true }: { store: StoreA
         for (const d of snap.docs) {
           const data = d.data()
           if (data.corrupted) continue
+          if (data.moderationStatus === 'hidden') continue
           if (seenVideosRef.current.has(d.id)) continue
           if (blockedIds.has(data.userId)) continue
           allDocs.push({ doc: d, createdAt: data.createdAt?.toDate?.() ?? new Date() })
