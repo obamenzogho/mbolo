@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react'
-import { Pressable, Text } from 'react-native'
+import { Pressable, Text, View } from 'react-native'
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -14,6 +14,7 @@ interface TabItemProps {
   label: string
   isActive: boolean
   onPress: () => void
+  badge?: number
 }
 
 const ICON_SIZE = 26
@@ -24,6 +25,7 @@ const TabItem = React.memo(function TabItem({
   label,
   isActive,
   onPress,
+  badge,
 }: TabItemProps) {
   const pressScale = useSharedValue(1)
   const activeScale = useSharedValue(isActive ? 1.05 : 1)
@@ -64,7 +66,21 @@ const TabItem = React.memo(function TabItem({
       <Animated.View
         style={[{ alignItems: 'center', justifyContent: 'center' }, animatedStyle]}
       >
-        <Ionicons name={icon} size={ICON_SIZE} color={iconColor} />
+        <View>
+          <Ionicons name={icon} size={ICON_SIZE} color={iconColor} />
+          {badge != null && badge > 0 && (
+            <View style={{
+              position: 'absolute', top: -6, right: -10,
+              backgroundColor: '#ef4444', borderRadius: 9,
+              minWidth: 18, height: 18, paddingHorizontal: 4,
+              justifyContent: 'center', alignItems: 'center',
+            }}>
+              <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>
+                {badge > 99 ? '99+' : badge}
+              </Text>
+            </View>
+          )}
+        </View>
         <Text
           numberOfLines={1}
           style={{
@@ -83,7 +99,8 @@ const TabItem = React.memo(function TabItem({
   return (
     prev.isActive === next.isActive &&
     prev.icon === next.icon &&
-    prev.label === next.label
+    prev.label === next.label &&
+    prev.badge === next.badge
   )
 })
 

@@ -81,6 +81,14 @@
       ]
     },
     {
+      "collectionGroup": "notifications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "read", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "videos",
       "queryScope": "COLLECTION",
       "fields": [

@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../lib/theme'
 import { useHaptics } from '../../hooks/useHaptics'
 import { useTabBarVisibility } from '../../contexts/TabBarVisibilityContext'
+import { useUnreadNotifications } from '../../hooks/useUnreadNotifications'
 import TabItem from './TabItem'
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs'
 
@@ -44,6 +45,7 @@ const BottomTabBar = React.memo(function BottomTabBar({
 
   const activeRouteName = state.routes[state.index]?.name
   const isFeed = activeRouteName === 'feed'
+  const unreadNotifs = useUnreadNotifications()
 
   const handleTabPress = useCallback(
     (routeName: string, routeIndex: number) => {
@@ -114,6 +116,7 @@ const BottomTabBar = React.memo(function BottomTabBar({
                 label={TAB_LABELS[tabName]}
                 isActive={isActive}
                 onPress={() => handleTabPress(route.name, index)}
+                badge={tabName === 'notifications' ? unreadNotifs : undefined}
               />
             </View>
           )

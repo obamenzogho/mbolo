@@ -1,15 +1,68 @@
 import { useState, useEffect, useCallback } from 'react'
-import { View, Text, FlatList, TouchableOpacity } from 'react-native'
+import { View, Text, SectionList, TouchableOpacity } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { router } from 'expo-router'
+import { router, useFocusEffect } from 'expo-router'
 import { collection, query, where, orderBy, onSnapshot, limit } from 'firebase/firestore'
 import { auth, db } from '../../src/lib/firebase'
 import { batchFetchUsers } from '../../src/lib/firestore'
 import { colors } from '../../src/lib/theme'
 import QueryErrorMessage, { getIndexErrorMessage } from '../../src/components/ui/QueryErrorMessage'
 import OrbitLoader from '../../src/components/OrbitLoader'
+import { markAllNotificationsRead, markNotificationRead } from '../../src/services/notificationActions'
+import { groupByTime } from '../../src/lib/notificationGroups'
 import type { Notification as NotificationType } from '../../src/types'
+
+const iconMap: Record<string, any> = {
+  like: 'heart',
+  comment: 'chatbubble',
+  follow: 'person-add',
+  follow_request: 'person-add',
+  follow_accept: 'checkmark-circle',
+  message: 'chatbubble-ellipses',
+  repost: 'repeat',
+  tag: 'pricetag',
+  mention: 'at',
+}
+
+const handleNotifPress = (item: NotificationType) => {
+  markNotificationRead(item.id)
+  switch (item.type) {
+    case 'follow':
+    case 'follow_accept':
+      router.push({ pathname: '/(tabs)/user/[userId]', params: { userId: item.fromUserId } })
+      break
+    case 'follow_request':
+      router.push('/(tabs)/notifications/follow-requests')
+      break
+    case 'like':
+    case 'comment':
+    case 'reply':
+    case 'repost':
+    case 'tag':
+    case 'mention':
+      if (item.videoId) router.push({ pathname: '/post', params: { id: item.videoId } })
+      break
+    case 'message':
+      router.push('/(tabs)/messages')
+      break
+  }
+}
+
+const messageForType = (type: string, name: string) => {
+  switch (type) {
+    case 'like': return `${name} a aimé ta vidéo`
+    case 'comment': return `${name} a commenté ta vidéo`
+    case 'follow': return `${name} a commencé à te suivre`
+    case 'follow_request': return `${name} veut te suivre`
+    case 'follow_accept': return `${name} a accepté ta demande`
+    case 'message': return `${name} t'a envoyé un message`
+    case 'repost': return `${name} a republié ta vidéo`
+    case 'tag': return `${name} t'a identifié dans une vidéo`
+    case 'mention': return `${name} t'a mentionné`
+    default: return ''
+  }
+}
 
 export default function Notifications() {
   const [notifications, setNotifications] = useState<NotificationType[]>([])
@@ -65,19 +118,14 @@ export default function Notifications() {
     return () => { if (unsub) unsub() }
   }, [subscribe, retryCount])
 
+  useFocusEffect(useCallback(() => {
+    const t = setTimeout(() => markAllNotificationsRead(), 1500)
+    return () => clearTimeout(t)
+  }, []))
+
   const handleRetry = useCallback(() => {
     setRetryCount((c) => c + 1)
   }, [])
-
-  const iconMap: Record<string, any> = {
-    like: 'heart',
-    comment: 'chatbubble',
-    follow: 'person-add',
-    follow_request: 'person-add',
-    follow_accept: 'checkmark-circle',
-    message: 'chatbubble-ellipses',
-    repost: 'repeat',
-  }
 
   if (!ready) {
     return (
@@ -86,6 +134,8 @@ export default function Notifications() {
       </SafeAreaView>
     )
   }
+
+  const sections = groupByTime(notifications)
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
@@ -96,10 +146,16 @@ export default function Notifications() {
       {errorMessage && (
         <QueryErrorMessage message={errorMessage} onRetry={handleRetry} />
       )}
-      <FlatList
-        data={notifications}
+
+      <SectionList
+        sections={sections}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ padding: 16 }}
+        renderSectionHeader={({ section }) => (
+          <Text style={{ color: colors.textSecondary, fontSize: 13, fontWeight: '700', paddingHorizontal: 12, paddingTop: 16, paddingBottom: 8 }}>
+            {section.title}
+          </Text>
+        )}
+        contentContainerStyle={{ padding: 8, paddingBottom: 80 }}
         ListEmptyComponent={
           <View style={{ alignItems: 'center', marginTop: 80 }}>
             <Ionicons name="notifications-outline" size={64} color={colors.textSecondary} />
@@ -111,45 +167,25 @@ export default function Notifications() {
         renderItem={({ item }) => {
           const name = fromUserNames[item.fromUserId] || 'Quelqu\'un'
 
-          const content = (
-            <View
-              style={{
-                backgroundColor: item.read ? colors.surface : colors.surfaceLight,
-                padding: 14, borderRadius: 12, marginBottom: 8,
-                borderWidth: 1, borderColor: colors.border,
+          return (
+            <TouchableOpacity onPress={() => handleNotifPress(item)} activeOpacity={0.7}>
+              <View style={{
                 flexDirection: 'row', alignItems: 'center', gap: 12,
-              }}
-            >
-              <Ionicons
-                name={iconMap[item.type] || 'notifications'}
-                size={24}
-                color={colors.primary}
-              />
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: colors.text, fontSize: 14 }}>
-                  {item.type === 'like' && `${name} a aimé ta vidéo`}
-                  {item.type === 'comment' && `${name} a commenté ta vidéo`}
-                  {item.type === 'follow' && `${name} a commencé à te suivre`}
-                  {item.type === 'follow_request' && `${name} veut te suivre`}
-                  {item.type === 'follow_accept' && `${name} a accepté ta demande`}
-                  {item.type === 'message' && `${name} t'a envoyé un message`}
+                paddingVertical: 12, paddingHorizontal: 12, borderRadius: 10,
+                backgroundColor: item.read ? 'transparent' : 'rgba(0,200,83,0.08)',
+              }}>
+                <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceLight, justifyContent: 'center', alignItems: 'center' }}>
+                  <Ionicons name={iconMap[item.type] || 'notifications'} size={20} color={colors.primary} />
+                </View>
+                <Text style={{ color: colors.text, flex: 1, fontSize: 14 }}>
+                  {messageForType(item.type, name)}
                 </Text>
+                {!item.read && (
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary }} />
+                )}
               </View>
-            </View>
+            </TouchableOpacity>
           )
-
-          if (item.type === 'follow_request') {
-            return (
-              <TouchableOpacity
-                onPress={() => router.push('/(tabs)/notifications/follow-requests')}
-                activeOpacity={0.7}
-              >
-                {content}
-              </TouchableOpacity>
-            )
-          }
-
-          return content
         }}
       />
     </SafeAreaView>

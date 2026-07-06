@@ -128,7 +128,7 @@ export interface Story {
 export interface Notification {
   id: string
   userId: string
-  type: 'like' | 'comment' | 'follow' | 'follow_request' | 'follow_accept' | 'message' | 'reply' | 'repost' | 'share'
+  type: 'like' | 'comment' | 'follow' | 'follow_request' | 'follow_accept' | 'message' | 'reply' | 'repost' | 'share' | 'tag' | 'mention'
   fromUserId: string
   videoId?: string
   read: boolean

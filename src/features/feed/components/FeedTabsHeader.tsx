@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useCreateModal } from '../../../contexts/CreateModalContext'
+import { router } from 'expo-router'
 
 const TAB_GAP = 32
 
@@ -148,6 +149,24 @@ export default function FeedTabsHeader({ scrollPosition, onTabPress }: FeedTabsH
           }}
         />
       </LinearGradient>
+
+      <TouchableOpacity
+        onPress={() => router.push('/search')}
+        activeOpacity={0.7}
+        style={{
+          position: 'absolute',
+          right: 60,
+          top: insets.top + 10,
+          width: 32,
+          height: 32,
+          borderRadius: 16,
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 11,
+        }}
+      >
+        <Ionicons name="search-outline" size={24} color="#fff" />
+      </TouchableOpacity>
 
       <TouchableOpacity
         onPress={openCreateModal}

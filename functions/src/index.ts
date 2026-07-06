@@ -164,7 +164,7 @@ export const onVideoTagPeople = onDocumentCreated('videos/{videoId}', async (eve
       userId: uid,
       fromUserId: video.userId,
       type: 'tag',
-      postId: event.params.videoId,
+      videoId: event.params.videoId,
       createdAt: FieldValue.serverTimestamp(),
       read: false,
     })
