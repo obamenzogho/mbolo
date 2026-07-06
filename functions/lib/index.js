@@ -102,7 +102,9 @@ exports.signCloudinaryUpload = (0, https_1.onCall)({ secrets: [CLOUDINARY_API_SE
     const apiSecret = CLOUDINARY_API_SECRET.value();
     const apiKey = CLOUDINARY_API_KEY.value();
     const toSign = `folder=${folder}&timestamp=${timestamp}${apiSecret}`;
-    const signature = crypto.createHash('sha256').update(toSign).digest('hex');
+    // SHA-1 est l'algo par défaut de Cloudinary. Si ton compte est passé en SHA-256
+    // (Settings > Security > Signature algorithm), remplace 'sha1' par 'sha256'.
+    const signature = crypto.createHash('sha1').update(toSign).digest('hex');
     return { signature, timestamp, folder, apiKey };
 });
 /* ---------- PUSH NOTIFICATIONS : on notification doc created ---------- */
