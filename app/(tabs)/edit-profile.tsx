@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, Image, Alert,
-  KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator,
+  KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -161,7 +161,7 @@ export default function EditProfile() {
           style={{ width: 36, height: 36, justifyContent: 'center', alignItems: 'flex-end' }}
         >
           {saving ? (
-            <ActivityIndicator size="small" color={colors.primary} />
+            <OrbitLoader size={20} />
           ) : (
             <Ionicons name="save-outline" size={22} color={colors.primary} />
           )}
@@ -185,7 +185,7 @@ export default function EditProfile() {
             </View>
             <TouchableOpacity onPress={pickAndUploadPhoto} disabled={uploadingPhoto} style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               {uploadingPhoto ? (
-                <ActivityIndicator size="small" color={colors.primary} />
+                <OrbitLoader size={20} />
               ) : (
                 <Ionicons name="camera-outline" size={16} color={colors.primary} />
               )}

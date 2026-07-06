@@ -124,6 +124,11 @@ function RootContent() {
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="post" options={{ headerShown: false, presentation: 'modal' }} />
+      <Stack.Screen name="search" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="insights" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="hashtag/[tag]" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="u/[pseudo]" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="settings" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
     </Stack>
   )
 }

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, Alert, Image,
-  KeyboardAvoidingView, Platform, ActivityIndicator,
+  KeyboardAvoidingView, Platform,
   Keyboard, ScrollView,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -11,6 +11,7 @@ import { auth, db } from '../../src/lib/firebase'
 import { colors } from '../../src/lib/theme'
 import { EyeIcon, EyeOffIcon } from '../../src/components/Icons'
 import { router } from 'expo-router'
+import OrbitLoader from '../../src/components/OrbitLoader'
 import { useStartupStore } from '../../src/features/startup/store/startupStore'
 import type { User } from '../../src/types'
 
@@ -215,7 +216,7 @@ export default function Login() {
               }}
             >
               {loading ? (
-                <ActivityIndicator color={colors.white} size="small" />
+                <OrbitLoader size={20} />
               ) : (
                 <Text style={{ color: colors.white, fontSize: 17, fontWeight: '700' }}>
                   Se connecter

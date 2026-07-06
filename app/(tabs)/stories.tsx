@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, Image, Dimensions,
-  Modal, Animated, ActivityIndicator, Alert,
+  Modal, Animated, Alert,
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'

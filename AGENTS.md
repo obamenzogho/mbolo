@@ -60,6 +60,9 @@ Tu es l'architecte logiciel principal de cette application sociale mobile Mbolo.
 
 ### ❌ Interdits
 - `ActivityIndicator` — utiliser `OrbitLoader` à la place
+- `router.push()` pour un retour arrière — utiliser `BackButton` ou `useGoBack().goBack()` (seul `router.back()` avec fallback replace est correct)
+- `router.back()` sans `router.canGoBack()` — toujours vérifier avant d'appeler `back()`
+- Navigation manuelle (pathname + historyRef) — le `NavigationHistoryProvider` utilise maintenant `router.canGoBack()`, pas d'historique custom
 - `<View>` racine sans `PageWrapper` dans une page
 - `console.log` en production — utiliser `captureException` ou `console.warn`
 - `catch {}` silencieux — toujours logger l'erreur (`captureException` ou au moins `console.warn`)

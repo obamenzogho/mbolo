@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   View, Text, TouchableOpacity, Image, TextInput,
-  Alert, ScrollView, Dimensions, ActivityIndicator,
+  Alert, ScrollView, Dimensions,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import * as MediaLibrary from 'expo-media-library'
 import * as FileSystem from 'expo-file-system'
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet'
+import OrbitLoader from '@/components/OrbitLoader'
 import { auth } from '@/lib/firebase'
 import { captureException } from '@/lib/sentry'
 import { colors } from '@/lib/theme'
@@ -205,7 +206,7 @@ export default function HighlightEditSheet({ visible, onClose, onSaved, highligh
             style={{ padding: 4 }}
           >
             {uploading ? (
-              <ActivityIndicator size="small" color={colors.primary} />
+              <OrbitLoader size={20} />
             ) : (
               <Text style={{ color: title.trim() && media.length > 0 ? colors.primary : '#444', fontSize: 16, fontWeight: '700' }}>
                 Terminé

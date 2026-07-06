@@ -3,7 +3,7 @@ import { router, useFocusEffect, useRouter } from 'expo-router'
 import {
   View, Text, TouchableOpacity, Image, FlatList, Alert, TextInput,
   Dimensions, RefreshControl, ScrollView, Modal, Animated, Share,
-  ActivityIndicator, StyleSheet,
+  StyleSheet,
 } from 'react-native'
 import { GestureDetector, Gesture } from 'react-native-gesture-handler'
 import {

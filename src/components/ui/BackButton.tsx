@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react'
 import { TouchableOpacity, type ViewStyle } from 'react-native'
-import { useRouter } from 'expo-router'
+import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 
 interface BackButtonProps {
@@ -12,21 +12,15 @@ interface BackButtonProps {
   fallbackRoute?: string
 }
 
-function BackButtonComponent({ icon = 'close', size = 28, color = '#fff', style, onPress, fallbackRoute }: BackButtonProps) {
-  const router = useRouter()
-
+function BackButtonComponent({ icon = 'arrow-back', size = 28, color = '#fff', style, onPress, fallbackRoute = '/(tabs)/feed' }: BackButtonProps) {
   const handlePress = useCallback(() => {
-    if (onPress) {
-      onPress()
-    } else if (fallbackRoute) {
-      router.replace(fallbackRoute as any)
-    } else {
-      try { router.back() } catch {}
-    }
-  }, [onPress, router, fallbackRoute])
+    if (onPress) { onPress(); return }
+    if (router.canGoBack()) router.back()
+    else router.replace(fallbackRoute as any)
+  }, [onPress, fallbackRoute])
 
   return (
-    <TouchableOpacity onPress={handlePress} style={[{ padding: 4 }, style]} activeOpacity={0.7}>
+    <TouchableOpacity onPress={handlePress} hitSlop={12} style={style}>
       <Ionicons name={icon} size={size} color={color} />
     </TouchableOpacity>
   )

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   View, Text, TextInput, FlatList, TouchableOpacity,
-  Image, ActivityIndicator, StyleSheet, Dimensions,
+  Image, StyleSheet, Dimensions,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { gifService, KlipyGifResult } from '../services/gifService'

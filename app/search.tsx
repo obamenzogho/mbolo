@@ -9,6 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { searchAll, type SearchResults } from '../src/services/searchService'
 import { colors } from '../src/lib/theme'
 import OrbitLoader from '../src/components/OrbitLoader'
+import { BackButton } from '../src/components/ui/BackButton'
 
 const RECENT_KEY = 'mbolo_recent_searches'
 const MAX_RECENT = 8
@@ -72,9 +73,8 @@ export default function Search() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 }}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
-        </TouchableOpacity>
+        <BackButton icon="arrow-back" size={24} color={colors.text} />
+        
         <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: 10, paddingHorizontal: 12 }}>
           <Ionicons name="search" size={18} color={colors.textSecondary} />
           <TextInput

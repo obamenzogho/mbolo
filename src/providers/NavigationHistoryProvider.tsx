@@ -1,37 +1,21 @@
-import { createContext, ReactNode, useCallback, useEffect, useRef } from 'react'
-import { router, usePathname } from 'expo-router'
+import { createContext, ReactNode, useCallback } from 'react'
+import { router } from 'expo-router'
 
 interface NavigationHistoryContextType {
-  goBack: () => void
+  goBack: (fallback?: string) => void
 }
 
 export const NavigationHistoryContext = createContext<NavigationHistoryContextType>({
   goBack: () => {},
 })
 
-const MAX_HISTORY = 20
-
 export function NavigationHistoryProvider({ children }: { children: ReactNode }) {
-  const pathname = usePathname()
-  const historyRef = useRef<string[]>([])
-
-  useEffect(() => {
-    const hist = historyRef.current
-    if (hist[hist.length - 1] !== pathname) {
-      hist.push(pathname)
-      if (hist.length > MAX_HISTORY) hist.shift()
+  const goBack = useCallback((fallback: string = '/(tabs)/feed') => {
+    if (router.canGoBack()) {
+      router.back()
+    } else {
+      router.replace(fallback as any)
     }
-  }, [pathname])
-
-  const goBack = useCallback(() => {
-    const hist = historyRef.current
-    if (hist.length < 2) {
-      router.push('/(tabs)/feed')
-      return
-    }
-    hist.pop()
-    const previous = hist[hist.length - 1]
-    router.push(previous as any)
   }, [])
 
   return (

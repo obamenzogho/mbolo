@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, Alert,
-  KeyboardAvoidingView, Platform, ActivityIndicator,
+  KeyboardAvoidingView, Platform,
   Keyboard, ScrollView,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -13,6 +13,7 @@ import { colors } from '../../src/lib/theme'
 import { EyeIcon, EyeOffIcon } from '../../src/components/Icons'
 import DatePicker from '../../src/components/DatePicker'
 import { router } from 'expo-router'
+import OrbitLoader from '../../src/components/OrbitLoader'
 import { useStartupStore } from '../../src/features/startup/store/startupStore'
 import type { User } from '../../src/types'
 
@@ -331,7 +332,7 @@ export default function Register() {
                 />
                 {username.length >= 2 && (
                   usernameStatus === 'checking' ? (
-                    <ActivityIndicator size="small" color={colors.textSecondary} style={{ marginLeft: 6 }} />
+                    <OrbitLoader size={20} />
                   ) : usernameStatus === 'available' ? (
                     <Text style={{ color: colors.success, fontSize: 18, marginLeft: 6 }}>✓</Text>
                   ) : usernameStatus === 'unavailable' ? (
@@ -385,7 +386,7 @@ export default function Register() {
                 />
                 {email.length >= 5 && email.includes('@') && (
                   emailStatus === 'checking' ? (
-                    <ActivityIndicator size="small" color={colors.textSecondary} style={{ marginLeft: 6 }} />
+                    <OrbitLoader size={20} />
                   ) : emailStatus === 'available' ? (
                     <Text style={{ color: colors.success, fontSize: 18, marginLeft: 6 }}>✓</Text>
                   ) : emailStatus === 'unavailable' ? (
@@ -567,7 +568,7 @@ export default function Register() {
               }}
             >
               {loading ? (
-                <ActivityIndicator color={colors.white} size="small" />
+                <OrbitLoader size={20} />
               ) : (
                 <Text style={{ color: colors.white, fontSize: 17, fontWeight: '700' }}>S'inscrire</Text>
               )}
@@ -576,7 +577,7 @@ export default function Register() {
             {/* Retour connexion */}
             <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 20 }}>
               <Text style={{ color: colors.textSecondary, fontSize: 14 }}>Déjà un compte ?{' '}</Text>
-              <TouchableOpacity onPress={() => router.back()}>
+              <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace('/(auth)/login')}>
                 <Text style={{ color: colors.secondary, fontSize: 14, fontWeight: '700' }}>Connecte-toi</Text>
               </TouchableOpacity>
             </View>

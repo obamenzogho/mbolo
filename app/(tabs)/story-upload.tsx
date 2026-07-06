@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   View, Text, TouchableOpacity, Image, TextInput,
-  ActivityIndicator, Alert, Dimensions, Modal,
+  Alert, Dimensions, Modal,
   KeyboardAvoidingView, Platform,
 } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'

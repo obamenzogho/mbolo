@@ -3,9 +3,10 @@ import { View, Text, FlatList, Image, TouchableOpacity, Dimensions } from 'react
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useLocalSearchParams, router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import { getVideosByHashtag, getHashtagMeta } from '../../src/services/hashtagService'
+import { router, useLocalSearchParams } from 'expo-router'
 import { colors } from '../../src/lib/theme'
 import OrbitLoader from '../../src/components/OrbitLoader'
+import { BackButton } from '../../src/components/ui/BackButton'
 
 const { width } = Dimensions.get('window')
 const COL = 3
@@ -31,9 +32,7 @@ export default function HashtagPage() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 }}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
-        </TouchableOpacity>
+        <BackButton icon="arrow-back" size={24} color={colors.text} />
         <View>
           <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700' }}>#{tag}</Text>
           {count !== null && (

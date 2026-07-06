@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
-  View, Text, TouchableOpacity, TextInput, ActivityIndicator,
+  View, Text, TouchableOpacity, TextInput,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet'
 import {
   collection, query, where, limit, getDocs,
 } from 'firebase/firestore'
+import OrbitLoader from '@/components/OrbitLoader'
 import { db } from '@/lib/firebase'
 import { Avatar } from '@/components/ui/Avatar'
 import { colors } from '@/lib/theme'
@@ -131,7 +132,7 @@ export function NewConversationModal({
             </Text>
             {friendsLoading ? (
               <View style={{ paddingTop: 20, alignItems: 'center' }}>
-                <ActivityIndicator size="small" color="#555" />
+                <OrbitLoader size={20} />
               </View>
             ) : friends.length === 0 ? (
               <View style={{ paddingTop: 20, alignItems: 'center' }}>

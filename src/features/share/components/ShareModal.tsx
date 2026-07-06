@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useEffect } from 'react'
-import { Modal, View, Text, TouchableOpacity, ActivityIndicator, Dimensions, Keyboard } from 'react-native'
+import { Modal, View, Text, TouchableOpacity, Dimensions, Keyboard } from 'react-native'
 import Reanimated, {
   useSharedValue,
   useAnimatedStyle,
@@ -18,6 +18,7 @@ import { ShareActions } from './ShareActions'
 import { useShare } from '../hooks/useShare'
 import { useShareSearch } from '../hooks/useShareSearch'
 import { useShareStore } from '../store/shareStore'
+import OrbitLoader from '@/components/OrbitLoader'
 import { auth } from '@/lib/firebase'
 import type { ShareSuggestion } from '../types'
 
@@ -235,7 +236,7 @@ export default function ShareModal({
               >
                 {searchLoading || suggestionsLoading ? (
                   <View style={{ padding: 24, alignItems: 'center' }}>
-                    <ActivityIndicator size="small" color="#00C853" />
+                    <OrbitLoader size={20} />
                   </View>
                 ) : displayData.length === 0 ? (
                   <View style={{ padding: 24, alignItems: 'center' }}>

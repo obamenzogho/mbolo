@@ -1,10 +1,11 @@
 import { useState, useCallback, useEffect } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, Image,
-  ActivityIndicator, StyleSheet, Dimensions, Alert,
+  StyleSheet, Dimensions, Alert,
   SafeAreaView, Modal,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import OrbitLoader from './OrbitLoader'
 import { useGallery, GalleryAsset } from '../hooks/useGallery'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
@@ -151,7 +152,7 @@ export default function GalleryPicker({
         style={[styles.headerBtn, selectedAssets.length === 0 && styles.headerBtnDisabled]}
       >
         {submitting ? (
-          <ActivityIndicator size="small" color="#00A86B" />
+          <OrbitLoader size={20} />
         ) : (
           <Text style={[styles.confirmText, selectedAssets.length === 0 && styles.confirmTextDisabled]}>
             Suivant
@@ -226,7 +227,7 @@ export default function GalleryPicker({
           ListFooterComponent={
             loading ? (
               <View style={styles.loadingFooter}>
-                <ActivityIndicator size="small" color="#00A86B" />
+                <OrbitLoader size={20} />
               </View>
             ) : null
           }
