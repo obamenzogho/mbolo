@@ -191,5 +191,10 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if false;
     }
+
+    match /analytics_events/{eventId} {
+      allow create: if request.auth != null;
+      allow read, update, delete: if false;
+    }
   }
 }

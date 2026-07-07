@@ -26,6 +26,9 @@
     "test:e2e:headed": "playwright test --headed",
     "mcp:playwright": "npx @playwright/mcp",
     "test": "jest",
+    "test:ci": "jest --ci --coverage --passWithNoTests",
+    "lint": "eslint . --ext .ts,.tsx --max-warnings 0",
+    "typecheck": "tsc --noEmit",
     "postinstall": "node scripts/patch-expo-image-contentposition.js"
   },
   "dependencies": {

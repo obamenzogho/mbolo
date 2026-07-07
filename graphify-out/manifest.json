@@ -90,8 +90,8 @@
     "semantic_hash": ""
   },
   "app/_layout.tsx": {
-    "mtime": 1783425596.8890352,
-    "ast_hash": "3f75dd0ee2468aca8361323dacc37ad2",
+    "mtime": 1783458258.661337,
+    "ast_hash": "0e85ac4962e3f1bdfec98970cb36a0b5",
     "semantic_hash": ""
   },
   "app/index.tsx": {
@@ -175,8 +175,8 @@
     "semantic_hash": ""
   },
   "firestore.indexes.json": {
-    "mtime": 1783437056.6716585,
-    "ast_hash": "0e720c493b5141bd47f00d69971a514f",
+    "mtime": 1783456540.6777616,
+    "ast_hash": "4cb7da08cabfdf3e360ea7b2ba44f54a",
     "semantic_hash": ""
   },
   "index.ts": {
@@ -205,8 +205,8 @@
     "semantic_hash": "b02bcf4fde15f746f6e5248537d0b156"
   },
   "package.json": {
-    "mtime": 1783439306.7400134,
-    "ast_hash": "b81985458f017fc9821ee84a00a91755",
+    "mtime": 1783458244.2130713,
+    "ast_hash": "33735a3f941e0a5a08b4f0a58f2911c8",
     "semantic_hash": ""
   },
   "playwright-report/results.json": {
@@ -685,8 +685,8 @@
     "semantic_hash": ""
   },
   "src/features/feed/FeedScreen.tsx": {
-    "mtime": 1783351716.8021026,
-    "ast_hash": "837d60361a4d61b83a133735debdb855",
+    "mtime": 1783457128.534566,
+    "ast_hash": "cbe04871369ed4cba81ab3e4673c4bba",
     "semantic_hash": ""
   },
   "src/features/feed/FeedTabsScreen.tsx": {
@@ -1050,8 +1050,8 @@
     "semantic_hash": ""
   },
   "src/services/analyticsService.ts": {
-    "mtime": 1780010308.4294326,
-    "ast_hash": "29d98182164129f93a9b3463658ca3d4",
+    "mtime": 1783458256.9403055,
+    "ast_hash": "9cc885cea46c8945ab302d9ef11ad9c6",
     "semantic_hash": ""
   },
   ".opencode/plans/render-comment-modal-in-feed.md": {
@@ -1160,8 +1160,8 @@
     "semantic_hash": ""
   },
   "functions/src/index.ts": {
-    "mtime": 1783449895.3746252,
-    "ast_hash": "9d5284953448942b73c9abfd7fdf8564",
+    "mtime": 1783456505.286111,
+    "ast_hash": "d6055f2467ad0a899cd69a3882e92676",
     "semantic_hash": ""
   },
   "functions/src/search.ts": {
@@ -1175,8 +1175,8 @@
     "semantic_hash": ""
   },
   "jest.config.js": {
-    "mtime": 1783417950.075492,
-    "ast_hash": "c82ff790f31afa0bde47cb1daac27cd2",
+    "mtime": 1783458244.5490777,
+    "ast_hash": "53a7a7c2734a829e02b2f55694f8af21",
     "semantic_hash": ""
   },
   "scripts/migrate-pseudo-lower.ts": {
@@ -1295,8 +1295,8 @@
     "semantic_hash": ""
   },
   "src/hooks/useCreatorInsights.ts": {
-    "mtime": 1783288258.099299,
-    "ast_hash": "5239f03b64eb2ec7771d91e393dc8fc6",
+    "mtime": 1783456517.4023337,
+    "ast_hash": "092832698988a89c82ddb3ed4a2b84ce",
     "semantic_hash": ""
   },
   "src/hooks/useProfileStats.ts": {
@@ -1357,6 +1357,31 @@
   "scripts/set-admin.mjs": {
     "mtime": 1783450966.9753206,
     "ast_hash": "691a2b80ae4ea88995c6c87b86f87f6f",
+    "semantic_hash": ""
+  },
+  "scripts/backfill-creator-totals.mjs": {
+    "mtime": 1783456522.7644324,
+    "ast_hash": "cfa19c744d689d5e708195ce62be6513",
+    "semantic_hash": ""
+  },
+  "src/features/feed/services/viewService.ts": {
+    "mtime": 1783457126.7865338,
+    "ast_hash": "e3910116f516a766740c8bee2c310743",
+    "semantic_hash": ""
+  },
+  "eslint.config.js": {
+    "mtime": 1783458237.9099555,
+    "ast_hash": "0f7df3c4435b8974faf5d7ab8092d925",
+    "semantic_hash": ""
+  },
+  ".github/workflows/ci.yml": {
+    "mtime": 1783458244.5480776,
+    "ast_hash": "68d6e03753d853141215114e6c37c0cd",
+    "semantic_hash": ""
+  },
+  ".github/workflows/eas-build.yml": {
+    "mtime": 1783458244.6880803,
+    "ast_hash": "1dc3b0d936833e641c2b5df3afefdd6e",
     "semantic_hash": ""
   }
 }

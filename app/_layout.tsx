@@ -28,6 +28,7 @@ import { usePresence } from '../src/hooks/usePresence'
 import { useStartup } from '../src/features/startup/hooks/useStartup'
 import { useStartupStore } from '../src/features/startup/store/startupStore'
 import StartupScreen from '../src/features/startup/components/StartupScreen'
+import { initAnalytics } from '../src/services/analyticsService'
 
 const handleNotificationNavigation = (router: ReturnType<typeof useRouter>, type: string, data: Record<string, any>) => {
   switch (type) {
@@ -63,6 +64,8 @@ function RootContent() {
   useEffect(() => {
     setSentryRoute(pathname)
   }, [pathname])
+
+  useEffect(() => { initAnalytics() }, [])
 
   useEffect(() => {
     if (!user) return

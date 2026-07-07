@@ -1,0 +1,31 @@
+name: EAS Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'Profil EAS'
+        required: true
+        default: 'preview'
+        type: choice
+        options: [preview, production]
+
+jobs:
+  build:
+    name: EAS ${{ github.event.inputs.profile || 'preview' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: npm ci
+      - name: Build
+        run: eas build --non-interactive --no-wait --platform android --profile ${{ github.event.inputs.profile || 'preview' }}

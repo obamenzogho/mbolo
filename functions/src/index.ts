@@ -54,10 +54,29 @@ export const onCommentDelete = onDocumentDeleted('videos/{videoId}/comments/{com
   bump(`videos/${e.params.videoId}`, 'comments', -1),
 )
 
+/* ---------- COMMENTS → CREATOR totalComments ---------- */
+export const onCommentUpdateCreatorTotal = onDocumentCreated('videos/{videoId}/comments/{commentId}', async (event) => {
+  const videoSnap = await db.doc(`videos/${event.params.videoId}`).get()
+  const creatorId = videoSnap.data()?.userId
+  if (creatorId) await db.doc(`users/${creatorId}`).update({ totalComments: FieldValue.increment(1) }).catch(() => {})
+})
+export const onCommentDeleteCreatorTotal = onDocumentDeleted('videos/{videoId}/comments/{commentId}', async (event) => {
+  const videoSnap = await db.doc(`videos/${event.params.videoId}`).get()
+  const creatorId = videoSnap.data()?.userId
+  if (creatorId) await db.doc(`users/${creatorId}`).update({ totalComments: FieldValue.increment(-1) }).catch(() => {})
+})
+
 /* ---------- VIEWS : videos/{videoId}/views/{userId} (une par user) ---------- */
 export const onViewCreate = onDocumentCreated('videos/{videoId}/views/{userId}', (e) =>
   bump(`videos/${e.params.videoId}`, 'views', 1),
 )
+
+/* ---------- VIEWS → CREATOR totalViews ---------- */
+export const onViewUpdateCreatorTotal = onDocumentCreated('videos/{videoId}/views/{userId}', async (event) => {
+  const videoSnap = await db.doc(`videos/${event.params.videoId}`).get()
+  const creatorId = videoSnap.data()?.userId
+  if (creatorId) await db.doc(`users/${creatorId}`).update({ totalViews: FieldValue.increment(1) }).catch(() => {})
+})
 
 /* ---------- REPOSTS : collection top-level reposts, champ postId ---------- */
 export const onRepostCreate = onDocumentCreated('reposts/{repostId}', (e) => {
@@ -77,6 +96,22 @@ export const onShareCreate = onDocumentCreated('shares/{shareId}', (e) => {
 export const onShareDelete = onDocumentDeleted('shares/{shareId}', (e) => {
   const videoId = e.data?.get('postId')
   return videoId ? bump(`videos/${videoId}`, 'shares', -1) : null
+})
+
+/* ---------- SHARES → CREATOR totalShares ---------- */
+export const onShareUpdateCreatorTotal = onDocumentCreated('shares/{shareId}', async (event) => {
+  const videoId = event.data?.get('postId')
+  if (!videoId) return
+  const videoSnap = await db.doc(`videos/${videoId}`).get()
+  const creatorId = videoSnap.data()?.userId
+  if (creatorId) await db.doc(`users/${creatorId}`).update({ totalShares: FieldValue.increment(1) }).catch(() => {})
+})
+export const onUnshareUpdateCreatorTotal = onDocumentDeleted('shares/{shareId}', async (event) => {
+  const videoId = event.data?.get('postId')
+  if (!videoId) return
+  const videoSnap = await db.doc(`videos/${videoId}`).get()
+  const creatorId = videoSnap.data()?.userId
+  if (creatorId) await db.doc(`users/${creatorId}`).update({ totalShares: FieldValue.increment(-1) }).catch(() => {})
 })
 
 /* ---------- CLOUDINARY SIGNATURE : callable ---------- */

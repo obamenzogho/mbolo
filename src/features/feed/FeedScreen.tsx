@@ -21,6 +21,7 @@ import { colors } from '../../lib/theme'
 import { captureException } from '../../lib/sentry'
 import { VideoCache } from './services/VideoCache'
 import { loadWatchCache } from './services/watchTracker'
+import { recordView } from './services/viewService'
 import CommentSheet from './components/CommentSheet'
 import VideoOptionsSheet from './components/VideoOptionsSheet'
 import ShareModal from '../share/components/ShareModal'
@@ -133,6 +134,14 @@ export default function FeedScreen({ feedType = 'forYou', isActive = true }: Fee
     if (!isActive) return
     pool.syncPool(feedData.videos, currentIndex, isScrolling)
   }, [isActive, currentIndex, isScrolling, feedData.videos, pool])
+
+  useEffect(() => {
+    if (!isActive) return
+    const video = feedData.videos[currentIndex]
+    if (!video) return
+    const t = setTimeout(() => recordView(video.id), 1000)
+    return () => clearTimeout(t)
+  }, [isActive, currentIndex, feedData.videos])
 
   useEffect(() => {
     if (isActive) return
