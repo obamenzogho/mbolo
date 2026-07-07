@@ -129,6 +129,8 @@ function RootContent() {
       <Stack.Screen name="hashtag/[tag]" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
       <Stack.Screen name="u/[pseudo]" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
       <Stack.Screen name="settings" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="legal/terms" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="legal/privacy" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
     </Stack>
   )
 }

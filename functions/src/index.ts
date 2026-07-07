@@ -3,6 +3,7 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https'
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { initializeApp } from 'firebase-admin/app'
 import { getFirestore, FieldValue } from 'firebase-admin/firestore'
+import { getAuth } from 'firebase-admin/auth'
 import { defineSecret } from 'firebase-functions/params'
 import * as crypto from 'crypto'
 
@@ -278,4 +279,33 @@ export const onReportCreate = onDocumentCreated('reports/{reportId}', async (eve
   } catch (e) {
     console.warn('auto-moderation failed:', (e as any)?.message ?? e)
   }
+})
+
+/* ---------- DELETE ACCOUNT : callable ---------- */
+export const deleteAccount = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Must be signed in')
+  const uid = request.auth.uid
+
+  const userSnap = await db.doc(`users/${uid}`).get()
+  const pseudo = userSnap.data()?.pseudo
+  if (pseudo) await db.doc(`usernames/${pseudo}`).delete().catch(() => {})
+
+  const videos = await db.collection('videos').where('userId', '==', uid).get()
+  for (const v of videos.docs) await db.recursiveDelete(v.ref)
+
+  for (const col of ['stories', 'reposts', 'shares', 'highlights']) {
+    const snap = await db.collection(col).where('userId', '==', uid).get()
+    const batch = db.batch()
+    snap.docs.forEach((d) => batch.delete(d.ref))
+    await batch.commit().catch(() => {})
+  }
+  const notifs = await db.collection('notifications').where('userId', '==', uid).get()
+  const nb = db.batch()
+  notifs.docs.forEach((d) => nb.delete(d.ref))
+  await nb.commit().catch(() => {})
+
+  await db.recursiveDelete(userSnap.ref)
+  await getAuth().deleteUser(uid)
+
+  return { ok: true }
 })

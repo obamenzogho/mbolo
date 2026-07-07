@@ -9,6 +9,7 @@ import {
 } from 'firebase/auth'
 import { type Firestore } from 'firebase/firestore'
 import { getStorage, FirebaseStorage } from 'firebase/storage'
+import { getFunctions, Functions } from 'firebase/functions'
 import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage'
 import { validateEnv, logEnvStatus } from './env'
 import { captureException } from './sentry'
@@ -69,6 +70,7 @@ function initFirestore(app: FirebaseApp): Firestore {
 
 const db = initFirestore(app)
 const storage: FirebaseStorage = getStorage(app)
+const functions: Functions = getFunctions(app)
 
-export { auth, db, storage }
+export { auth, db, storage, functions }
 export default app

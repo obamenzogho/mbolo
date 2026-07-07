@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, Alert, Switch } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { signOut } from 'firebase/auth'
+import { httpsCallable } from 'firebase/functions'
 import { doc, getDoc, updateDoc } from 'firebase/firestore'
-import { auth, db } from '../../src/lib/firebase'
+import { auth, db, functions } from '../../src/lib/firebase'
 import { colors } from '../../src/lib/theme'
 import { router } from 'expo-router'
 import PageWrapper from '../../src/components/PageWrapper'
@@ -53,8 +55,14 @@ export default function Settings() {
         {
           text: 'Supprimer',
           style: 'destructive',
-          onPress: () => {
-            Alert.alert('Contacte-nous', 'Pour supprimer ton compte, envoie un email à support@mbolo.app')
+          onPress: async () => {
+            try {
+              await httpsCallable(functions, 'deleteAccount')()
+              await signOut(auth)
+              router.replace('/(auth)/login')
+            } catch {
+              Alert.alert('Erreur', 'Suppression impossible. Reconnecte-toi puis réessaie.')
+            }
           },
         },
       ]
@@ -164,13 +172,13 @@ export default function Settings() {
           icon: 'document-text-outline',
           label: 'Conditions d\'utilisation',
           type: 'action' as const,
-          action: () => Alert.alert('Conditions', 'Conditions d\'utilisation de Mbolo v1.0'),
+          action: () => router.push('/legal/terms'),
         },
         {
           icon: 'shield-checkmark-outline',
           label: 'Politique de confidentialité',
           type: 'action' as const,
-          action: () => Alert.alert('Confidentialité', 'Politique de confidentialité de Mbolo v1.0'),
+          action: () => router.push('/legal/privacy'),
         },
       ],
     },
