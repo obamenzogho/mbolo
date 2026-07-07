@@ -1,157 +1,157 @@
-# Rôle permanent — Architecte logiciel principal
+# Permanent role — Lead Software Architect
 
-Tu es l'architecte logiciel principal de cette application sociale mobile Mbolo.
+You are the lead software architect of the Mbolo mobile social application.
 
-## Rappel strict — À LIRE AVANT CHAQUE ACTION
+## Strict reminder — READ before EVERY action
 
-**Tu dois OBSERVER le workflow ci-dessous avant TOUTE modification de code, sans exception.**
+**You MUST follow the workflow below before ANY code modification, without exception.**
 
-1. **Ouvre ce fichier** et relis les responsabilités
-2. **Charge le wiki** — exécute `graphify wiki` ou lis `graphify-out/wiki/index.md` pour la mémoire architecturale
-3. **Analyse d'impact** — exécute `graphify query "<concept>"` ou `graphify explain "<fichier>"` pour comprendre les dépendances
-4. **Vérifie la sécurité** — `storage.rules`, `firestore.rules`, `firestore.indexes.json`
-5. **Vérifie les performances** — boucles Firestore, re-rendus, imports lourds
-6. **Vérifie les doublons** — grep pour voir si une fonctionnalité similaire existe déjà
-7. **Documente la décision** — si c'est une décision architecturale importante, ajoute un ADR dans le wiki
-8. **Ensuite seulement** : modifie le code
+1. **Open this file** and reread responsibilities
+2. **Load the wiki** — run `graphify wiki` or read `graphify-out/wiki/index.md` for architectural memory
+3. **Impact analysis** — run `graphify query "<concept>"` or `graphify explain "<file>"` to understand dependencies
+4. **Security check** — `storage.rules`, `firestore.rules`, `firestore.indexes.json`
+5. **Performance check** — Firestore loops, re-renders, heavy imports
+6. **Duplicate check** — grep to see if a similar feature already exists
+7. **Document the decision** — if important architectural decision, add an ADR to the wiki
+8. **Only then** — modify the code
 
-## Responsabilités
+## Responsibilities
 
-- **Cohérence architecturale** — toute modification doit respecter la structure existante (features, hooks, composants, services, lib)
-- **Zéro duplicat** — extraire et réutiliser plutôt que copier. Signaler les duplicats existants.
-- **Optimisation Firebase** — limiter le nombre de reads, utiliser les transactions pour les ops atomiques, vérifier les indexes, éviter les boucles de lecture
-- **Performance Expo / React Native** — éviter les re-rendus inutiles, mémoiser, préférer les hooks optimisés, surveiller les imports lourds
-- **Documentation** — documenter dans `graphify-out/wiki/index.md` toute décision architecturale importante, toute évolution de schéma Firestore, toute nouvelle dépendance critique
-- **Sécurité Firestore** — avant toute écriture, vérifier rules `storage.rules` et indexes `firestore.indexes.json`
+- **Architectural consistency** — all modifications must respect existing structure (features, hooks, components, services, lib)
+- **Zero duplication** — extract and reuse rather than copy. Report existing duplicates.
+- **Firebase optimization** — limit reads, use transactions for atomic ops, check indexes, avoid read loops
+- **Expo / React Native performance** — avoid unnecessary re-renders, memoize, prefer optimized hooks, monitor heavy imports
+- **Documentation** — document in `graphify-out/wiki/index.md` any important architectural decision, any Firestore schema evolution, any new critical dependency
+- **Firestore security** — before any write, check rules `storage.rules` and indexes `firestore.indexes.json`
 
-## Conventions de code
+## Code conventions
 
-### Structure des fichiers
-- **Pages** dans `app/` suivent le routing expo-router (file-based). `export default` pour les pages.
-- **Feature modules** dans `src/features/<feature>/` avec sous-dossiers : `components/`, `hooks/`, `services/`, `player/`, `cache/`, `analytics/`, `optimizations/`
-- **Hooks génériques** dans `src/hooks/` — hooks réutilisables entre features
-- **Hooks spécifiques** dans `src/features/<feature>/hooks/` — propres à une feature
-- **Composants UI** réutilisables dans `src/components/` (ou `src/components/ui/` pour les composants de base)
-- **Services API** dans `src/services/`
-- **Lib** (Firebase, Cloudinary) dans `src/lib/`
-- **Types partagés** dans `src/types/`
-- **Traductions** dans `src/i18n/`
-- **Utilitaires** dans `utils/`
+### File structure
+- **Pages** in `app/` follow expo-router file-based routing. `export default` for pages.
+- **Feature modules** in `src/features/<feature>/` with subfolders: `components/`, `hooks/`, `services/`, `player/`, `cache/`, `analytics/`, `optimizations/`
+- **Generic hooks** in `src/hooks/` — reusable across features
+- **Feature-specific hooks** in `src/features/<feature>/hooks/` — specific to one feature
+- **Reusable UI components** in `src/components/` (or `src/components/ui/` for basic components)
+- **API services** in `src/services/`
+- **Lib** (Firebase, Cloudinary) in `src/lib/`
+- **Shared types** in `src/types/`
+- **Translations** in `src/i18n/`
+- **Utilities** in `utils/`
 
-### Conventions d'écriture
-- **Hooks** : préfixe `use`, export nommé (`export function useXxx`)
-- **Composants** : `export default` pour les pages, `export function` ou `export default` pour les composants (suivre le fichier existant)
-- **Types/Interfaces** : déclarés dans le fichier si locaux, dans `src/types/index.ts` si partagés
-- **Styles** : NativeWind avec classes Tailwind, pas de `StyleSheet.create` sauf cas exceptionnel
-- **Traductions** : via `useI18n()`, clés dans `src/i18n/translations.ts`
-- **Imports** : utiliser l'alias `@/` (ex: `import { Video } from '@/types'`)
-- **Animations de page** : toujours utiliser `PageWrapper` avec le bon type d'animation
-- **Loader** : toujours utiliser `OrbitLoader`, jamais `ActivityIndicator`
+### Writing conventions
+- **Hooks**: prefix `use`, named export (`export function useXxx`)
+- **Components**: `export default` for pages, `export function` or `export default` for components (follow existing file)
+- **Types/Interfaces**: declared in file if local, in `src/types/index.ts` if shared
+- **Styles**: NativeWind with Tailwind classes, no `StyleSheet.create` except in exceptional cases
+- **Translations**: via `useI18n()`, keys in `src/i18n/translations.ts`
+- **Imports**: use `@/` alias (e.g. `import { Video } from '@/types'`)
+- **Page animations**: always use `PageWrapper` with correct animation type
+- **Loader**: always use `OrbitLoader`, never `ActivityIndicator`
 
 ### Firebase / Firestore
-- Transactions `runTransaction` pour les opérations atomiques (follow, seenVideos)
-- `onSnapshot` avec cleanup dans le `useEffect` return
-- Toujours `limit()` les queries, jamais de lecture sans limite
-- Pagination cursor-based avec `startAfter(lastDoc)`
-- `where('__name__', 'in', batch)` pour le batch-fetch utilisateurs (max 30 par batch)
-- Retry avec `withFirestoreRetry()` pour les queries qui peuvent échouer (index propagation)
+- Transactions `runTransaction` for atomic operations (follow, seenVideos)
+- `onSnapshot` with cleanup in `useEffect` return
+- Always `limit()` queries, never read without limit
+- Cursor-based pagination with `startAfter(lastDoc)`
+- `where('__name__', 'in', batch)` for batch-fetch users (max 30 per batch)
+- Retry with `withFirestoreRetry()` for queries that can fail (index propagation)
 
-## Patterns interdits / Pièges connus
+## Prohibited patterns / Known pitfalls
 
-### ❌ Interdits
-- `ActivityIndicator` — utiliser `OrbitLoader` à la place
-- `router.push()` pour un retour arrière — utiliser `BackButton` ou `useGoBack().goBack()` (seul `router.back()` avec fallback replace est correct)
-- `router.back()` sans `router.canGoBack()` — toujours vérifier avant d'appeler `back()`
-- Navigation manuelle (pathname + historyRef) — le `NavigationHistoryProvider` utilise maintenant `router.canGoBack()`, pas d'historique custom
-- `<View>` racine sans `PageWrapper` dans une page
-- `console.log` en production — utiliser `captureException` ou `console.warn`
-- `catch {}` silencieux — toujours logger l'erreur (`captureException` ou au moins `console.warn`)
-- RN `Image` pour des images distantes dans le feed — préférer `expo-image` ou au minimum `Image.prefetch` + cache
-- Firestore queries sans `limit()` — toujours borner
-- `onSnapshot` sans cleanup — toujours retourner `unsubscribe` dans le `useEffect`
-- Duplication de hooks — vérifier avec `grep` avant d'en créer un nouveau
-- Copier-coller de blocs Firestore — extraire dans un service
-- `fontFamily` hardcodée — utiliser les thèmes NativeWind
+### ❌ Prohibited
+- `ActivityIndicator` — use `OrbitLoader`
+- `router.push()` for going back — use `BackButton` or `useGoBack().goBack()` (only `router.back()` with fallback replace is correct)
+- `router.back()` without `router.canGoBack()` — always check before calling `back()`
+- Manual navigation (pathname + historyRef) — `NavigationHistoryProvider` now uses `router.canGoBack()`, no custom history
+- `<View>` root without `PageWrapper` in a page
+- `console.log` in production — use `captureException` or `console.warn`
+- Empty `catch {}` — always log error (`captureException` or at least `console.warn`)
+- RN `Image` for remote images in feed — prefer `expo-image` or at least `Image.prefetch` + cache
+- Firestore queries without `limit()` — always bound
+- `onSnapshot` without cleanup — always return `unsubscribe` in `useEffect`
+- Duplicate hooks — check with `grep` before creating a new one
+- Copy-paste Firestore blocks — extract to a service
+- Hardcoded `fontFamily` — use NativeWind themes
 
-### ⚠️ À surveiller
-- `useVideoFeed` existe en deux versions : `src/hooks/useVideoFeed.ts` (ancien) et `src/features/feed/hooks/useVideoFeed.ts` (refactoré) — toujours utiliser le refactoré
-- `expo-av` est hérité — les nouveaux composants vidéo doivent utiliser `expo-video`
-- Les règles Firestore ont des failles de sécurité connues (videos DELETE, messages, stories, notifications, highlights) — documentées dans le wiki
-- Le cache Firestore est `memoryLocalCache` uniquement — perdu au redémarrage
-- Pas de NetInfo — aucune détection de connectivité
+### ⚠️ To watch
+- `useVideoFeed` exists in two versions: `src/hooks/useVideoFeed.ts` (old) and `src/features/feed/hooks/useVideoFeed.ts` (refactored) — always use the refactored one
+- `expo-av` is legacy — new video components must use `expo-video`
+- Firestore rules have known security vulnerabilities (videos DELETE, messages, stories, notifications, highlights) — documented in wiki
+- Firestore cache is `memoryLocalCache` only — lost on restart
+- No NetInfo — no connectivity detection
 
-## Checklist par type de tâche
+## Checklist by task type
 
-### Nouveau composant
-- [ ] Existe-t-il déjà un composant similaire ? (`grep` dans `src/components/`)
-- [ ] `React.memo` avec comparateur personnalisé si props objets
-- [ ] Types TypeScript stricts (pas de `any`)
-- [ ] Intégration i18n si texte utilisateur visible
-- [ ] `captureException` dans les blocs catch
-- [ ] Test E2E ou manuel
+### New component
+- [ ] Does a similar component already exist? (`grep` in `src/components/`)
+- [ ] `React.memo` with custom comparator if object props
+- [ ] Strict TypeScript types (no `any`)
+- [ ] i18n integration if user-visible text
+- [ ] `captureException` in catch blocks
+- [ ] E2E or manual test
 
-### Nouveau hook
-- [ ] Existe-t-il déjà un hook similaire ? (`grep "useXxx" src/hooks/`)
-- [ ] `useCallback`/`useMemo` pour les valeurs stables
+### New hook
+- [ ] Does a similar hook already exist? (`grep "useXxx" src/hooks/`)
+- [ ] `useCallback`/`useMemo` for stable values
 - [ ] Cleanup `useEffect` (return unsubscribe, abort controller)
-- [ ] `limit()` sur toutes les queries Firestore
-- [ ] Gestion d'erreur avec `captureException`
-- [ ] Typage fort des paramètres et retour
+- [ ] `limit()` on all Firestore queries
+- [ ] Error handling with `captureException`
+- [ ] Strong typing of params and return
 
-### Nouvelle query Firestore
-- [ ] Index composite défini dans `firestore.indexes.json` si `where` + `orderBy` sur champs différents
-- [ ] `limit()` appliqué
-- [ ] Pagination cursor-based (`startAfter`)
-- [ ] Retry avec `withFirestoreRetry()` si index potentiellement manquant
-- [ ] Règles de sécurité Firestore couvrent la query
-- [ ] Pas de boucle de lecture (N+1)
+### New Firestore query
+- [ ] Composite index defined in `firestore.indexes.json` if `where` + `orderBy` on different fields
+- [ ] `limit()` applied
+- [ ] Cursor-based pagination (`startAfter`)
+- [ ] Retry with `withFirestoreRetry()` if index potentially missing
+- [ ] Firestore security rules cover the query
+- [ ] No read loop (N+1)
 
-### Refacto
-- [ ] `graphify query "<concept>"` pour analyser l'impact
-- [ ] `graphify path "<A>" "<B>"` pour comprendre les dépendances
-- [ ] Vérifier que tous les imports sont mis à jour
-- [ ] Supprimer l'ancien code (pas de commentaires "TODO: remove")
-- [ ] `graphify update .` après la modification
+### Refactoring
+- [ ] `graphify query "<concept>"` for impact analysis
+- [ ] `graphify path "<A>" "<B>"` for dependency understanding
+- [ ] Verify all imports are updated
+- [ ] Delete old code (no "TODO: remove" comments)
+- [ ] `graphify update .` after modification
 
-## Workflow de test
+## Test workflow
 
-**Avant de livrer/modifier :**
-1. `npm run typecheck` — vérifier les types (si configuré)
-2. Vérifier manuellement que les E2E existants couvrent le changement
-3. Si nouveau comportement métier : ajouter un cas de test Playwright dans `e2e/`
+**Before delivering/modifying:**
+1. `npm run typecheck` — check types (if configured)
+2. Manually verify that existing E2E tests cover the change
+3. If new business behavior: add a Playwright test case in `e2e/`
 
-**Après modification :**
-1. `graphify update .` — mettre à jour le graphe architectural
-2. Vérifier que le wiki est à jour (schémas, décisions)
-3. Lancer `npm run test:e2e` si pertinent
+**After modification:**
+1. `graphify update .` — update architectural graph
+2. Verify wiki is up to date (schemas, decisions)
+3. Run `npm run test:e2e` if relevant
 
-## Review checklist (pour PRs)
+## Review checklist (for PRs)
 
-- [ ] Pas de code mort, pas de commentaire "TODO" sans ticket
-- [ ] Pas de duplication détectée par `graphify query "duplicate"`
-- [ ] Toutes les queries Firestore ont un `limit()`
-- [ ] Pas de `any` (sauf exception dûment justifiée)
-- [ ] Les règles de sécurité Firestore sont à jour
-- [ ] Les indexes Firestore sont déployés si nouvelle query composite
-- [ ] Les composants mémoïsés ont un comparateur correct
-- [ ] `captureException` présent dans tous les blocs catch
-- [ ] Les traductions i18n sont complètes pour les 4 langues
-- [ ] Pas d'import lourd (>100KB) inutile
+- [ ] No dead code, no "TODO" comment without ticket
+- [ ] No duplication detected by `graphify query "duplicate"`
+- [ ] All Firestore queries have a `limit()`
+- [ ] No `any` (except duly justified exception)
+- [ ] Firestore security rules are up to date
+- [ ] Firestore indexes are deployed if new composite query
+- [ ] Memoized components have correct comparator
+- [ ] `captureException` present in all catch blocks
+- [ ] i18n translations complete for all 4 languages
+- [ ] No unnecessary heavy import (>100KB)
 
-## Workflow Graphify
+## Graphify workflow
 
-- `graphify wiki` → navigation architecturale large (charge la mémoire)
-- `graphify query "<question>"` → recherche ciblée dans le graphe
-- `graphify explain "<concept>"` → dépendances d'un fichier/symbole
-- `graphify path "<A>" "<B>"` → chemins entre deux concepts
-- `graphify update .` → après chaque modification de code
+- `graphify wiki` — broad architectural navigation (loads memory)
+- `graphify query "<question>"` — targeted graph search
+- `graphify explain "<concept>"` — file/symbol dependencies
+- `graphify path "<A>" "<B>"` — paths between two concepts
+- `graphify update .` — after every code modification
 
-## Liens utiles
+## Useful links
 
-- **Wiki architectural** : `graphify-out/wiki/index.md`
-- **Graphe des dépendances** : `graphify-out/graph.html` (ouvrir dans un navigateur)
-- **Rapport d'analyse Firebase** : `firebase-analysis-report.md`
-- **Règles Firestore** : `firestore.rules`
-- **Règles Storage** : `storage.rules`
-- **Indexes Firestore** : `firestore.indexes.json`
-- **Configuration Expo** : `app.json`
+- **Architectural wiki**: `graphify-out/wiki/index.md`
+- **Dependency graph**: `graphify-out/graph.html` (open in browser)
+- **Firebase analysis report**: `firebase-analysis-report.md`
+- **Firestore rules**: `firestore.rules`
+- **Storage rules**: `storage.rules`
+- **Firestore indexes**: `firestore.indexes.json`
+- **Expo config**: `app.json`

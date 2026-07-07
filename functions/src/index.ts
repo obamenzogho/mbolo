@@ -281,6 +281,9 @@ export const onReportCreate = onDocumentCreated('reports/{reportId}', async (eve
   }
 })
 
+/* ---------- TYPESENSE SEARCH SYNC ---------- */
+export { syncUserToSearch } from './search'
+
 /* ---------- DELETE ACCOUNT : callable ---------- */
 export const deleteAccount = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Must be signed in')

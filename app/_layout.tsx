@@ -131,6 +131,7 @@ function RootContent() {
       <Stack.Screen name="settings" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
       <Stack.Screen name="legal/terms" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
       <Stack.Screen name="legal/privacy" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="place/[id]" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
     </Stack>
   )
 }

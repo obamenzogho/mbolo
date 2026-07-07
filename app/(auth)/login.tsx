@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, Alert, Image,
   KeyboardAvoidingView, Platform,
@@ -10,10 +10,13 @@ import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/
 import { auth, db } from '../../src/lib/firebase'
 import { colors } from '../../src/lib/theme'
 import { EyeIcon, EyeOffIcon } from '../../src/components/Icons'
+import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import OrbitLoader from '../../src/components/OrbitLoader'
 import { useStartupStore } from '../../src/features/startup/store/startupStore'
 import type { User } from '../../src/types'
+import * as AppleAuthentication from 'expo-apple-authentication'
+import { signInWithApple, useGoogleAuth } from '../../src/features/auth/oauth'
 
 const AUTH_ERRORS: Record<string, string> = {
   'auth/invalid-email': 'Email invalide',
@@ -35,6 +38,13 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [focusedField, setFocusedField] = useState<string | null>(null)
+  const [appleAvailable, setAppleAvailable] = useState(false)
+  const [socialLoading, setSocialLoading] = useState<'apple' | 'google' | null>(null)
+  const { ready: googleReady, signInWithGoogle } = useGoogleAuth()
+
+  useEffect(() => {
+    AppleAuthentication.isAvailableAsync().then(setAppleAvailable).catch(() => {})
+  }, [])
 
   const inputBase = {
     backgroundColor: colors.surface,
@@ -95,6 +105,30 @@ export default function Login() {
       Alert.alert('Erreur', getFirebaseError(error.code))
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleGoogle = async () => {
+    setSocialLoading('google')
+    try {
+      const user = await signInWithGoogle()
+      if (user) router.replace('/(tabs)/feed')
+    } catch {
+      Alert.alert('Erreur', 'Connexion Google impossible. Réessaie.')
+    } finally {
+      setSocialLoading(null)
+    }
+  }
+
+  const handleApple = async () => {
+    setSocialLoading('apple')
+    try {
+      const user = await signInWithApple()
+      if (user) router.replace('/(tabs)/feed')
+    } catch {
+      Alert.alert('Erreur', 'Connexion Apple impossible. Réessaie.')
+    } finally {
+      setSocialLoading(null)
     }
   }
 
@@ -237,6 +271,37 @@ export default function Login() {
               <Text style={{ color: colors.textSecondary, marginHorizontal: 16, fontSize: 13 }}>ou</Text>
               <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
             </View>
+
+            {/* Google */}
+            {googleReady && (
+              <TouchableOpacity
+                onPress={handleGoogle}
+                disabled={socialLoading !== null}
+                activeOpacity={0.85}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                  borderWidth: 1, borderColor: colors.border,
+                  paddingVertical: 15, borderRadius: 12, marginBottom: 12,
+                  opacity: socialLoading ? 0.6 : 1,
+                }}
+              >
+                <Ionicons name="logo-google" size={20} color={colors.text} style={{ marginRight: 10 }} />
+                <Text style={{ color: colors.text, fontSize: 16, fontWeight: '600' }}>
+                  {socialLoading === 'google' ? 'Connexion...' : 'Continuer avec Google'}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Apple (iOS only) */}
+            {appleAvailable && (
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+                cornerRadius={12}
+                style={{ height: 50, width: '100%', marginBottom: 12 }}
+                onPress={handleApple}
+              />
+            )}
 
             {/* Inscription */}
             <TouchableOpacity

@@ -21,6 +21,7 @@ import { uploadToCloudinary, generateThumbnailURL } from '../../src/lib/cloudina
 import { normalizeTag } from '../../src/lib/hashtags'
 import OrbitLoader from '../../src/components/OrbitLoader'
 import { BackButton } from '../../src/components/ui/BackButton'
+import { getCurrentPlace } from '../../src/features/location/locationService'
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 
@@ -48,6 +49,9 @@ export default function VideoEditorScreen() {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [isUploading, setIsUploading] = useState(false)
   const [coverUri, setCoverUri] = useState<string | null>(null)
+  const [includeLocation, setIncludeLocation] = useState(false)
+  const [placeInfo, setPlaceInfo] = useState<{ lat: number; lng: number; geohash: string; city: string | null; country: string | null } | null>(null)
+  const [fetchingLocation, setFetchingLocation] = useState(false)
 
   const descriptionRef = useRef<TextInput>(null)
 
@@ -67,6 +71,28 @@ export default function VideoEditorScreen() {
       prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
     )
   }, [])
+
+  const toggleLocation = useCallback(async () => {
+    if (placeInfo) {
+      setIncludeLocation(false)
+      setPlaceInfo(null)
+      return
+    }
+    setFetchingLocation(true)
+    try {
+      const place = await getCurrentPlace()
+      if (place) {
+        setPlaceInfo(place)
+        setIncludeLocation(true)
+      } else {
+        Alert.alert('Localisation', 'Impossible de récupérer ta position. Vérifie les permissions.')
+      }
+    } catch {
+      Alert.alert('Erreur', 'Impossible de récupérer ta position')
+    } finally {
+      setFetchingLocation(false)
+    }
+  }, [placeInfo])
 
   const goToSettings = useCallback(() => {
     setStep('settings')
@@ -126,6 +152,10 @@ export default function VideoEditorScreen() {
         hashtags: selectedHashtags.map(t => normalizeTag(t.replace(/^#/, ''))),
         visibility,
         commentsEnabled,
+        ...(includeLocation && placeInfo ? {
+          lat: placeInfo.lat, lng: placeInfo.lng,
+          geohash: placeInfo.geohash, place: placeInfo.city,
+        } : {}),
         likes: 0,
         comments: 0,
         shares: 0,
@@ -379,6 +409,52 @@ export default function VideoEditorScreen() {
                 alignSelf: commentsEnabled ? 'flex-end' : 'flex-start',
               }} />
             </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* LOCATION */}
+        <View style={{ paddingHorizontal: 16, marginBottom: 20 }}>
+          <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700', marginBottom: 12 }}>Localisation</Text>
+          <TouchableOpacity
+            onPress={toggleLocation}
+            disabled={fetchingLocation}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingVertical: 14,
+              paddingHorizontal: 16,
+              backgroundColor: '#1a1a1a',
+              borderRadius: 12,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Ionicons name="location-outline" size={22} color={includeLocation ? colors.primary : '#888'} />
+              <View>
+                <Text style={{ color: '#fff', fontSize: 15 }}>
+                  {fetchingLocation ? 'Récupération...' : includeLocation ? placeInfo?.city ?? 'Position ajoutée' : 'Ajouter le lieu'}
+                </Text>
+                {includeLocation && placeInfo?.city && (
+                  <Text style={{ color: '#888', fontSize: 12, marginTop: 1 }}>{placeInfo.city}</Text>
+                )}
+              </View>
+            </View>
+            {fetchingLocation ? (
+              <OrbitLoader size={18} />
+            ) : (
+              <View style={{
+                width: 48, height: 28, borderRadius: 14,
+                backgroundColor: includeLocation ? colors.primary : '#333',
+                justifyContent: 'center',
+                paddingHorizontal: 2,
+              }}>
+                <View style={{
+                  width: 24, height: 24, borderRadius: 12,
+                  backgroundColor: '#fff',
+                  alignSelf: includeLocation ? 'flex-end' : 'flex-start',
+                }} />
+              </View>
+            )}
           </TouchableOpacity>
         </View>
 

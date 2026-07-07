@@ -3,7 +3,9 @@ import { View, Text, FlatList, Image, TouchableOpacity, Dimensions } from 'react
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useLocalSearchParams, router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
+import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore'
 import { colors } from '../../src/lib/theme'
+import { db } from '../../src/lib/firebase'
 import OrbitLoader from '../../src/components/OrbitLoader'
 import { BackButton } from '../../src/components/ui/BackButton'
 
@@ -11,34 +13,37 @@ const { width } = Dimensions.get('window')
 const COL = 3
 const SIZE = width / COL
 
-export default function HashtagPage() {
-  const { tag } = useLocalSearchParams<{ tag: string }>()
+export default function PlacePage() {
+  const { id } = useLocalSearchParams<{ id: string }>()
   const [videos, setVideos] = useState<any[]>([])
-  const [count, setCount] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!tag) return
+    if (!id) return
     ;(async () => {
       setLoading(true)
-      const [vids, meta] = await Promise.all([getVideosByHashtag(tag), getHashtagMeta(tag)])
-      setVideos(vids)
-      setCount(meta?.videoCount ?? vids.length)
+      try {
+        const snap = await getDocs(query(
+          collection(db, 'videos'),
+          where('place', '==', id),
+          orderBy('createdAt', 'desc'),
+          limit(50),
+        ))
+        setVideos(snap.docs.map((d: any) => ({ id: d.id, ...d.data() as any })))
+      } catch {}
       setLoading(false)
     })()
-  }, [tag])
+  }, [id])
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 }}>
         <BackButton icon="arrow-back" size={24} color={colors.text} />
         <View>
-          <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700' }}>#{tag}</Text>
-          {count !== null && (
-            <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
-              {count} video{count > 1 ? 's' : ''}
-            </Text>
-          )}
+          <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700' }}>{id}</Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
+            {videos.length} vidéo{videos.length !== 1 ? 's' : ''}
+          </Text>
         </View>
       </View>
 
@@ -64,7 +69,7 @@ export default function HashtagPage() {
           )}
           ListEmptyComponent={
             <Text style={{ color: colors.textSecondary, textAlign: 'center', marginTop: 40 }}>
-              Aucune video pour #{tag} pour l'instant
+              Aucune vidéo pour {id} pour l'instant
             </Text>
           }
         />

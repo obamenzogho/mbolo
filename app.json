@@ -95,7 +95,7 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Mbolo utilise votre position pour afficher votre ville sur votre profil."
+          "locationWhenInUsePermission": "Mbolo utilise votre position pour afficher votre ville sur votre profil et trouver des vidéos autour de vous."
         }
       ],
       [
@@ -135,7 +135,8 @@
           "project": "mbolo-app"
         }
       ],
-      "expo-video"
+      "expo-video",
+      "expo-apple-authentication"
     ],
     "extra": {
       "router": {},
