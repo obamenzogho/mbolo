@@ -7,9 +7,10 @@ import {
   getReactNativePersistence,
   Auth,
 } from 'firebase/auth'
-import { type Firestore } from 'firebase/firestore'
+import { type Firestore, disableNetwork, enableNetwork } from 'firebase/firestore'
 import { getStorage, FirebaseStorage } from 'firebase/storage'
 import { getFunctions, Functions } from 'firebase/functions'
+import NetInfo from '@react-native-community/netinfo'
 import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage'
 import { validateEnv, logEnvStatus } from './env'
 import { captureException } from './sentry'
@@ -71,6 +72,17 @@ function initFirestore(app: FirebaseApp): Firestore {
 const db = initFirestore(app)
 const storage: FirebaseStorage = getStorage(app)
 const functions: Functions = getFunctions(app)
+
+// Connectivité → coupe/rétablit le réseau Firestore
+let netOnline = true
+NetInfo.addEventListener((state) => {
+  const online = !!state.isConnected && state.isInternetReachable !== false
+  if (online === netOnline) return
+  netOnline = online
+  ;(online ? enableNetwork(db) : disableNetwork(db)).catch((e) =>
+    console.warn('[Firestore] network toggle failed:', e?.message ?? e),
+  )
+})
 
 export { auth, db, storage, functions }
 export default app
