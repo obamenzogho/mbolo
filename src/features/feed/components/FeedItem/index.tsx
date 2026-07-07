@@ -1,7 +1,9 @@
 import { memo, useCallback, useRef, useState } from 'react'
-import { View, Text, Animated, StyleSheet } from 'react-native'
+import { View, Text, TouchableOpacity, Animated, StyleSheet } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
+import { router } from 'expo-router'
 import { auth } from '@/lib/firebase'
 
 import { VideoPlayerSlot, usePlayerForVideo } from '../VideoPlayerSlot'
@@ -100,6 +102,16 @@ function FeedItemComponent({
       <View style={[styles.infoColumn, { bottom: BOTTOM_PADDING + insets.bottom }]}>
         <AuthorInfo item={item} username={username} userPhotoURL={userPhotoURL} />
         <CaptionBlock description={item.description} hashtags={item.hashtags} />
+        {item.place && (
+          <TouchableOpacity
+            onPress={() => router.push({ pathname: '/place/[id]', params: { id: item.place! } })}
+            style={styles.locationPill}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="location-outline" size={13} color="#fff" />
+            <Text style={styles.locationText}>{item.place}</Text>
+          </TouchableOpacity>
+        )}
         <CommentPreview item={item} onPressComment={onPressComment} />
       </View>
 
@@ -151,4 +163,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.8)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20,
   },
   toastText: { color: '#FFF', fontSize: 14, fontWeight: '600' },
+  locationPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 12,
+    paddingHorizontal: 8, paddingVertical: 4, marginTop: 6, alignSelf: 'flex-start',
+  },
+  locationText: { color: '#fff', fontSize: 12, fontWeight: '500' },
 })

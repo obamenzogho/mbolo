@@ -282,7 +282,7 @@ export const onReportCreate = onDocumentCreated('reports/{reportId}', async (eve
 })
 
 /* ---------- TYPESENSE SEARCH SYNC ---------- */
-export { syncUserToSearch } from './search'
+export * from './search'
 
 /* ---------- DELETE ACCOUNT : callable ---------- */
 export const deleteAccount = onCall(async (request) => {

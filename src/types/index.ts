@@ -70,6 +70,10 @@ export interface Video {
   views?: number
   likedBy?: string[]
   corrupted?: boolean
+  place?: string
+  lat?: number
+  lng?: number
+  geohash?: string
   createdAt: Date
   previewComments?: PreviewComment[]
 }
