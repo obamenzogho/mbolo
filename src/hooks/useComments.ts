@@ -38,9 +38,11 @@ export function formatTime(timestamp: any): string {
 }
 
 async function enrichWithAuthors(items: any[], authorCache: Map<string, AuthorInfo>): Promise<any[]> {
+  // ✅ Fetch authors ONLY for legacy docs missing the denormalized fields.
+  // New comments/replies already carry authorName + authorPhoto (zero extra read).
   const missingIds = items
+    .filter((c) => !c.authorName && c.userId && !authorCache.has(c.userId))
     .map((c) => c.userId)
-    .filter((id: string) => id && !authorCache.has(id))
 
   if (missingIds.length > 0) {
     const fetched = await batchFetchAuthors(missingIds)
@@ -48,11 +50,10 @@ async function enrichWithAuthors(items: any[], authorCache: Map<string, AuthorIn
   }
 
   return items.map((c) => {
+    // ✅ Denormalized field takes priority; fall back to cache for legacy docs.
+    if (c.authorName) return c
     const author = authorCache.get(c.userId)
-    if (author) {
-      return { ...c, authorName: author.name, authorPhoto: author.photo }
-    }
-    return c
+    return author ? { ...c, authorName: author.name, authorPhoto: author.photo } : c
   })
 }
 
@@ -315,9 +316,8 @@ export function useComments(videoId: string, visible: boolean, initialPreviews?:
       await runTransaction(db, async (transaction) => {
         const snap = await transaction.get(ref)
         if (!snap.exists() || snap.data().userId !== currentUser.uid) return
-        const replyCount = snap.data().replyCount || 0
         transaction.delete(ref)
-        transaction.update(doc(db, 'videos', videoId), { comments: increment(-1 - replyCount) })
+        // ✅ compteur géré par onCommentDelete (serveur)
       })
     } catch (e) { captureException(e instanceof Error ? e : new Error(String(e)), { context: 'deleteComment' }) }
   }, [currentUser, videoId])
@@ -330,8 +330,7 @@ export function useComments(videoId: string, visible: boolean, initialPreviews?:
         const snap = await transaction.get(ref)
         if (!snap.exists() || snap.data().userId !== currentUser.uid) return
         transaction.delete(ref)
-        transaction.update(doc(db, 'videos', videoId, 'comments', commentId), { replyCount: increment(-1) })
-        transaction.update(doc(db, 'videos', videoId), { comments: increment(-1) })
+        // ✅ replyCount + comments gérés par onReplyDelete (serveur)
       })
     } catch (e) { captureException(e instanceof Error ? e : new Error(String(e)), { context: 'deleteReply' }) }
   }, [currentUser, videoId])
@@ -357,13 +356,13 @@ export function useComments(videoId: string, visible: boolean, initialPreviews?:
         const videoRef = doc(db, 'videos', videoId)
         const videoSnap = await transaction.get(videoRef)
         if (!videoSnap.exists() || videoSnap.data().commentsEnabled === false) return
-        const currentData = videoSnap.data()
-        const currentPreview = currentData?.previewComments ?? []
         const displayName = currentUser.displayName || currentUser.email?.split('@')[0] || 'Utilisateur'
 
         const commentRef = doc(collection(db, 'videos', videoId, 'comments'))
         transaction.set(commentRef, {
           userId: currentUser.uid,
+          authorName: displayName,
+          authorPhoto: currentUser.photoURL || null,
           videoId,
           text: trimmed,
           likes: 0,
@@ -373,13 +372,7 @@ export function useComments(videoId: string, visible: boolean, initialPreviews?:
           replyCount: 0,
           createdAt: serverTimestamp(),
         })
-        transaction.update(videoRef, {
-          comments: increment(1),
-          previewComments: [
-            { id: commentRef.id, text: trimmed, authorName: displayName, authorPhoto: currentUser.photoURL || null, likes: 0 },
-            ...currentPreview,
-          ].slice(0, 3),
-        })
+        // ✅ compteur + previewComments gérés par onCommentCreate (serveur)
       })
       if (videoOwnerId && videoOwnerId !== currentUser.uid) {
         createNotification({ userId: videoOwnerId, type: 'comment', fromUserId: currentUser.uid, videoId })
@@ -403,10 +396,11 @@ export function useComments(videoId: string, visible: boolean, initialPreviews?:
     const trimmed = text.trim()
     try {
       await runTransaction(db, async (transaction) => {
-        const videoRef = doc(db, 'videos', videoId)
         const replyRef = doc(collection(db, 'videos', videoId, 'comments', commentId, 'replies'))
         transaction.set(replyRef, {
           userId: currentUser.uid,
+          authorName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Utilisateur',
+          authorPhoto: currentUser.photoURL || null,
           videoId,
           text: trimmed,
           replyToUsername,
@@ -417,8 +411,7 @@ export function useComments(videoId: string, visible: boolean, initialPreviews?:
           dislikedBy: [],
           createdAt: serverTimestamp(),
         })
-        transaction.update(doc(db, 'videos', videoId, 'comments', commentId), { replyCount: increment(1) })
-        transaction.update(videoRef, { comments: increment(1) })
+        // ✅ replyCount + comments gérés par onReplyCreate (serveur)
       })
 
       try {

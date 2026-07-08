@@ -72,7 +72,7 @@ export function useFeedData({ store }: { store: StoreApi<FeedState> }) {
         tasteLoadedRef.current = true
       }
 
-      const constraints = [orderBy('createdAt', 'desc'), limit(PAGE_SIZE)]
+      const constraints = [orderBy('hotScore', 'desc'), limit(PAGE_SIZE)]   // ✅ hotScore (top global servi par le serveur)
       if (lastDocRef.current) {
         constraints.push(startAfter(lastDocRef.current))
       }

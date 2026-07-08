@@ -1,6 +1,6 @@
 import {
   collection, doc, addDoc, deleteDoc, getDocs, query, where, orderBy, limit, startAfter,
-  updateDoc, increment, arrayUnion, arrayRemove, serverTimestamp, getDoc, deleteField,
+  serverTimestamp,
   type QueryDocumentSnapshot, type DocumentData,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
@@ -27,45 +27,14 @@ export async function toggleRepost(
   const snap = await getDocs(q)
 
   if (!snap.empty) {
-    await deleteDoc(doc(db, REPOSTS_COLLECTION, snap.docs[0].id))
-    const videoRef = doc(db, 'videos', videoId)
-    const videoSnap = await getDoc(videoRef)
-    const currentRepostedBy = videoSnap.data()?.repostedBy ?? []
-    const remaining = currentRepostedBy.filter((id: string) => id !== userId)
-    const updateData: Record<string, any> = {
-      reposts: increment(-1),
-      repostedBy: arrayRemove(userId),
-    }
-    if (remaining.length > 0) {
-      const lastReposter = remaining[remaining.length - 1]
-      const lastReposterSnap = await getDoc(doc(db, 'users', lastReposter))
-      if (lastReposterSnap.exists()) {
-        updateData.latestRepostedBy = {
-          userId: lastReposter,
-          userName: lastReposterSnap.data().pseudo || lastReposterSnap.data().nom,
-        }
-      }
-    } else {
-      updateData.latestRepostedBy = deleteField()
-    }
-    await updateDoc(videoRef, updateData)
+    await deleteDoc(doc(db, REPOSTS_COLLECTION, snap.docs[0].id))   // ✅ la function décompte + recalcule latestRepostedBy
     return { reposted: false, repostCount: 0 }
   }
-
-  const userSnap = await getDoc(doc(db, 'users', userId))
-  const userName = userSnap.exists()
-    ? (userSnap.data().pseudo || userSnap.data().nom)
-    : userId
 
   await addDoc(repostRef, {
     userId,
     postId: videoId,
     createdAt: serverTimestamp(),
-  })
-  await updateDoc(doc(db, 'videos', videoId), {
-    reposts: increment(1),
-    repostedBy: arrayUnion(userId),
-    latestRepostedBy: { userId, userName },
   })
   createNotification({
     userId: videoOwnerId,

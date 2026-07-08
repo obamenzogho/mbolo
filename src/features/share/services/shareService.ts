@@ -1,6 +1,6 @@
 import {
   collection, addDoc, getDocs, query, where, orderBy, limit,
-  doc, updateDoc, increment, serverTimestamp, Timestamp,
+  doc, serverTimestamp, Timestamp,
   getDoc,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
@@ -34,8 +34,7 @@ export async function createShare({
       shareType,
       createdAt: serverTimestamp(),
     })
-    await updateDoc(doc(db, 'videos', postId), { shares: increment(1) })
-    return ref.id
+    return ref.id   // ✅ plus d'updateDoc du compteur ici (onShareCreate côté serveur)
   } catch (e) {
     captureException(e instanceof Error ? e : new Error(String(e)), { context: 'createShare' })
     throw e

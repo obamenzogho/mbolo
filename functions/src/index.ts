@@ -1,4 +1,4 @@
-import { onDocumentCreated, onDocumentDeleted } from 'firebase-functions/v2/firestore'
+import { onDocumentCreated, onDocumentDeleted, onDocumentWritten } from 'firebase-functions/v2/firestore'
 import { onCall, HttpsError } from 'firebase-functions/v2/https'
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { initializeApp } from 'firebase-admin/app'
@@ -19,40 +19,66 @@ const bump = (path: string, field: string, delta: number) =>
   })
 
 /* ---------- LIKES : videos/{videoId}/likes/{userId} ---------- */
-export const onLikeCreate = onDocumentCreated('videos/{videoId}/likes/{userId}', (e) =>
-  bump(`videos/${e.params.videoId}`, 'likes', 1),
-)
-export const onLikeDelete = onDocumentDeleted('videos/{videoId}/likes/{userId}', (e) =>
-  bump(`videos/${e.params.videoId}`, 'likes', -1),
-)
-
-/* ---------- LIKES → CREATOR totalLikes ---------- */
-export const onLikeUpdateCreatorTotal = onDocumentCreated('videos/{videoId}/likes/{userId}', async (event) => {
-  const videoSnap = await db.doc(`videos/${event.params.videoId}`).get()
-  const creatorId = videoSnap.data()?.userId
+export const onLikeCreate = onDocumentCreated('videos/{videoId}/likes/{userId}', async (e) => {
+  const videoRef = db.doc(`videos/${e.params.videoId}`)
+  await videoRef.update({
+    likes: FieldValue.increment(1),
+    likedBy: FieldValue.arrayUnion(e.params.userId),   // ✅ serveur possède le tableau
+  }).catch((err) => console.warn('onLikeCreate:', err?.message ?? err))
+  const creatorId = (await videoRef.get()).data()?.userId
   if (creatorId) await db.doc(`users/${creatorId}`).update({ totalLikes: FieldValue.increment(1) })
 })
-export const onUnlikeUpdateCreatorTotal = onDocumentDeleted('videos/{videoId}/likes/{userId}', async (event) => {
-  const videoSnap = await db.doc(`videos/${event.params.videoId}`).get()
-  const creatorId = videoSnap.data()?.userId
+
+export const onLikeDelete = onDocumentDeleted('videos/{videoId}/likes/{userId}', async (e) => {
+  const videoRef = db.doc(`videos/${e.params.videoId}`)
+  await videoRef.update({
+    likes: FieldValue.increment(-1),
+    likedBy: FieldValue.arrayRemove(e.params.userId),
+  }).catch((err) => console.warn('onLikeDelete:', err?.message ?? err))
+  const creatorId = (await videoRef.get()).data()?.userId
   if (creatorId) await db.doc(`users/${creatorId}`).update({ totalLikes: FieldValue.increment(-1) })
 })
 
 /* ---------- SAVES : videos/{videoId}/saves/{userId} ---------- */
 export const onSaveCreate = onDocumentCreated('videos/{videoId}/saves/{userId}', (e) =>
-  bump(`videos/${e.params.videoId}`, 'saves', 1),
+  db.doc(`videos/${e.params.videoId}`).update({
+    saves: FieldValue.increment(1),
+    savedBy: FieldValue.arrayUnion(e.params.userId),
+  }).catch((err) => console.warn('onSaveCreate:', err?.message ?? err)),
 )
 export const onSaveDelete = onDocumentDeleted('videos/{videoId}/saves/{userId}', (e) =>
-  bump(`videos/${e.params.videoId}`, 'saves', -1),
+  db.doc(`videos/${e.params.videoId}`).update({
+    saves: FieldValue.increment(-1),
+    savedBy: FieldValue.arrayRemove(e.params.userId),
+  }).catch((err) => console.warn('onSaveDelete:', err?.message ?? err)),
 )
 
-/* ---------- COMMENTS : videos/{videoId}/comments/{commentId} ---------- */
-export const onCommentCreate = onDocumentCreated('videos/{videoId}/comments/{commentId}', (e) =>
-  bump(`videos/${e.params.videoId}`, 'comments', 1),
-)
-export const onCommentDelete = onDocumentDeleted('videos/{videoId}/comments/{commentId}', (e) =>
-  bump(`videos/${e.params.videoId}`, 'comments', -1),
-)
+/* ---------- COMMENTS ---------- */
+export const onCommentCreate = onDocumentCreated('videos/{videoId}/comments/{commentId}', async (e) => {
+  const c = e.data?.data(); if (!c) return
+  const videoRef = db.doc(`videos/${e.params.videoId}`)
+  const preview = {
+    id: e.params.commentId,
+    text: c.text ?? '',
+    authorName: c.authorName ?? 'Utilisateur',
+    authorPhoto: c.authorPhoto ?? null,
+    likes: 0,
+  }
+  await db.runTransaction(async (tx) => {
+    const prev = (await tx.get(videoRef)).data()?.previewComments ?? []
+    tx.update(videoRef, {
+      comments: FieldValue.increment(1),
+      previewComments: [preview, ...prev].slice(0, 3),
+    })
+  }).catch((err) => console.warn('onCommentCreate:', err?.message ?? err))
+})
+
+export const onCommentDelete = onDocumentDeleted('videos/{videoId}/comments/{commentId}', (e) => {
+  const replyCount = e.data?.get('replyCount') ?? 0   // ✅ décompte le commentaire + ses réponses
+  return db.doc(`videos/${e.params.videoId}`)
+    .update({ comments: FieldValue.increment(-1 - replyCount) })
+    .catch((err) => console.warn('onCommentDelete:', err?.message ?? err))
+})
 
 /* ---------- COMMENTS → CREATOR totalComments ---------- */
 export const onCommentUpdateCreatorTotal = onDocumentCreated('videos/{videoId}/comments/{commentId}', async (event) => {
@@ -66,6 +92,20 @@ export const onCommentDeleteCreatorTotal = onDocumentDeleted('videos/{videoId}/c
   if (creatorId) await db.doc(`users/${creatorId}`).update({ totalComments: FieldValue.increment(-1) }).catch(() => {})
 })
 
+/* ---------- REPLIES : videos/{v}/comments/{c}/replies/{r} ---------- */
+export const onReplyCreate = onDocumentCreated('videos/{videoId}/comments/{commentId}/replies/{replyId}', (e) =>
+  Promise.all([
+    db.doc(`videos/${e.params.videoId}/comments/${e.params.commentId}`).update({ replyCount: FieldValue.increment(1) }),
+    db.doc(`videos/${e.params.videoId}`).update({ comments: FieldValue.increment(1) }),
+  ]).catch((err) => console.warn('onReplyCreate:', err?.message ?? err)),
+)
+export const onReplyDelete = onDocumentDeleted('videos/{videoId}/comments/{commentId}/replies/{replyId}', (e) =>
+  Promise.all([
+    db.doc(`videos/${e.params.videoId}/comments/${e.params.commentId}`).update({ replyCount: FieldValue.increment(-1) }),
+    db.doc(`videos/${e.params.videoId}`).update({ comments: FieldValue.increment(-1) }),
+  ]).catch((err) => console.warn('onReplyDelete:', err?.message ?? err)),
+)
+
 /* ---------- VIEWS : videos/{videoId}/views/{userId} (une par user) ---------- */
 export const onViewCreate = onDocumentCreated('videos/{videoId}/views/{userId}', (e) =>
   bump(`videos/${e.params.videoId}`, 'views', 1),
@@ -78,14 +118,37 @@ export const onViewUpdateCreatorTotal = onDocumentCreated('videos/{videoId}/view
   if (creatorId) await db.doc(`users/${creatorId}`).update({ totalViews: FieldValue.increment(1) }).catch(() => {})
 })
 
-/* ---------- REPOSTS : collection top-level reposts, champ postId ---------- */
-export const onRepostCreate = onDocumentCreated('reposts/{repostId}', (e) => {
-  const videoId = e.data?.get('postId')
-  return videoId ? bump(`videos/${videoId}`, 'reposts', 1) : null
+/* ---------- REPOSTS ---------- */
+export const onRepostCreate = onDocumentCreated('reposts/{repostId}', async (e) => {
+  const { userId, postId } = e.data?.data() ?? {}
+  if (!userId || !postId) return
+  const userName = (await db.doc(`users/${userId}`).get()).data()?.pseudo ?? userId
+  await db.doc(`videos/${postId}`).update({
+    reposts: FieldValue.increment(1),
+    repostedBy: FieldValue.arrayUnion(userId),
+    latestRepostedBy: { userId, userName },
+  }).catch((err) => console.warn('onRepostCreate:', err?.message ?? err))
 })
-export const onRepostDelete = onDocumentDeleted('reposts/{repostId}', (e) => {
-  const videoId = e.data?.get('postId')
-  return videoId ? bump(`videos/${videoId}`, 'reposts', -1) : null
+
+export const onRepostDelete = onDocumentDeleted('reposts/{repostId}', async (e) => {
+  const { userId, postId } = e.data?.data() ?? {}
+  if (!userId || !postId) return
+  const videoRef = db.doc(`videos/${postId}`)
+  await db.runTransaction(async (tx) => {
+    const remaining = ((await tx.get(videoRef)).data()?.repostedBy ?? []).filter((id: string) => id !== userId)
+    const update: Record<string, any> = {
+      reposts: FieldValue.increment(-1),
+      repostedBy: FieldValue.arrayRemove(userId),
+    }
+    if (remaining.length > 0) {
+      const last = remaining[remaining.length - 1]
+      const lastName = (await db.doc(`users/${last}`).get()).data()?.pseudo ?? last
+      update.latestRepostedBy = { userId: last, userName: lastName }
+    } else {
+      update.latestRepostedBy = FieldValue.delete()
+    }
+    tx.update(videoRef, update)
+  }).catch((err) => console.warn('onRepostDelete:', err?.message ?? err))
 })
 
 /* ---------- SHARES : collection top-level shares, champ postId ---------- */
@@ -346,4 +409,70 @@ export const deleteAccount = onCall(async (request) => {
   await getAuth().deleteUser(uid)
 
   return { ok: true }
+})
+
+/* ==========================================================
+   HOT SCORE — ranking global (engagement + fraîcheur)
+   La partie perso (affinité, watch ratio) reste côté client.
+   ========================================================== */
+const HOT_FRESHNESS_TAU = 36        // heures, identique au client
+const HOT_DECAY_WINDOW_DAYS = 14    // au-delà, on ne rafraîchit plus la fraîcheur
+
+function computeHotScore(data: FirebaseFirestore.DocumentData, now = Date.now()): number {
+  const engagement =
+    Math.log1p(data.likes ?? 0) * 1.0 +
+    Math.log1p(data.comments ?? 0) * 1.5 +
+    Math.log1p(data.shares ?? 0) * 2.0 +
+    Math.log1p(data.saves ?? 0) * 1.8
+
+  const createdMs = data.createdAt?.toMillis?.() ?? now
+  const ageHours = Math.max(0, (now - createdMs) / 3_600_000)
+  const freshness = Math.exp(-ageHours / HOT_FRESHNESS_TAU)
+
+  // Même pondération que scoreVideo côté client (partie globale)
+  return Number((engagement * 1.0 + freshness * 4.0).toFixed(4))
+}
+
+/* --- Événementiel : recalcule quand un compteur change --- */
+export const onVideoWriteHotScore = onDocumentWritten('videos/{videoId}', async (event) => {
+  const after = event.data?.after
+  if (!after?.exists) return                     // vidéo supprimée
+  const before = event.data?.before?.data()
+  const data = after.data()!
+
+  // ✅ Anti-boucle : si SEULS hotScore/hotScoreUpdatedAt ont changé, on stoppe
+  const engagementChanged = !before ||
+    before.likes !== data.likes ||
+    before.comments !== data.comments ||
+    before.shares !== data.shares ||
+    before.saves !== data.saves ||
+    before.createdAt?.toMillis?.() !== data.createdAt?.toMillis?.()
+  if (!engagementChanged) return
+
+  const hotScore = computeHotScore(data)
+  if (data.hotScore === hotScore) return         // rien à écrire
+
+  await after.ref.update({
+    hotScore,
+    hotScoreUpdatedAt: FieldValue.serverTimestamp(),
+  }).catch((e) => console.warn('onVideoWriteHotScore:', e?.message ?? e))
+})
+
+/* --- Planifié : rafraîchit la fraîcheur des vidéos récentes --- */
+export const refreshHotScores = onSchedule('every 60 minutes', async () => {
+  const cutoff = new Date(Date.now() - HOT_DECAY_WINDOW_DAYS * 86_400_000)
+  const snap = await db.collection('videos')
+    .where('createdAt', '>=', cutoff)
+    .get()
+
+  const now = Date.now()
+  let batch = db.batch()
+  let ops = 0
+  for (const d of snap.docs) {
+    const hotScore = computeHotScore(d.data(), now)
+    if (d.data().hotScore === hotScore) continue
+    batch.update(d.ref, { hotScore })
+    if (++ops === 450) { await batch.commit(); batch = db.batch(); ops = 0 }  // limite 500/batch
+  }
+  if (ops > 0) await batch.commit()
 })

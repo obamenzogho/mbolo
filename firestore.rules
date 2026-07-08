@@ -2,199 +2,207 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ===== Helpers (lisibilité + validation) =====
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+    // Un tableau ne peut que basculer l'uid de l'appelant (follow, likedBy, viewedBy…)
+    function togglesSelfOnly(field) {
+      return
+        ( request.resource.data[field].hasAny([request.auth.uid]) &&
+          ( !(field in resource.data) || !resource.data[field].hasAny([request.auth.uid]) ) )
+        ||
+        ( (field in resource.data) &&
+          resource.data[field].hasAny([request.auth.uid]) &&
+          !request.resource.data[field].hasAny([request.auth.uid]) );
+    }
+
     match /users/{userId} {
+      // ⚠️ read public conservé pour u/[pseudo] + deep links.
+      // NE STOCKE JAMAIS email/tel/données privées dans ce doc.
       allow read: if true;
-      allow create: if request.auth != null && request.auth.uid == userId;
-      allow update: if request.auth != null && (
-        // Owner can update profile fields — but NOT verified
-        (request.auth.uid == userId &&
-         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['verified'])) ||
-
-        // Follow public (ajout followers)
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followers', 'followerCount']) &&
-         request.resource.data.followers.hasAny([request.auth.uid]) &&
-         (!('followers' in resource.data) || !resource.data.followers.hasAny([request.auth.uid]))) ||
-
-        // Unfollow (retrait followers)
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followers', 'followerCount']) &&
+      allow create: if isOwner(userId);
+      allow update: if isSignedIn() && (
+        request.auth.uid == userId ||
+        (changedKeys().hasOnly(['followers','followerCount']) && togglesSelfOnly('followers')) ||
+        (changedKeys().hasOnly(['followers','followerCount']) &&
          'followers' in resource.data &&
          resource.data.followers.hasAny([request.auth.uid]) &&
          !request.resource.data.followers.hasAny([request.auth.uid])) ||
-
-        // Demande follow privé (ajout pendingFollowers)
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingFollowers']) &&
-         request.resource.data.pendingFollowers.hasAny([request.auth.uid]) &&
-         (!('pendingFollowers' in resource.data) || !resource.data.pendingFollowers.hasAny([request.auth.uid]))) ||
-
-        // Annulation / rejet demande (retrait pendingFollowers)
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingFollowers']) &&
+        (changedKeys().hasOnly(['pendingFollowers']) && togglesSelfOnly('pendingFollowers')) ||
+        (changedKeys().hasOnly(['pendingFollowers']) &&
          'pendingFollowers' in resource.data &&
          resource.data.pendingFollowers.hasAny([request.auth.uid]) &&
          !request.resource.data.pendingFollowers.hasAny([request.auth.uid])) ||
-
-        // Annulation / rejet demande (retrait pendingFollowings)
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingFollowings']) &&
+        (changedKeys().hasOnly(['pendingFollowings']) &&
          'pendingFollowings' in resource.data &&
          resource.data.pendingFollowings.hasAny([request.auth.uid]) &&
          !request.resource.data.pendingFollowings.hasAny([request.auth.uid])) ||
-
-        // Acceptation follow (ajout following + retrait pendingFollowings)
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['following', 'followingCount', 'pendingFollowings']) &&
+        (changedKeys().hasOnly(['following','followingCount','pendingFollowings']) &&
          request.resource.data.following.hasAny([request.auth.uid]) &&
          (!('following' in resource.data) || !resource.data.following.hasAny([request.auth.uid])) &&
          'pendingFollowings' in resource.data &&
          resource.data.pendingFollowings.hasAny([request.auth.uid]) &&
          !request.resource.data.pendingFollowings.hasAny([request.auth.uid])) ||
-
-        // Quelqu'un me bloque : il peut ajouter/retirer MON blockedBy + se retirer de mes followers
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['blockedBy', 'followers', 'following']) &&
-         (
-           (request.resource.data.blockedBy.hasAny([request.auth.uid])
-            && (!('blockedBy' in resource.data) || !resource.data.blockedBy.hasAny([request.auth.uid])))
-           ||
-           ('blockedBy' in resource.data && resource.data.blockedBy.hasAny([request.auth.uid])
-            && !request.resource.data.blockedBy.hasAny([request.auth.uid]))
-         ))
+        // blocage : seul l'appelant peut (se) toggler dans blockedBy
+        (changedKeys().hasOnly(['blockedBy','followers','following']) && togglesSelfOnly('blockedBy'))
       );
+      allow delete: if isOwner(userId);
     }
 
+    // Le mapping username appartient à l'appelant (uid)
     match /usernames/{username} {
       allow read: if true;
-      allow create: if request.auth != null;
+      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
     }
 
-    // SECURITY WARNING: counters (likes, saves, views, shares, reposts, comments)
-    // are written by the client via increment(). Firestore rules cannot enforce
-    // increment-only semantics — a malicious client can set likes: 999999 directly.
-    // TODO: move to Cloud Functions once project is on Blaze plan.
-    //
-    // moderationStatus, hiddenAt, hiddenReason are SERVER-ONLY (Cloud Functions).
-    // No client can write these fields — enforced in create/update rules below.
     match /videos/{videoId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null
+      allow read: if isSignedIn();
+      // l'auteur déclaré = l'appelant ; moderationStatus/hiddenAt/hiddenReason SERVER-ONLY
+      allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid
-        && !('moderationStatus' in request.resource.data);
-      allow update: if request.auth != null && (
-        // Owner can edit their fields, but NEVER moderation fields
-        (request.auth.uid == resource.data.userId
-          && !request.resource.data.diff(resource.data).affectedKeys()
-               .hasAny(['moderationStatus', 'hiddenAt', 'hiddenReason']))
-        ||
-        // Counter updates reserved for Cloud Functions (temporarily client-side)
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['likes', 'likedBy', 'comments', 'commentCount', 'previewComments', 'saves', 'savedBy', 'shares', 'views', 'reposts', 'repostedBy', 'latestRepostedBy'])
-      );
-      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
+        && !('moderationStatus' in request.resource.data)
+        && !('hiddenAt' in request.resource.data)
+        && !('hiddenReason' in request.resource.data);
+      // ✅ VERROU : compteurs & tableaux (likes/likedBy/saves/savedBy/reposts/
+      // repostedBy/latestRepostedBy/comments/previewComments/shares/views) sont
+      // possédés par les Cloud Functions (Admin SDK). Le client ne touche le doc
+      // vidéo que s'il en est l'auteur, et jamais les champs de modération.
+      allow update: if isSignedIn()
+        && request.auth.uid == resource.data.userId
+        && !changedKeys().hasAny(['moderationStatus','hiddenAt','hiddenReason']);
+      allow delete: if isSignedIn() && request.auth.uid == resource.data.userId;
 
-      match /likes/{userId} {
-        allow read: if request.auth != null;
-        allow create: if request.auth != null && request.auth.uid == userId;
-        allow delete: if request.auth != null && request.auth.uid == userId;
-      }
-
-      match /saves/{userId} {
-        allow read: if request.auth != null;
-        allow create: if request.auth != null && request.auth.uid == userId;
-        allow delete: if request.auth != null && request.auth.uid == userId;
-      }
-
+      // vue par user (onViewCreate côté serveur)
       match /views/{userId} {
-        allow read: if request.auth != null;
-        allow create: if request.auth != null && request.auth.uid == userId;
+        allow read: if isSignedIn();
+        allow create: if isOwner(userId);
         allow update, delete: if false;
       }
 
+      match /likes/{userId} {
+        allow read: if isSignedIn();
+        allow create, delete: if isOwner(userId);
+      }
+      match /saves/{userId} {
+        allow read: if isSignedIn();
+        allow create, delete: if isOwner(userId);
+      }
       match /comments/{commentId} {
-        allow read: if request.auth != null;
-        allow create: if request.auth != null && request.resource.data.text is string && request.resource.data.text.size() > 0;
-        allow update: if request.auth.uid == resource.data.userId || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likedBy', 'dislikes', 'dislikedBy', 'replyCount']);
-        allow delete: if request.auth.uid == resource.data.userId;
+        allow read: if isSignedIn();
+        // auteur = appelant, texte borné
+        allow create: if isSignedIn()
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 2000;
+        allow update: if isSignedIn() && (
+          request.auth.uid == resource.data.userId ||
+          ( changedKeys().hasOnly(['likes','likedBy','dislikes','dislikedBy','replyCount'])
+            && ( !changedKeys().hasAny(['likedBy'])    || togglesSelfOnly('likedBy') )
+            && ( !changedKeys().hasAny(['dislikedBy']) || togglesSelfOnly('dislikedBy') )
+          )
+        );
+        allow delete: if isSignedIn() && request.auth.uid == resource.data.userId;
 
         match /replies/{replyId} {
-          allow read: if request.auth != null;
-          allow create: if request.auth != null && request.resource.data.text is string && request.resource.data.text.size() > 0;
-          allow update: if request.auth.uid == resource.data.userId || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likedBy', 'dislikes', 'dislikedBy']);
-          allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
+          allow read: if isSignedIn();
+          allow create: if isSignedIn()
+            && request.resource.data.userId == request.auth.uid
+            && request.resource.data.text is string
+            && request.resource.data.text.size() > 0
+            && request.resource.data.text.size() <= 2000;
+          allow update: if isSignedIn() && (
+            request.auth.uid == resource.data.userId ||
+            ( changedKeys().hasOnly(['likes','likedBy','dislikes','dislikedBy'])
+              && ( !changedKeys().hasAny(['likedBy'])    || togglesSelfOnly('likedBy') )
+              && ( !changedKeys().hasAny(['dislikedBy']) || togglesSelfOnly('dislikedBy') )
+            )
+          );
+          allow delete: if isSignedIn() && request.auth.uid == resource.data.userId;
         }
       }
     }
 
     match /messages/{messageId} {
-      allow read: if request.auth != null && resource.data.participants != null && resource.data.participants.hasAny([request.auth.uid]);
-      allow create: if request.auth != null && request.resource.data.senderId == request.auth.uid;
-      allow delete: if request.auth != null && request.auth.uid == resource.data.senderId;
+      allow read: if isSignedIn()
+        && resource.data.participants != null
+        && resource.data.participants.hasAny([request.auth.uid]);
+      // expéditeur = appelant ET participant
+      allow create: if isSignedIn()
+        && request.resource.data.senderId == request.auth.uid
+        && request.resource.data.participants.hasAny([request.auth.uid]);
+      allow delete: if isSignedIn() && request.auth.uid == resource.data.senderId;
     }
 
     match /conversations/{conversationId} {
-      allow read: if request.auth != null && (resource == null || resource.data.participants.hasAny([request.auth.uid]));
-      allow create: if request.auth != null && request.resource.data.participants.hasAny([request.auth.uid]);
-      allow update: if request.auth != null && resource.data.participants.hasAny([request.auth.uid]);
+      allow read: if isSignedIn()
+        && (resource == null || resource.data.participants.hasAny([request.auth.uid]));
+      allow create: if isSignedIn()
+        && request.resource.data.participants.hasAny([request.auth.uid]);
+      allow update: if isSignedIn()
+        && resource.data.participants.hasAny([request.auth.uid]);
       allow delete: if false;
 
       match /messages/{messageId} {
-        allow read: if request.auth != null && get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants.hasAny([request.auth.uid]);
-        allow create: if request.auth != null && request.resource.data.senderId == request.auth.uid;
+        allow read: if isSignedIn()
+          && get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants.hasAny([request.auth.uid]);
+        allow create: if isSignedIn() && request.resource.data.senderId == request.auth.uid;
         allow update: if false;
-        allow delete: if request.auth != null && request.auth.uid == resource.data.senderId;
+        allow delete: if isSignedIn() && request.auth.uid == resource.data.senderId;
       }
     }
 
     match /stories/{storyId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow update: if request.auth != null && (
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn() && (
         resource.data.userId == request.auth.uid ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views', 'viewedBy'])
+        ( changedKeys().hasOnly(['views','viewedBy']) && togglesSelfOnly('viewedBy') )
       );
-      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
 
     match /notifications/{notificationId} {
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.fromUserId == request.auth.uid;
-      allow update: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.fromUserId == request.auth.uid;
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
 
     match /reposts/{repostId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow update: if false;
     }
 
     match /highlights/{highlightId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow update: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
 
     match /shares/{shareId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null && request.resource.data.senderId == request.auth.uid;
-      allow delete: if request.auth != null && resource.data.senderId == request.auth.uid;
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.senderId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.senderId == request.auth.uid;
       allow update: if false;
     }
 
     match /reports/{reportId} {
-      allow create: if request.auth != null
+      allow create: if isSignedIn()
         && request.resource.data.reportedBy == request.auth.uid
         && request.resource.data.status == 'pending'
         && request.resource.data.reason is string
         && request.resource.data.targetId is string;
-      allow read, update, delete: if false;
-    }
-
-    match /hashtags/{tag} {
-      allow read: if request.auth != null;
-      allow write: if false;
-    }
-
-    match /analytics_events/{eventId} {
-      allow create: if request.auth != null;
-      allow read, update, delete: if false;
+      allow read: if false;
+      allow update: if false;
+      allow delete: if false;
     }
   }
 }

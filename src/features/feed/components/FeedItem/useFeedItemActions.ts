@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { doc, updateDoc, increment, arrayUnion, arrayRemove, setDoc, deleteDoc, getDoc } from 'firebase/firestore'
+import { doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore'
 import { auth, db } from '../../../../lib/firebase'
 import { createNotification } from '../../../../lib/notifications'
 import { captureException } from '../../../../lib/sentry'
@@ -24,7 +24,6 @@ export function useFeedItemActions(item: Video) {
     const user = auth.currentUser
     if (!user) return
     if (opts?.force && liked) return
-    const videoRef = doc(db, 'videos', item.id)
     const likeRef = doc(db, 'videos', item.id, 'likes', user.uid)
     const willLike = opts?.force ? true : !liked
 
@@ -33,12 +32,10 @@ export function useFeedItemActions(item: Video) {
 
     try {
       if (willLike) {
-        await setDoc(likeRef, { createdAt: Date.now() })
-        await updateDoc(videoRef, { likes: increment(1) })
+        await setDoc(likeRef, { userId: user.uid, createdAt: serverTimestamp() })
         createNotification({ userId: item.userId, type: 'like', fromUserId: user.uid, videoId: item.id })
       } else {
         await deleteDoc(likeRef)
-        await updateDoc(videoRef, { likes: increment(-1) })
       }
     } catch (e) {
       captureException(e instanceof Error ? e : new Error(String(e)), { context: 'toggleLike' })
@@ -53,8 +50,7 @@ export function useFeedItemActions(item: Video) {
     setLiked(true)
     setLikeCount((p) => p + 1)
     try {
-      await setDoc(doc(db, 'videos', item.id, 'likes', user.uid), { createdAt: Date.now() })
-      await updateDoc(doc(db, 'videos', item.id), { likes: increment(1) })
+      await setDoc(doc(db, 'videos', item.id, 'likes', user.uid), { userId: user.uid, createdAt: serverTimestamp() })
       createNotification({ userId: item.userId, type: 'like', fromUserId: user.uid, videoId: item.id })
     } catch (e) {
       captureException(e instanceof Error ? e : new Error(String(e)), { context: 'doubleTapLike' })
@@ -66,7 +62,6 @@ export function useFeedItemActions(item: Video) {
   const toggleSave = useCallback(async () => {
     const user = auth.currentUser
     if (!user) return
-    const videoRef = doc(db, 'videos', item.id)
     const saveRef = doc(db, 'videos', item.id, 'saves', user.uid)
     const willSave = !saved
 
@@ -75,11 +70,9 @@ export function useFeedItemActions(item: Video) {
 
     try {
       if (willSave) {
-        await setDoc(saveRef, { createdAt: Date.now() })
-        await updateDoc(videoRef, { saves: increment(1) })
+        await setDoc(saveRef, { userId: user.uid, createdAt: serverTimestamp() })
       } else {
         await deleteDoc(saveRef)
-        await updateDoc(videoRef, { saves: increment(-1) })
       }
     } catch (e) {
       captureException(e instanceof Error ? e : new Error(String(e)), { context: 'toggleSave' })
