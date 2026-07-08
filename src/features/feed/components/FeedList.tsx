@@ -17,12 +17,6 @@ function isSuggestionItem(item: FeedListItem): item is { type: 'suggestion'; key
   return 'type' in item && item.type === 'suggestion'
 }
 
-function flatToVideoIdx(flatIdx: number, mode: FeedMode, hasSuggestions: boolean): number {
-  if (!hasSuggestions) return flatIdx
-  if (mode === 'following') return Math.max(0, flatIdx - 1)
-  return flatIdx - Math.floor((flatIdx + 1) / SUGGESTION_STRIDE)
-}
-
 interface FeedListProps {
   videos: Video[]
   suggestions: FollowSuggestion[]
@@ -66,9 +60,8 @@ function FeedListComponent({
 }: FeedListProps) {
   const indexRef = useRef(currentIndex)
   indexRef.current = currentIndex
-  const hasSuggestions = !!suggestions && suggestions.length > 0
-  const hasSuggestionsRef = useRef(hasSuggestions)
-  hasSuggestionsRef.current = hasSuggestions
+  const videosRef = useRef(videos)
+  videosRef.current = videos
   const { height: SCREEN_HEIGHT } = useWindowDimensions()
   const insets = useSafeAreaInsets()
   const ITEM_HEIGHT = SCREEN_HEIGHT - insets.bottom
@@ -104,15 +97,14 @@ function FeedListComponent({
 
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: any[] }) => {
-      const videoItems = viewableItems.filter((v) => !(v.item && isSuggestionItem(v.item)))
+      const videoItems = viewableItems.filter((v) => v.item && !isSuggestionItem(v.item))
       if (videoItems.length === 0) return
-      const top = videoItems[0]
-      if (top && top.index != null) {
-        const videoIdx = flatToVideoIdx(top.index, feedType, hasSuggestionsRef.current)
-        if (videoIdx !== indexRef.current) {
-          setCurrentIndex(videoIdx)
-          setIsScrolling(false)
-        }
+      const topVideo = videoItems[0].item as Video
+      // index réel via l'ID, plus aucun calcul de décalage
+      const videoIdx = videosRef.current.findIndex((v) => v.id === topVideo.id)
+      if (videoIdx !== -1 && videoIdx !== indexRef.current) {
+        setCurrentIndex(videoIdx)
+        setIsScrolling(false)
       }
     },
   ).current
@@ -142,7 +134,7 @@ function FeedListComponent({
         )
       }
       const video = item as Video
-      const videoIndex = flatToVideoIdx(index, feedType, hasSuggestions)
+      const videoIndex = videos.findIndex((v) => v.id === video.id)
       return (
         <FeedItem
           item={video}
@@ -156,7 +148,7 @@ function FeedListComponent({
         />
       )
     },
-    [instanceId, onLongPress, onPressComment, onPressShare, onPressMore, suggestions, onDismissSuggestion, feedType, data, currentIndex],
+    [instanceId, onLongPress, onPressComment, onPressShare, onPressMore, suggestions, onDismissSuggestion, feedType, data, currentIndex, videos],
   )
 
   const keyExtractor = useCallback((item: FeedListItem) => {
