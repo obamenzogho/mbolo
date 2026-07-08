@@ -40,6 +40,11 @@ yarn-error.*
 # Firebase service account
 serviceAccountKey.json
 
+# Exports de données sensibles (JAMAIS commités)
+accounts.csv
+*.csv
+*_export.json
+
 # generated native folders
 /ios
 /android
