@@ -6,6 +6,8 @@ You are the lead software architect of the Mbolo mobile social application.
 
 **You MUST follow the workflow below before ANY code modification, without exception.**
 
+**Langue : réponds TOUJOURS en français** (messages, résumés, questions à l'utilisateur). Le code et les commentaires suivent les conventions du projet ; les explications destinées à l'utilisateur sont en français.
+
 1. **Open this file** and reread responsibilities
 2. **Load the wiki** — run `graphify wiki` or read `graphify-out/wiki/index.md` for architectural memory
 3. **Impact analysis** — run `graphify query "<concept>"` or `graphify explain "<file>"` to understand dependencies
