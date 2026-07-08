@@ -71,11 +71,21 @@ export function ProfileTabBar({ tabs, activeTab, onTabChange, swipeOffsetPx }: P
           onPress={() => handlePress(tab)}
           style={{ flex: 1, alignItems: 'center', paddingVertical: 10 }}
         >
-          <Ionicons
-            name={TAB_ICONS[tab]}
-            size={22}
-            color={activeTab === tab ? colors.white : '#555'}
-          />
+          <View>
+            <Ionicons
+              name={TAB_ICONS[tab]}
+              size={22}
+              color={activeTab === tab ? colors.white : '#555'}
+            />
+            {tab === 'grid' && (
+              <Ionicons
+                name="chevron-down"
+                size={12}
+                color={colors.primary}
+                style={{ position: 'absolute', top: -8, right: -10 }}
+              />
+            )}
+          </View>
         </TouchableOpacity>
       ))}
       <Reanimated.View

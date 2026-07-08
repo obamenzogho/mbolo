@@ -35,6 +35,7 @@ import { RichText } from '@/components/RichText'
 import { VerifiedBadge } from '@/components/VerifiedBadge'
 import { AvatarViewer } from '@/components/AvatarViewer'
 import { ContentActionsSheet } from '@/components/ContentActionsSheet'
+import { StatsCards } from '@/components/profile/StatsCards'
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 
@@ -56,8 +57,18 @@ export default function UserProfile() {
   const [imgError, setImgError] = useState(false)
   const [photoViewerVisible, setPhotoViewerVisible] = useState(false)
   const [ready, setReady] = useState(false)
-  const tabsHook = useProfileTabs({ userId: userId || '', tabs: ['grid', 'reels'] })
-  const { activeTab, setActiveTab, currentVideos, loading, refreshing, onRefresh: tabsRefresh, loadMore, hasMore } = tabsHook
+  const tabsHook = useProfileTabs({ userId: userId || '', tabs: ['grid'] })
+  const { activeTab, setActiveTab, currentVideos, loading, refreshing, onRefresh: tabsRefresh, loadMore, hasMore, gridVideos, reelVideos } = tabsHook
+  const [gridFilter, setGridFilter] = useState<'publications' | 'reels' | 'photos'>('publications')
+  const [filterOpen, setFilterOpen] = useState(false)
+
+  const filteredVideos = useMemo(() => {
+    if (activeTab !== 'grid') return currentVideos
+    if (gridFilter === 'reels') return reelVideos
+    if (gridFilter === 'photos') return []
+    return gridVideos
+  }, [activeTab, gridFilter, currentVideos, reelVideos, gridVideos])
+
   const [followersModal, setFollowersModal] = useState(false)
   const scrollRef = useRef<ScrollView>(null)
   const [tabLayouts, setTabLayouts] = useState<{ x: number; width: number }[]>([
@@ -126,7 +137,7 @@ export default function UserProfile() {
     })
   }, [userId, isFollowing, isFriend])
 
-  const tabConfig: ProfileTab[] = ['grid', 'reels']
+  const tabConfig: ProfileTab[] = ['grid']
 
   const translateX = useSharedValue(0)
   const swipeOffsetPx = useDerivedValue(() => {
@@ -135,9 +146,14 @@ export default function UserProfile() {
   })
 
   const handleTabChange = useCallback((tab: ProfileTab) => {
+    if (tab === 'grid' && activeTab === 'grid') {
+      setFilterOpen((p) => !p)
+      return
+    }
+    setFilterOpen(false)
     setActiveTab(tab)
     translateX.value = 0
-  }, [setActiveTab])
+  }, [setActiveTab, activeTab])
 
   const swipeGesture = Gesture.Pan()
     .minDistance(10)
@@ -203,7 +219,7 @@ export default function UserProfile() {
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
       <GestureDetector gesture={swipeGesture}>
         <VideoGrid
-          videos={currentVideos}
+          videos={filteredVideos}
           tab={activeTab}
           loading={loading}
           refreshing={refreshing}
@@ -231,19 +247,15 @@ export default function UserProfile() {
                     <Image source={{ uri: profile.photoURL }} onError={() => setImgError(true)} style={{ width: 84, height: 84, borderRadius: 42 }} />
                   ) : <Ionicons name="person" size={40} color="#555" />}
                 </TouchableOpacity>
-                <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'center' }}>
-                  <TouchableOpacity style={{ alignItems: 'center' }}>
-                    <Text style={{ color: colors.white, fontSize: 18, fontWeight: '700' }}>{currentVideos.length}</Text>
-                    <Text style={{ color: '#888', fontSize: 12 }}>Vidéos</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => openFollowList('followers')}>
-                    <Text style={{ color: colors.white, fontSize: 18, fontWeight: '700' }}>{followerCount}</Text>
-                    <Text style={{ color: '#888', fontSize: 12 }}>Abonnés</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => openFollowList('following')}>
-                    <Text style={{ color: colors.white, fontSize: 18, fontWeight: '700' }}>{followingCount}</Text>
-                    <Text style={{ color: '#888', fontSize: 12 }}>Abonnements</Text>
-                  </TouchableOpacity>
+                <View style={{ flex: 1, paddingLeft: 12 }}>
+                  <StatsCards
+                    videos={currentVideos.length}
+                    followers={followerCount}
+                    following={followingCount}
+                    onPressVideos={() => setActiveTab('grid')}
+                    onPressFollowers={() => openFollowList('followers')}
+                    onPressFollowing={() => openFollowList('following')}
+                  />
                 </View>
               </View>
 
@@ -303,12 +315,30 @@ export default function UserProfile() {
                 )}
               </View>
 
-              <ProfileTabBar
-                activeTab={activeTab}
-                onTabChange={handleTabChange}
-                tabs={tabConfig}
-                swipeOffsetPx={swipeOffsetPx}
-              />
+              <View style={{ position: 'relative', zIndex: 100 }}>
+                <ProfileTabBar
+                  activeTab={activeTab}
+                  onTabChange={handleTabChange}
+                  tabs={tabConfig}
+                  swipeOffsetPx={swipeOffsetPx}
+                />
+                {filterOpen && (
+                  <View style={{ position: 'absolute', top: 44, left: 8, backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.border, elevation: 10 }}>
+                    {(['publications', 'reels', 'photos'] as const).map((opt) => (
+                      <TouchableOpacity
+                        key={opt}
+                        onPress={() => { setGridFilter(opt); setFilterOpen(false) }}
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10, minWidth: 140 }}
+                      >
+                        <Ionicons name={opt === 'reels' ? 'film-outline' : opt === 'photos' ? 'image-outline' : 'grid-outline'} size={16} color={gridFilter === opt ? colors.primary : colors.textMuted} />
+                        <Text style={{ color: gridFilter === opt ? colors.primary : colors.white, fontSize: 14, fontWeight: gridFilter === opt ? '700' : '400' }}>
+                          {opt === 'reels' ? 'Réel' : opt === 'photos' ? 'Photo' : 'Publications'}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
             </View>
           }
           />

@@ -28,7 +28,7 @@ export interface User {
   genre?: 'homme' | 'femme' | 'non-binaire' | 'prefere-ne-pas-dire'
 }
 
-export type ProfileTab = 'grid' | 'reels' | 'saved' | 'liked' | 'reposted' | 'tagged'
+export type ProfileTab = 'grid' | 'saved' | 'liked' | 'reposted' | 'tagged'
 
 export interface Repost {
   id: string

@@ -65,7 +65,9 @@ export default function Explore() {
           Artistes gabonais
         </Text>
         {loading ? (
-          <OrbitLoader size={80} />
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <OrbitLoader size={80} />
+          </View>
         ) : (
           <FlatList
             horizontal

@@ -17,7 +17,7 @@ interface UseProfileTabsOptions {
 }
 
 export function useProfileTabs({ userId, tabs: allowedTabs }: UseProfileTabsOptions) {
-  const allTabs = allowedTabs ?? ['grid', 'reels', 'saved', 'liked']
+  const allTabs = allowedTabs ?? ['grid', 'saved', 'liked']
   const [activeTab, setActiveTab] = useState<ProfileTab>(allTabs[0])
 
   const [ownVideos, setOwnVideos] = useState<VideoType[]>([])
@@ -53,7 +53,7 @@ export function useProfileTabs({ userId, tabs: allowedTabs }: UseProfileTabsOpti
   const [refreshing, setRefreshing] = useState(false)
 
   const fetchPage = useCallback(async (tab: ProfileTab, isRefresh = false) => {
-    if (tab === 'grid' || tab === 'reels') {
+    if (tab === 'grid') {
       if (!isRefresh && (ownLoading || (!ownHasMore.current && ownLoaded.current))) return
       setOwnLoading(true)
       try {
@@ -151,7 +151,7 @@ export function useProfileTabs({ userId, tabs: allowedTabs }: UseProfileTabsOpti
   }, [userId])
 
   useEffect(() => {
-    const loaded = activeTab === 'grid' || activeTab === 'reels' ? ownLoaded.current
+    const loaded = activeTab === 'grid' ? ownLoaded.current
       : activeTab === 'saved' ? savedLoaded.current
       : activeTab === 'liked' ? likedLoaded.current
       : activeTab === 'reposted' ? repostedLoaded.current
@@ -165,21 +165,20 @@ export function useProfileTabs({ userId, tabs: allowedTabs }: UseProfileTabsOpti
 
   const currentVideos = useMemo(() => {
     if (activeTab === 'grid') return gridVideos
-    if (activeTab === 'reels') return reelVideos
     if (activeTab === 'saved') return savedVideos
     if (activeTab === 'liked') return likedVideos
     if (activeTab === 'reposted') return repostedVideos
     if (activeTab === 'tagged') return taggedVideos
     return []
-  }, [activeTab, gridVideos, reelVideos, savedVideos, likedVideos, repostedVideos, taggedVideos])
+  }, [activeTab, gridVideos, savedVideos, likedVideos, repostedVideos, taggedVideos])
 
-  const loading = activeTab === 'grid' || activeTab === 'reels' ? ownLoading
+  const loading = activeTab === 'grid' ? ownLoading
     : activeTab === 'saved' ? savedLoading
     : activeTab === 'liked' ? likedLoading
     : activeTab === 'tagged' ? taggedLoading
     : repostedLoading
 
-  const hasMore = activeTab === 'grid' || activeTab === 'reels' ? ownHasMore.current
+  const hasMore = activeTab === 'grid' ? ownHasMore.current
     : activeTab === 'saved' ? savedHasMore.current
     : activeTab === 'liked' ? likedHasMore.current
     : activeTab === 'tagged' ? taggedHasMore.current

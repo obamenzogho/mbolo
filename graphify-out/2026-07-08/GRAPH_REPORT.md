@@ -1,16 +1,16 @@
-# Graph Report - mbolo  (2026-07-07)
+# Graph Report - mbolo  (2026-07-08)
 
 ## Corpus Check
-- 266 files · ~604,153 words
+- 267 files · ~604,185 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 3570 nodes · 3905 edges · 2020 communities (76 shown, 1944 thin omitted)
+- 3571 nodes · 3906 edges · 2026 communities (81 shown, 1945 thin omitted)
 - Extraction: 77% EXTRACTED · 23% INFERRED · 0% AMBIGUOUS · INFERRED: 888 edges (avg confidence: 0.84)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `f9b93397`
+- Built from commit: `eb571f32`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -37,13 +37,16 @@
 - [[_COMMUNITY_index.js|index.js]]
 - [[_COMMUNITY_FeedTabsScreen.tsx|FeedTabsScreen.tsx]]
 - [[_COMMUNITY_FeedScreen.tsx|FeedScreen.tsx]]
+- [[_COMMUNITY_sentry.ts|sentry.ts]]
 - [[_COMMUNITY_compilerOptions|compilerOptions]]
 - [[_COMMUNITY_babel.config.js|babel.config.js]]
+- [[_COMMUNITY_Feature Comments & Sharing|Feature: Comments & Sharing]]
 - [[_COMMUNITY_ActionBar.tsx|ActionBar.tsx]]
 - [[_COMMUNITY_sentry.ts|sentry.ts]]
 - [[_COMMUNITY_migrate-pseudo-lower.ts|migrate-pseudo-lower.ts]]
 - [[_COMMUNITY_ErrorBoundary.tsx|ErrorBoundary.tsx]]
 - [[_COMMUNITY_captureException|captureException]]
+- [[_COMMUNITY_ProfileVideoViewer.tsx|ProfileVideoViewer.tsx]]
 - [[_COMMUNITY_index.tsx|index.tsx]]
 - [[_COMMUNITY_ffmpeg-kit-plugin.js|ffmpeg-kit-plugin.js]]
 - [[_COMMUNITY_FeedTabsScreen.tsx|FeedTabsScreen.tsx]]
@@ -56,18 +59,22 @@
 - [[_COMMUNITY_GifPicker.tsx|GifPicker.tsx]]
 - [[_COMMUNITY_playwright-reportresults.json|playwright-report/results.json]]
 - [[_COMMUNITY_playwright.config.ts|playwright.config.ts]]
+- [[_COMMUNITY_analyticsService.ts|analyticsService.ts]]
+- [[_COMMUNITY_useVideoPlayerPool.ts|useVideoPlayerPool.ts]]
 - [[_COMMUNITY_Role App Shell & Routing|Role: App Shell & Routing]]
 - [[_COMMUNITY_VideoCache.ts|VideoCache.ts]]
 - [[_COMMUNITY_FeedScreen.tsx|FeedScreen.tsx]]
 - [[_COMMUNITY_srccomponentsCommentModal.tsx|src/components/CommentModal.tsx]]
+- [[_COMMUNITY_arch-check.sh|arch-check.sh]]
 - [[_COMMUNITY_BottomTabBar.tsx|BottomTabBar.tsx]]
 - [[_COMMUNITY_storage.ts|storage.ts]]
+- [[_COMMUNITY_ErrorBoundary|ErrorBoundary]]
 - [[_COMMUNITY_metro.config.js|metro.config.js]]
 - [[_COMMUNITY_patch-ffmpeg-podspec.js|patch-ffmpeg-podspec.js]]
 - [[_COMMUNITY_FollowContext.tsx|FollowContext.tsx]]
 - [[_COMMUNITY_env.ts|env.ts]]
-- [[_COMMUNITY_ErrorBoundary.tsx|ErrorBoundary.tsx]]
-- [[_COMMUNITY_QueryErrorMessage.tsx|QueryErrorMessage.tsx]]
+- [[_COMMUNITY_MboloBottomSheet.tsx|MboloBottomSheet.tsx]]
+- [[_COMMUNITY_DataSaverContext.tsx|DataSaverContext.tsx]]
 - [[_COMMUNITY_srcfeaturesfeedanalyticsfeedTracker.ts|src/features/feed/analytics/feedTracker.ts]]
 - [[_COMMUNITY_srcfeaturesfeedcomponentsFeedEmptyState.tsx|src/features/feed/components/FeedEmptyState.tsx]]
 - [[_COMMUNITY_srcfeaturesfeedcomponentsFeedPage.tsx|src/features/feed/components/FeedPage.tsx]]
@@ -89,7 +96,6 @@
 - [[_COMMUNITY_index.tsx|index.tsx]]
 - [[_COMMUNITY_ffmpeg-kit-plugin.js|ffmpeg-kit-plugin.js]]
 - [[_COMMUNITY_GalleryPicker.tsx|GalleryPicker.tsx]]
-- [[_COMMUNITY_helpers.ts|helpers.ts]]
 - [[_COMMUNITY_ErrorBoundary.tsx|ErrorBoundary.tsx]]
 - [[_COMMUNITY_DatePicker.tsx|DatePicker.tsx]]
 - [[_COMMUNITY_compilerOptions|compilerOptions]]
@@ -1992,7 +1998,6 @@
 - [[_COMMUNITY_cmd|cmd]]
 - [[_COMMUNITY_cmd|cmd]]
 - [[_COMMUNITY_cmd|cmd]]
-- [[_COMMUNITY_cmd|cmd]]
 - [[_COMMUNITY_compressVideo|compressVideo]]
 - [[_COMMUNITY_..configdevMode|../config/devMode]]
 - [[_COMMUNITY_convertToMp4|convertToMp4]]
@@ -2047,77 +2052,77 @@
 10. `BackButton` - 15 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `checkRepostStatus()` --calls--> `query()`  [INFERRED]
+  src/features/repost/services/repostService.ts → scripts/graphify-cli.js
 - `Login()` --calls--> `query()`  [INFERRED]
   app/(auth)/login.tsx → scripts/graphify-cli.js
 - `Register()` --calls--> `query()`  [INFERRED]
   app/(auth)/register.tsx → scripts/graphify-cli.js
-- `Messages()` --indirect_call--> `chunk()`  [INFERRED]
-  app/(tabs)/messages.tsx → scripts/generate-mbolo-logo.js
 - `Messages()` --calls--> `query()`  [INFERRED]
   app/(tabs)/messages.tsx → scripts/graphify-cli.js
 - `Notifications()` --calls--> `query()`  [INFERRED]
   app/(tabs)/notifications.tsx → scripts/graphify-cli.js
 
 ## Import Cycles
-- None detected.
+- 2-file cycle: `src/lib/firebase.ts -> src/lib/sentry.ts -> src/lib/firebase.ts`
 
-## Communities (2020 total, 1944 thin omitted)
+## Communities (2026 total, 1945 thin omitted)
 
 ### Community 1 - "app/(auth)/_layout.tsx"
-Cohesion: 0.14
-Nodes (11): app/(auth)/_layout.tsx, app/(auth)/login.tsx, app/(auth)/register.tsx, app/index.tsx, app/_layout.tsx, app/settings/index.tsx, app/(tabs)/_layout.tsx, Feature: Auth & Onboarding (+3 more)
+Cohesion: 0.15
+Nodes (14): app/(auth)/_layout.tsx, app/(auth)/login.tsx, app/(auth)/register.tsx, app/index.tsx, app/_layout.tsx, app/post.tsx, app/settings/index.tsx, app/(tabs)/_layout.tsx (+6 more)
 
 ### Community 2 - "app/(auth)/login.tsx"
 Cohesion: 0.11
-Nodes (16): CreateButtonComponent(), CreateButtonProps, CreateModalProps, OPTIONS, CreateOptionComponent(), CreateOptionProps, ShareModal(), ShareOption() (+8 more)
+Nodes (18): CreateButtonComponent(), CreateButtonProps, CreateOptionComponent(), CreateOptionProps, ShareModal(), ShareOption(), TAB_ICONS, TAB_LABELS (+10 more)
 
 ### Community 3 - "app/(auth)/register.tsx"
 Cohesion: 0.05
 Nodes (41): CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET, CRITICAL_REASONS, db, decayTrendingScores, deleteAccount, onCommentCreate, onCommentDelete (+33 more)
 
 ### Community 4 - "app/(tabs)/_layout.tsx"
-Cohesion: 0.27
-Nodes (10): useFeedData(), diversify(), EMPTY_TASTE, rankVideos(), scoreVideo(), UserTaste, buildUserTaste(), getBlockedUserIds() (+2 more)
+Cohesion: 0.22
+Nodes (13): FeedScreen(), useFeedData(), useFollowingFeedData(), diversify(), EMPTY_TASTE, rankVideos(), scoreVideo(), UserTaste (+5 more)
 
 ### Community 5 - "app/(tabs)/camera.tsx"
-Cohesion: 0.13
-Nodes (14): CaptionBlock, CaptionBlockProps, styles, CommentPreview, CommentPreviewProps, styles, FeedItemProps, styles (+6 more)
+Cohesion: 0.11
+Nodes (15): CaptionBlock, CaptionBlockProps, styles, CommentPreview, CommentPreviewProps, styles, FeedItemProps, styles (+7 more)
 
 ### Community 6 - "app/(tabs)/edit-profile.tsx"
-Cohesion: 0.05
-Nodes (49): CameraScreen(), Feature: Comments & Sharing, Role: Comments & Sharing, generateMatrix(), isReserved(), QRCodeView(), QRCodeViewProps, src/components/QRCodeView.tsx (+41 more)
+Cohesion: 0.12
+Nodes (21): CommentInputProps, QUICK_EMOJIS, styles, CommentData, CommentItem, CommentItemComponent(), CommentItemProps, formatTimeAgo() (+13 more)
 
 ### Community 7 - "app/(tabs)/explore.tsx"
 Cohesion: 0.23
 Nodes (7): AUTH_ERRORS, generateSuggestions(), getFirebaseError(), Register(), EyeIcon(), EyeOffIcon(), IconProps
 
 ### Community 8 - "app/(tabs)/feed.tsx"
-Cohesion: 0.17
-Nodes (15): PostScreen(), SUGGESTED_HASHTAGS, Visibility, { height: SCREEN_HEIGHT }, ReelUploadScreen(), Upload(), Step, SUGGESTED_HASHTAGS (+7 more)
+Cohesion: 0.13
+Nodes (21): PostScreen(), SUGGESTED_HASHTAGS, Visibility, { height: SCREEN_HEIGHT }, ReelUploadScreen(), Step, SUGGESTED_HASHTAGS, VideoEditorScreen() (+13 more)
 
 ### Community 9 - "app/(tabs)/highlight/[highlightId].tsx"
-Cohesion: 0.11
-Nodes (31): StoriesScreen(), app/(tabs)/stories.tsx, { width: SCREEN_WIDTH, height: SCREEN_HEIGHT }, StoryUploadScreen(), Feature: Stories & Highlights, Role: Stories & Highlights, HighlightPickerModal(), HighlightPickerModalProps (+23 more)
+Cohesion: 0.13
+Nodes (28): StoriesScreen(), app/(tabs)/stories.tsx, { width: SCREEN_WIDTH, height: SCREEN_HEIGHT }, Feature: Stories & Highlights, Role: Stories & Highlights, HighlightPickerModal(), HighlightPickerModalProps, styles (+20 more)
 
 ### Community 10 - "app/(tabs)/messages.tsx"
-Cohesion: 0.18
-Nodes (9): react, FeedItemComponent(), mockCaptureException, mockCreateNotification, mockDeleteDoc, mockSetDoc, mockUpdateDoc, renderActions() (+1 more)
+Cohesion: 0.19
+Nodes (10): react, mockCaptureException, mockCreateNotification, mockDeleteDoc, mockSetDoc, mockUpdateDoc, renderActions(), useFeedItemActions() (+2 more)
 
 ### Community 12 - "app/(tabs)/profile.tsx"
-Cohesion: 0.29
-Nodes (6): AuthorInfo, AuthorInfoProps, styles, cache, FollowState, useFollowFast()
+Cohesion: 0.15
+Nodes (17): app/(tabs)/edit-profile.tsx, app/(tabs)/profile.tsx, app/(tabs)/user/[userId].tsx, Convention: Custom Hooks pattern (src/hooks/), Feature: Profile & Users, Role: Profile & Users, AuthorInfo, AuthorInfoProps (+9 more)
 
 ### Community 13 - "app/(tabs)/reel-upload.tsx"
-Cohesion: 0.22
-Nodes (13): ProfileTabBarProps, VideoGridProps, getRepostedVideos(), useProfileTabs(), UseProfileTabsOptions, getErrorCode(), isIndexError(), RetryOptions (+5 more)
+Cohesion: 0.20
+Nodes (14): ProfileTabBarProps, VideoGridProps, checkRepostStatus(), getRepostedVideos(), useProfileTabs(), UseProfileTabsOptions, getErrorCode(), isIndexError() (+6 more)
 
 ### Community 14 - "app/(tabs)/stories.tsx"
 Cohesion: 0.23
 Nodes (14): ContentActionsSheet(), Props, Props, ReportModal(), styles, VideoOptionsSheet(), VideoOptionsSheetProps, clearBlockedUsersCache() (+6 more)
 
 ### Community 15 - "app/(tabs)/story-upload.tsx"
-Cohesion: 0.14
-Nodes (16): SuggestionFeedCardInner(), Listener, listeners, playerRegistry, removePlayerForVideo(), setPlayerForVideo(), subscribeRegistry(), usePlayerForVideo() (+8 more)
+Cohesion: 0.22
+Nodes (10): FeedItemComponent(), SuggestionFeedCardInner(), Listener, listeners, playerRegistry, subscribeRegistry(), usePlayerForVideo(), VideoPlayerSlot (+2 more)
 
 ### Community 16 - "app/(tabs)/upload.tsx"
 Cohesion: 0.11
@@ -2125,7 +2130,7 @@ Nodes (15): ShareActionItem, ShareActions, ShareActionsProps, { height: SCREEN_H
 
 ### Community 17 - "app/(tabs)/user/[userId].tsx"
 Cohesion: 0.14
-Nodes (13): devDependencies, eas-cli, firebase-admin, firebase-tools, playwright, @playwright/mcp, @playwright/test, @types/react (+5 more)
+Nodes (18): AUTH_ERRORS, getFirebaseError(), Login(), ensureUserDoc(), generateUniquePseudo(), signInWithApple(), useGoogleAuth(), getCachedSession() (+10 more)
 
 ### Community 18 - "app/(tabs)/video-editor.tsx"
 Cohesion: 0.12
@@ -2136,20 +2141,28 @@ Cohesion: 0.14
 Nodes (12): app_1, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET, CRITICAL_REASONS, crypto, db, firestore_1, firestore_2 (+4 more)
 
 ### Community 20 - "FeedTabsScreen.tsx"
-Cohesion: 0.60
-Nodes (3): Props, TaggableUser, TagPeopleSelector()
+Cohesion: 0.13
+Nodes (9): { width }, app/settings/about.tsx, CameraScreen(), styles, { width: SCREEN_WIDTH, height: SCREEN_HEIGHT }, Role: Settings & About, BackButton, BackButtonProps (+1 more)
+
+### Community 22 - "sentry.ts"
+Cohesion: 0.20
+Nodes (15): handleNotificationNavigation(), RootContent(), RootLayout(), SafeGestureHandlerRootView(), StartupScreen(), StartupScreenProps, { width, height }, useStartupStore (+7 more)
 
 ### Community 23 - "compilerOptions"
 Cohesion: 0.22
 Nodes (8): compilerOptions, esModuleInterop, module, outDir, skipLibCheck, strict, target, include
 
 ### Community 24 - "babel.config.js"
-Cohesion: 0.05
-Nodes (60): AUTH_ERRORS, getFirebaseError(), Login(), handleNotificationNavigation(), RootContent(), RootLayout(), BlockedWords(), image (+52 more)
+Cohesion: 0.24
+Nodes (15): err(), useStartup(), CachedSettings, cacheFeed(), cacheSettings(), hydrateCache(), preloadFeed(), preloadNotifications() (+7 more)
+
+### Community 25 - "Feature: Comments & Sharing"
+Cohesion: 0.16
+Nodes (15): Feature: Comments & Sharing, Role: Comments & Sharing, generateMatrix(), isReserved(), QRCodeView(), QRCodeViewProps, src/components/QRCodeView.tsx, src/components/ShareModal.tsx (+7 more)
 
 ### Community 26 - "ActionBar.tsx"
-Cohesion: 0.25
-Nodes (4): FeedState, followingFeedStore, forYouFeedStore, PlayerRole
+Cohesion: 0.20
+Nodes (6): readings, FeedState, followingFeedStore, forYouFeedStore, PlayerRole, _useFeedStore()
 
 ### Community 28 - "migrate-pseudo-lower.ts"
 Cohesion: 0.33
@@ -2160,40 +2173,44 @@ Cohesion: 0.40
 Nodes (4): batch, db, sa, totals
 
 ### Community 30 - "captureException"
-Cohesion: 0.27
-Nodes (9): EditProfile(), app/(tabs)/edit-profile.tsx, app/(tabs)/profile.tsx, app/(tabs)/user/[userId].tsx, Feature: Profile & Users, Role: Profile & Users, src/hooks/useFollow.ts, src/hooks/useSuggestions.ts (+1 more)
+Cohesion: 0.23
+Nodes (11): CommentText(), CommentTextProps, extractMentions(), parseMentions(), resolveMentions(), Segment, enrichWithAuthors(), formatCount() (+3 more)
+
+### Community 32 - "ProfileVideoViewer.tsx"
+Cohesion: 0.23
+Nodes (9): ShareVideoData, FeedItem, useVisibleIndex(), UseVisibleIndexOptions, ProfileFeedItem, ProfileFeedItemProps, ProfileVideoViewer(), ProfileVideoViewerProps (+1 more)
 
 ### Community 33 - "index.tsx"
 Cohesion: 0.11
 Nodes (27): HashtagPage(), Search(), Explore(), Convention: i18n Translations (src/i18n/), Feature: Localization, Role: Localization, useTrendingHashtags(), defaultContext (+19 more)
 
 ### Community 35 - "FeedTabsScreen.tsx"
-Cohesion: 0.13
-Nodes (14): app/(tabs)/explore.tsx, app/(tabs)/feed.tsx, Feature: Feed & Discovery, Role: Feed & Discovery, AnimatedPagerView, FeedTabsScreen(), FeedTabsScreenProps, clearSeenVideos() (+6 more)
+Cohesion: 0.08
+Nodes (25): app/(tabs)/explore.tsx, app/(tabs)/feed.tsx, Convention: Core Lib (src/lib/), Feature: Feed & Discovery, Role: Feed & Discovery, AnimatedPagerView, FeedTabsScreen(), FeedTabsScreenProps (+17 more)
 
 ### Community 36 - "notifications.tsx"
-Cohesion: 0.29
-Nodes (9): handleNotifPress(), iconMap, messageForType(), Notifications(), batchFetchUsers(), groupByTime(), markAllNotificationsRead(), markNotificationRead() (+1 more)
+Cohesion: 0.17
+Nodes (15): handleNotifPress(), iconMap, messageForType(), Notifications(), app/(tabs)/notifications.tsx, Feature: Notifications, Role: Notifications, getIndexErrorMessage() (+7 more)
 
 ### Community 37 - "useFollowingFeedData.ts"
-Cohesion: 0.25
-Nodes (10): app/(tabs)/camera.tsx, config/modules.js, Feature: Camera & Capture, mocks/VisionCameraMock.jsx, Role: Camera & Capture, FilterName, FILTERS, src/hooks/useCamera.ts (+2 more)
+Cohesion: 0.18
+Nodes (5): __dirname, FIREBASE_BIN, report, REPORT_FILE, ROOT
 
 ### Community 38 - "metro.config.js"
 Cohesion: 0.07
 Nodes (47): Discover(), styles, FeedList, FeedListComponent(), FeedListItem, FeedListProps, FeedMode, flatToVideoIdx() (+39 more)
 
 ### Community 39 - "Convention: Core Lib (src/lib/)"
-Cohesion: 0.09
-Nodes (22): app/(tabs)/notifications.tsx, Convention: Firestore Data Layer, Convention: Core Lib (src/lib/), Convention: API Services (src/services/), Feature: Notifications, Role: Data, Firebase & Storage, Role: Notifications, src/lib/cloudinary.ts (+14 more)
+Cohesion: 0.19
+Nodes (8): Convention: Firestore Data Layer, Convention: API Services (src/services/), Role: Data, Firebase & Storage, gifService, src/services/gifService.ts, TenorGifResult, tenorService, src/services/tenorService.ts
 
 ### Community 40 - "Role: Scripts & Tooling"
-Cohesion: 0.05
-Nodes (40): Role: Scripts & Tooling, __dirname, FIREBASE_BIN, report, REPORT_FILE, ROOT, fail(), info() (+32 more)
+Cohesion: 0.12
+Nodes (16): Role: Scripts & Tooling, scripts/enrich-graphify-roles.js, scripts/generate-mbolo-logo.js, scripts/graphify-cli.js, admin, generateThumbnailURL(), getGoogleTime(), isDryRun (+8 more)
 
 ### Community 41 - "nativewind-env.d.ts"
-Cohesion: 0.15
-Nodes (19): extractAndCacheFirstFrame(), prefetchedCache, timeout(), usePrefetch(), NetworkQuality, readings, executeTask(), PrefetchQueue (+11 more)
+Cohesion: 0.30
+Nodes (10): extractAndCacheFirstFrame(), prefetchedCache, timeout(), usePrefetch(), NetworkQuality, PrefetchQueue, QualityOverride, resolveByForce() (+2 more)
 
 ### Community 42 - "GifPicker.tsx"
 Cohesion: 0.36
@@ -2203,90 +2220,93 @@ Nodes (7): CATEGORIES, GifPicker(), GifPickerProps, STICKER_CATEGORIES, styles, 
 Cohesion: 0.03
 Nodes (62): dependencies, babel-preset-expo, @babel/traverse, expo, expo-apple-authentication, expo-auth-session, expo-av, expo-build-properties (+54 more)
 
-### Community 47 - "Role: App Shell & Routing"
+### Community 45 - "analyticsService.ts"
+Cohesion: 0.31
+Nodes (8): AnalyticsEvent, enqueue(), eventBuffer, flush(), flushAnalyticsEvents(), trackRepostImpact(), trackShare(), trackWatchTime()
+
+### Community 46 - "useVideoPlayerPool.ts"
 Cohesion: 0.28
-Nodes (5): styles, useCameraDevice(), useCameraPermission(), useMicrophonePermission(), useVisionCamera()
+Nodes (7): removePlayerForVideo(), setPlayerForVideo(), createPoolPlayer(), PlayerState, Slot, SlotRole, useVideoPlayerPool()
+
+### Community 47 - "Role: App Shell & Routing"
+Cohesion: 0.32
+Nodes (7): executeTask(), Priority, processNext(), queue, RETRY_DELAYS_MS, sortByPriority(), Task
 
 ### Community 48 - "VideoCache.ts"
 Cohesion: 0.24
 Nodes (7): CacheEntry, evictL2IfNeeded(), getL2Index(), l1AccessOrder, l1Cache, L2IndexEntry, saveL2Index()
 
 ### Community 49 - "FeedScreen.tsx"
-Cohesion: 0.20
-Nodes (11): useTabBarVisibility(), FeedScreen(), FeedScreenProps, FeedType, useFollowingFeedData(), VideoCache, recordView(), viewedThisSession (+3 more)
+Cohesion: 0.39
+Nodes (8): CACHE_DIR(), cleanupTemp(), ensureTempDir(), fs(), getTempPath(), initFFmpeg(), mergeClips(), TEMP_DIR()
 
 ### Community 50 - "src/components/CommentModal.tsx"
-Cohesion: 0.17
-Nodes (14): calcAge(), UserProfile(), ShareAnalyticsEvent, shareEventBuffer, trackShareEvent(), ShareVideoConfig, useShare(), createShare() (+6 more)
+Cohesion: 0.18
+Nodes (14): sendMessage(), ShareAnalyticsEvent, shareEventBuffer, trackShareEvent(), ShareVideoConfig, useShare(), createShare(), getSharesForVideo() (+6 more)
+
+### Community 51 - "arch-check.sh"
+Cohesion: 0.52
+Nodes (6): fail(), info(), ok(), section(), arch-check.sh script, warn()
 
 ### Community 52 - "BottomTabBar.tsx"
-Cohesion: 0.25
-Nodes (6): TAB_ICONS, TAB_LABELS, TabName, VISIBLE_TABS, TabItem, TabItemProps
+Cohesion: 0.40
+Nodes (6): FFmpegKit, FFprobeKit, cancelAllOperations(), cancelOperation(), getFFmpegModules(), getVideoInfo()
 
 ### Community 53 - "storage.ts"
-Cohesion: 0.17
-Nodes (12): CloudinaryResponse, compressImage(), detectResourceType(), getFileUri(), UploadOptions, uploadToCloudinary(), captureUploadError(), startTransaction() (+4 more)
+Cohesion: 0.21
+Nodes (8): Upload(), Props, TaggableUser, TagPeopleSelector(), StorageProvider, uploadLocal(), UploadResult, uploadVideo()
 
 ### Community 55 - "metro.config.js"
 Cohesion: 0.33
 Nodes (5): config, DEV_MODE_STUBS, { getDefaultConfig }, path, { withNativeWind }
 
 ### Community 56 - "patch-ffmpeg-podspec.js"
-Cohesion: 0.33
-Nodes (5): content, fs, patched, path, podspecPath
+Cohesion: 0.60
+Nodes (3): StoryUploadScreen(), Story, useStories()
 
 ### Community 57 - "FollowContext.tsx"
-Cohesion: 0.33
-Nodes (4): FollowContext, FollowContextValue, FollowProvider(), FollowState
+Cohesion: 0.14
+Nodes (14): BlockedWords(), image, FollowContext, FollowContextValue, FollowProvider(), FollowState, VideoCache, cache (+6 more)
 
-### Community 58 - "env.ts"
-Cohesion: 0.40
-Nodes (5): EnvValidation, logEnvStatus(), OPTIONAL_VARS, REQUIRED_VARS, validateEnv()
-
-### Community 61 - "ErrorBoundary.tsx"
+### Community 60 - "DataSaverContext.tsx"
 Cohesion: 0.50
-Nodes (3): Props, State, styles
+Nodes (3): DataSaverContext, DataSaverContextValue, DataSaverProvider()
 
 ### Community 76 - "src/features/feed/analytics/feedTracker.ts"
-Cohesion: 0.11
-Nodes (35): FFmpegKit, FFprobeKit, addMusic(), addVoiceover(), addWaterMark(), applyCustomFilter(), applyTrimAndFilter(), applyVideoFilter() (+27 more)
+Cohesion: 0.16
+Nodes (21): addMusic(), addVoiceover(), addWaterMark(), applyCustomFilter(), applyTrimAndFilter(), applyVideoFilter(), changeSpeed(), compressVideo() (+13 more)
 
 ### Community 77 - "src/features/feed/components/FeedEmptyState.tsx"
-Cohesion: 0.17
-Nodes (10): BottomTabBar, CreateModalContext, CreateModalContextValue, CreateModalProvider(), useCreateModal(), TabBarVisibilityContext, TabBarVisibilityContextValue, TabBarVisibilityProvider() (+2 more)
+Cohesion: 0.13
+Nodes (13): BottomTabBar, CreateModalContext, CreateModalContextValue, CreateModalProvider(), useCreateModal(), TabBarVisibilityContext, TabBarVisibilityContextValue, TabBarVisibilityProvider() (+5 more)
 
 ### Community 78 - "src/features/feed/components/FeedPage.tsx"
-Cohesion: 0.08
-Nodes (46): ConversationDetail(), ConversationItemWithStatus(), Messages(), app/(tabs)/messages.tsx, FollowRequests(), PendingUser, Feature: Messages, Role: Messages (+38 more)
+Cohesion: 0.07
+Nodes (50): ConversationDetail(), ConversationItemWithStatus(), Messages(), app/(tabs)/messages.tsx, FollowRequests(), Feature: Messages, Role: Messages, blend() (+42 more)
 
 ### Community 79 - "src/features/feed/components/FeedTopBar.tsx"
 Cohesion: 0.04
 Nodes (47): backgroundColor, foregroundImage, adaptiveIcon, edgeToEdgeEnabled, package, permissions, softwareKeyboardLayoutMode, userInterfaceStyle (+39 more)
 
 ### Community 80 - "src/features/feed/components/VideoItem.tsx"
-Cohesion: 0.07
-Nodes (28): scripts, android, arch:check, build:android, build:ios, build:preview:android, build:preview:ios, build:production (+20 more)
+Cohesion: 0.05
+Nodes (41): devDependencies, eas-cli, firebase-admin, firebase-tools, playwright, @playwright/mcp, @playwright/test, @types/react (+33 more)
 
 ### Community 81 - "src/features/feed/hooks/useVideoAutoplay.ts"
 Cohesion: 0.09
-Nodes (42): PlacePage(), addCrossReferences(), createGraphBuilder(), crypto, explain(), extractFirestoreCollections(), extractFirestoreRelations(), extractHookCalls() (+34 more)
+Nodes (42): Insights(), PlacePage(), addCrossReferences(), createGraphBuilder(), crypto, explain(), extractFirestoreCollections(), extractFirestoreRelations() (+34 more)
 
 ### Community 82 - "src/features/feed/hooks/useVideoFeed.ts"
-Cohesion: 0.11
-Nodes (10): getCameraModule(), {
-  Camera,
-  useCameraDevice,
-  useCameraPermission,
-  useMicrophonePermission,
-}, CameraHandle, FPS_OPTIONS, PhotoSettings, RESOLUTION_OPTIONS, useVisionCameraPhoto(), VideoSettings (+2 more)
+Cohesion: 0.06
+Nodes (25): app/(tabs)/camera.tsx, getCameraModule(), config/modules.js, Feature: Camera & Capture, mocks/VisionCameraMock.jsx, styles, useCameraDevice(), useCameraPermission() (+17 more)
 
 ### Community 83 - "src/features/feed/optimizations/PerformanceMonitor.tsx"
 Cohesion: 0.12
 Nodes (24): COLORS, conventionForFile(), CONVENTIONS, enrichGraph(), featureForFile(), FEATURES, fs, GRAPH_DIR (+16 more)
 
 ### Community 84 - "src/features/feed/player/VideoPlayer.tsx"
-Cohesion: 0.13
-Nodes (21): ShareVideoData, VideoThumbnailCellProps, FeedItem, useVisibleIndex(), ProfileFeedItem, ProfileFeedItemProps, ProfileVideoViewer(), ProfileVideoViewerProps (+13 more)
+Cohesion: 0.25
+Nodes (11): VideoThumbnailCellProps, UseProfileFeedDataProps, UseProfileFeedDataResult, RepostButtonComponent(), RepostButtonProps, useRepost(), UseRepostOptions, toggleRepost() (+3 more)
 
 ### Community 96 - "src/hooks/useVideoFeed.ts"
 Cohesion: 0.09
@@ -2297,16 +2317,16 @@ Cohesion: 0.11
 Nodes (19): Checklist by task type, Code conventions, File structure, Firebase / Firestore, Graphify workflow, New component, New Firestore query, New hook (+11 more)
 
 ### Community 122 - "_layout.tsx"
-Cohesion: 0.11
-Nodes (17): e2e/comments.spec.ts, e2e/feed.spec.ts, e2e/helpers.ts, e2e/navigation.spec.ts, e2e/screenshots.spec.ts, e2e/upload.spec.ts, Feature: Miscellaneous, Role: Miscellaneous (+9 more)
+Cohesion: 0.12
+Nodes (19): e2e/comments.spec.ts, e2e/feed.spec.ts, navigateToTab(), SCREENSHOT_DIR, takeScreenshot(), e2e/helpers.ts, waitForApp(), e2e/navigation.spec.ts (+11 more)
 
 ### Community 123 - "profile.tsx"
 Cohesion: 0.14
-Nodes (19): calcAge(), Profile(), { width: SCREEN_WIDTH, height: SCREEN_HEIGHT }, { width: SCREEN_WIDTH, height: SCREEN_HEIGHT }, AvatarViewer(), AvatarViewerProps, { width }, FollowButton() (+11 more)
+Nodes (20): calcAge(), Profile(), { width: SCREEN_WIDTH, height: SCREEN_HEIGHT }, calcAge(), UserProfile(), { width: SCREEN_WIDTH, height: SCREEN_HEIGHT }, AvatarViewer(), AvatarViewerProps (+12 more)
 
 ### Community 124 - "SuggestionFeedCard.tsx"
-Cohesion: 0.14
-Nodes (14): Convention: Custom Hooks pattern (src/hooks/), SessionCache, CreatorInsights, TopVideo, useFollowAction(), ProfileStats, apps, db (+6 more)
+Cohesion: 0.11
+Nodes (19): EditProfile(), recordView(), viewedThisSession, setOnline(), usePresence(), ProfileStats, useUnreadNotifications(), useUsernameCheck() (+11 more)
 
 ### Community 126 - "firebase-modules.d.ts"
 Cohesion: 0.10
@@ -2317,8 +2337,8 @@ Cohesion: 0.15
 Nodes (13): 1. Ajouter l'import, 1. Restaurer KeyboardAvoidingView dans les imports, 2. Garder l'interface mais ajouter `commentOptions`, 2. Lire commentOptions du contexte, 3. Ajouter le rendu du modal dans le JSX, 3. Exporter RootCommentModal, 4. Supprimer le kbHeight et son useEffect, 5. Restaurer KeyboardAvoidingView (+5 more)
 
 ### Community 135 - "index.tsx"
-Cohesion: 0.47
-Nodes (4): PageWrapper(), PageWrapperProps, styles, usePageAnimation()
+Cohesion: 0.33
+Nodes (6): Settings(), PageWrapper(), PageWrapperProps, styles, useDataSaver(), usePageAnimation()
 
 ### Community 137 - "ffmpeg-kit-plugin.js"
 Cohesion: 0.21
@@ -2336,13 +2356,9 @@ Nodes (8): addFfmpegHooks(), addSwiftConcurrencyFix(), fs, {
 Cohesion: 0.26
 Nodes (10): formatDuration(), GalleryPicker(), GalleryPickerProps, styles, TabType, { width: SCREEN_WIDTH }, GalleryAlbum, GalleryAsset (+2 more)
 
-### Community 141 - "helpers.ts"
-Cohesion: 0.42
-Nodes (4): navigateToTab(), SCREENSHOT_DIR, takeScreenshot(), waitForApp()
-
 ### Community 142 - "ErrorBoundary.tsx"
 Cohesion: 0.10
-Nodes (17): { width }, Insights(), { width }, styles, Settings(), styles, { width: SCREEN_WIDTH, height: SCREEN_HEIGHT }, COLORS (+9 more)
+Nodes (17): { width }, styles, PendingUser, Props, State, styles, COLORS, TAB_ICONS (+9 more)
 
 ### Community 144 - "DatePicker.tsx"
 Cohesion: 0.22
@@ -2357,12 +2373,12 @@ Cohesion: 0.33
 Nodes (5): fadeTransition, scaleTransition, slideBottomTransition, slideRightTransition, slideUpTransition
 
 ### Community 157 - "index.tsx"
-Cohesion: 0.09
-Nodes (35): Convention: Reusable Components (src/components/), Feature: UI System & Theme, Role: UI Components & Theme, src/components/create/CreateButton.tsx, src/components/create/CreateModal.tsx, src/components/create/CreateOption.tsx, src/components/DatePicker.tsx, src/components/DraggableElement.tsx (+27 more)
+Cohesion: 0.11
+Nodes (31): Convention: Reusable Components (src/components/), Feature: UI System & Theme, Role: UI Components & Theme, src/components/create/CreateButton.tsx, src/components/create/CreateModal.tsx, src/components/create/CreateOption.tsx, src/components/DatePicker.tsx, src/components/DraggableElement.tsx (+23 more)
 
 ### Community 160 - "filters.ts"
-Cohesion: 0.19
-Nodes (20): app/post.tsx, app/settings/about.tsx, app/(tabs)/reel-upload.tsx, app/(tabs)/story-upload.tsx, app/(tabs)/upload.tsx, app/(tabs)/video-editor.tsx, Convention: File-based Routing (expo-router), Convention: Utilities (utils/) (+12 more)
+Cohesion: 0.16
+Nodes (19): app/(tabs)/story-upload.tsx, app/(tabs)/video-editor.tsx, Convention: Utilities (utils/), Feature: Upload & Editing, mocks/FFmpegMock.js, Role: Upload & Editing, content, fs (+11 more)
 
 ### Community 161 - "dependencies"
 Cohesion: 0.15
@@ -2373,24 +2389,24 @@ Cohesion: 0.33
 Nodes (6): Firestore: messages, Firestore: notifications, Firestore: stories, Firestore: usernames, Firestore: users, Firestore: videos
 
 ## Knowledge Gaps
-- **2489 isolated node(s):** `@opencode-ai/plugin`, `name`, `slug`, `version`, `orientation` (+2484 more)
+- **2488 isolated node(s):** `@opencode-ai/plugin`, `name`, `slug`, `version`, `orientation` (+2483 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **1944 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **1945 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `dependencies` connect `playwright-report/results.json` to `app/(tabs)/user/[userId].tsx`, `app/(tabs)/messages.tsx`?**
-  _High betweenness centrality (0.020) - this node is a cross-community bridge._
-- **Why does `captureException()` connect `babel.config.js` to `app/(auth)/login.tsx`, `app/(tabs)/_layout.tsx`, `app/(tabs)/edit-profile.tsx`, `app/(tabs)/feed.tsx`, `app/(tabs)/highlight/[highlightId].tsx`, `app/(tabs)/messages.tsx`, `GalleryPicker.tsx`, `app/(tabs)/reel-upload.tsx`, `ErrorBoundary.tsx`, `app/(tabs)/story-upload.tsx`, `app/(tabs)/stories.tsx`, `index.tsx`, `captureException`, `index.tsx`, `FeedTabsScreen.tsx`, `notifications.tsx`, `useFollowingFeedData.ts`, `metro.config.js`, `Convention: Core Lib (src/lib/)`, `FeedScreen.tsx`, `src/components/CommentModal.tsx`, `storage.ts`, `FollowContext.tsx`, `ErrorBoundary.tsx`, `src/features/feed/components/FeedPage.tsx`, `src/features/feed/hooks/useVideoAutoplay.ts`, `src/features/feed/hooks/useVideoFeed.ts`, `src/features/feed/player/VideoPlayer.tsx`, `_layout.tsx`, `profile.tsx`, `SuggestionFeedCard.tsx`?**
-  _High betweenness centrality (0.014) - this node is a cross-community bridge._
-- **Why does `Firebase Analysis Report` connect `src/hooks/useVideoFeed.ts` to `_layout.tsx`?**
-  _High betweenness centrality (0.011) - this node is a cross-community bridge._
+- **Why does `dependencies` connect `playwright-report/results.json` to `src/features/feed/components/VideoItem.tsx`, `app/(tabs)/messages.tsx`?**
+  _High betweenness centrality (0.021) - this node is a cross-community bridge._
+- **Why does `captureException()` connect `FollowContext.tsx` to `app/(auth)/login.tsx`, `app/(tabs)/_layout.tsx`, `app/(tabs)/edit-profile.tsx`, `app/(tabs)/feed.tsx`, `app/(tabs)/highlight/[highlightId].tsx`, `app/(tabs)/messages.tsx`, `GalleryPicker.tsx`, `app/(tabs)/profile.tsx`, `app/(tabs)/reel-upload.tsx`, `ErrorBoundary.tsx`, `app/(tabs)/story-upload.tsx`, `app/(tabs)/stories.tsx`, `app/(tabs)/user/[userId].tsx`, `app/(tabs)/upload.tsx`, `sentry.ts`, `babel.config.js`, `index.tsx`, `captureException`, `index.tsx`, `FeedTabsScreen.tsx`, `notifications.tsx`, `metro.config.js`, `Convention: Core Lib (src/lib/)`, `analyticsService.ts`, `useVideoPlayerPool.ts`, `src/components/CommentModal.tsx`, `ErrorBoundary`, `patch-ffmpeg-podspec.js`, `src/features/feed/components/FeedEmptyState.tsx`, `src/features/feed/components/FeedPage.tsx`, `src/features/feed/hooks/useVideoAutoplay.ts`, `src/features/feed/hooks/useVideoFeed.ts`, `src/features/feed/player/VideoPlayer.tsx`, `_layout.tsx`, `profile.tsx`, `SuggestionFeedCard.tsx`?**
+  _High betweenness centrality (0.015) - this node is a cross-community bridge._
 - **Are the 156 inferred relationships involving `Feature: Miscellaneous` (e.g. with `AGENTS.md` and `app.json`) actually correct?**
   _`Feature: Miscellaneous` has 156 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 113 inferred relationships involving `Role: Miscellaneous` (e.g. with `AGENTS.md` and `discover.tsx`) actually correct?**
   _`Role: Miscellaneous` has 113 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `@opencode-ai/plugin`, `name`, `slug` to the rest of the system?**
-  _2489 weakly-connected nodes found - possible documentation gaps or missing edges._
-- **Should `app/(auth)/_layout.tsx` be split into smaller, more focused modules?**
-  _Cohesion score 0.13725490196078433 - nodes in this community are weakly interconnected._
+  _2488 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Should `app/(auth)/login.tsx` be split into smaller, more focused modules?**
+  _Cohesion score 0.11076923076923077 - nodes in this community are weakly interconnected._
+- **Should `app/(auth)/register.tsx` be split into smaller, more focused modules?**
+  _Cohesion score 0.04756871035940803 - nodes in this community are weakly interconnected._

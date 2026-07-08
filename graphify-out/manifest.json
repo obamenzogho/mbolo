@@ -30,13 +30,13 @@
     "semantic_hash": ""
   },
   "app/(tabs)/edit-profile.tsx": {
-    "mtime": 1783380257.7476661,
-    "ast_hash": "b035abfae3cee14e6bdcf96f9f449ab1",
+    "mtime": 1783495773.2614372,
+    "ast_hash": "ea6fdbc1718b200d1f749e5099733ee3",
     "semantic_hash": ""
   },
   "app/(tabs)/explore.tsx": {
-    "mtime": 1783363292.2108507,
-    "ast_hash": "f91ed25f2a8ff32a94af434bcac2beb9",
+    "mtime": 1783487723.1409888,
+    "ast_hash": "e24f30ca2e94db13c7e30992bffda09a",
     "semantic_hash": ""
   },
   "app/(tabs)/feed.tsx": {
@@ -55,8 +55,8 @@
     "semantic_hash": ""
   },
   "app/(tabs)/profile.tsx": {
-    "mtime": 1783379746.2102644,
-    "ast_hash": "57012db8d9ee2b164c661699258fd78d",
+    "mtime": 1783495273.1682458,
+    "ast_hash": "48a9e8eec89813515d6fe7f3cb5b3f79",
     "semantic_hash": ""
   },
   "app/(tabs)/reel-upload.tsx": {
@@ -815,8 +815,8 @@
     "semantic_hash": ""
   },
   "src/features/highlights/components/HighlightViewer.tsx": {
-    "mtime": 1779763020.5982282,
-    "ast_hash": "6fa15537e8c75d4a8dfbdaed124597d6",
+    "mtime": 1783487763.4957306,
+    "ast_hash": "bb2d3d0be5e64f4e011d5a7bbc2685fd",
     "semantic_hash": ""
   },
   "src/features/highlights/hooks/useHighlights.ts": {
@@ -1135,8 +1135,8 @@
     "semantic_hash": ""
   },
   "app/search.tsx": {
-    "mtime": 1783379574.421107,
-    "ast_hash": "5318644d5afa3f88bc444bd77b35a5fc",
+    "mtime": 1783487722.6699803,
+    "ast_hash": "ab5bd17e17d7ac0db6125f0804217c06",
     "semantic_hash": ""
   },
   "app/settings/blocked-words.tsx": {
@@ -1387,6 +1387,31 @@
   "app/settings/_layout.tsx": {
     "mtime": 1783484580.9962385,
     "ast_hash": "4954de44ff3ab49d84d57982801385e1",
+    "semantic_hash": ""
+  },
+  "src/components/profile/CollapsibleSection.tsx": {
+    "mtime": 1783495636.9379318,
+    "ast_hash": "8a59755e10bf38e1578e98e7027132d4",
+    "semantic_hash": ""
+  },
+  "src/components/profile/ExternalLinkCTA.tsx": {
+    "mtime": 1783495252.5098662,
+    "ast_hash": "3ff9333be015cc7dfb99726989e21209",
+    "semantic_hash": ""
+  },
+  "src/components/profile/FieldWithCounter.tsx": {
+    "mtime": 1783495639.8219848,
+    "ast_hash": "badf398d01f2ea07da271702b4179570",
+    "semantic_hash": ""
+  },
+  "src/components/profile/ProfilePreview.tsx": {
+    "mtime": 1783495643.0090432,
+    "ast_hash": "0fc0b8825a678ab96a47ff862ffece50",
+    "semantic_hash": ""
+  },
+  "src/components/profile/StatsCards.tsx": {
+    "mtime": 1783495249.780816,
+    "ast_hash": "c4b82187c867f85182b6a87717a386a2",
     "semantic_hash": ""
   }
 }

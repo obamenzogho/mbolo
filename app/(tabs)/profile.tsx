@@ -51,6 +51,8 @@ import { VideoGrid } from '@/components/VideoGrid'
 import { ProfileVideoViewer } from '@/features/feed/profile-viewer/ProfileVideoViewer'
 import { AvatarViewer } from '@/components/AvatarViewer'
 import { VerifiedBadge } from '@/components/VerifiedBadge'
+import { StatsCards } from '@/components/profile/StatsCards'
+import { ExternalLinkCTA } from '@/components/profile/ExternalLinkCTA'
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 
@@ -71,12 +73,22 @@ export default function Profile() {
   const user = auth.currentUser
   const { acceptFollowRequest, rejectFollowRequest } = useFollow(user?.uid || '')
   const tabsHook = useProfileTabs({ userId: user?.uid || '' })
-  const { activeTab, setActiveTab, currentVideos, loading, refreshing, onRefresh: tabsRefresh, loadMore, hasMore, gridVideos } = tabsHook
+  const { activeTab, setActiveTab, currentVideos, loading, refreshing, onRefresh: tabsRefresh, loadMore, hasMore, gridVideos, reelVideos } = tabsHook
   const [profileErrors, setProfileErrors] = useState<{ stories?: string }>({})
   const [profileLoaded, setProfileLoaded] = useState(false)
   const [storiesCheckDone, setStoriesCheckDone] = useState(false)
   const [highlightsLoaded, setHighlightsLoaded] = useState(false)
   const [ready, setReady] = useState(false)
+
+  const [gridFilter, setGridFilter] = useState<'publications' | 'reels' | 'photos'>('publications')
+  const [filterOpen, setFilterOpen] = useState(false)
+
+  const filteredVideos = useMemo(() => {
+    if (activeTab !== 'grid') return currentVideos
+    if (gridFilter === 'reels') return reelVideos
+    if (gridFilter === 'photos') return currentVideos.filter((v: any) => v.type !== 'reel')
+    return gridVideos
+  }, [activeTab, gridFilter, currentVideos, reelVideos, gridVideos])
 
   const [menuVisible, setMenuVisible] = useState(false)
   const [shareVisible, setShareVisible] = useState(false)
@@ -274,7 +286,7 @@ export default function Profile() {
     }
   }, [followersModal, page])
 
-  const tabConfig: ProfileTab[] = ['grid', 'reels', 'saved', 'liked', 'reposted', 'tagged']
+  const tabConfig: ProfileTab[] = ['grid', 'saved', 'liked', 'reposted', 'tagged']
 
   const translateX = useSharedValue(0)
   const swipeOffsetPx = useDerivedValue(() => {
@@ -283,9 +295,14 @@ export default function Profile() {
   })
 
   const handleTabChange = useCallback((tab: ProfileTab) => {
+    if (tab === 'grid' && activeTab === 'grid') {
+      setFilterOpen((p) => !p)
+      return
+    }
+    setFilterOpen(false)
     setActiveTab(tab)
     translateX.value = 0
-  }, [setActiveTab])
+  }, [setActiveTab, activeTab])
 
   const swipeGesture = Gesture.Pan()
     .minDistance(10)
@@ -321,7 +338,7 @@ export default function Profile() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.black }}>
       <GestureDetector gesture={swipeGesture}>
         <VideoGrid
-          videos={currentVideos}
+          videos={filteredVideos}
           tab={activeTab}
           loading={loading}
           refreshing={refreshing}
@@ -351,25 +368,26 @@ export default function Profile() {
                 <TouchableOpacity activeOpacity={0.8} onPress={() => profile?.photoURL && setPhotoViewerVisible(true)} style={{ width: 90, height: 90, borderRadius: 45, borderWidth: hasStory ? 3 : 0, borderColor: hasStory ? colors.secondary : 'transparent', justifyContent: 'center', alignItems: 'center' }}>
                   {profile?.photoURL ? <Image source={{ uri: profile.photoURL }} style={{ width: 84, height: 84, borderRadius: 42 }} /> : <Ionicons name="person" size={40} color="#555" />}
                 </TouchableOpacity>
-                <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'center' }}>
-                  <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => setActiveTab('grid')}>
-                    <Text style={{ color: colors.white, fontSize: 18, fontWeight: '700' }}>{gridVideos.length}</Text>
-                    <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Vidéos</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => openFollowList('followers')}>
-                    <Text style={{ color: colors.white, fontSize: 18, fontWeight: '700' }}>{profile?.followerCount ?? profile?.followers?.length ?? 0}</Text>
-                    <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Abonnés</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => openFollowList('following')}>
-                    <Text style={{ color: colors.white, fontSize: 18, fontWeight: '700' }}>{profile?.followingCount ?? profile?.following?.length ?? 0}</Text>
-                    <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Abonnements</Text>
-                  </TouchableOpacity>
+                <View style={{ flex: 1, paddingLeft: 12 }}>
+                  <StatsCards
+                    videos={gridVideos.length}
+                    followers={profile?.followerCount ?? profile?.followers?.length ?? 0}
+                    following={profile?.followingCount ?? profile?.following?.length ?? 0}
+                    onPressVideos={() => setActiveTab('grid')}
+                    onPressFollowers={() => openFollowList('followers')}
+                    onPressFollowing={() => openFollowList('following')}
+                  />
                 </View>
               </View>
 
               <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingTop: 12 }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: colors.white, fontSize: 14, fontWeight: '700' }}>{profile?.nom || ''}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={{ color: colors.white, fontSize: 14, fontWeight: '700' }}>{profile?.nom || ''}</Text>
+                    <TouchableOpacity onPress={() => router.push('/(tabs)/edit-profile')} style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: colors.surfaceLight, borderWidth: 1, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' }}>
+                      <Ionicons name="pencil" size={14} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  </View>
                   <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 1 }}>@{profile?.pseudo || user?.displayName || ''}</Text>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
                     {profile?.city ? (
@@ -388,10 +406,7 @@ export default function Profile() {
                   </View>
                   {profile?.bio ? <RichText text={profile.bio} style={{ color: colors.white, fontSize: 13, marginTop: 4, lineHeight: 18 }} /> : null}
                   {(profile as any)?.externalLink ? (
-                    <TouchableOpacity onPress={async () => { try { await require('expo-linking').openURLAsync((profile as any).externalLink) } catch {} }} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                      <Ionicons name="link-outline" size={13} color={colors.secondary} />
-                      <Text style={{ color: colors.secondary, fontSize: 12 }}>{(profile as any).externalLink}</Text>
-                    </TouchableOpacity>
+                    <ExternalLinkCTA url={(profile as any).externalLink} />
                   ) : null}
                   {profile?.pendingFollowers?.length ? (
                     <TouchableOpacity onPress={() => openFollowList('requests')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8 }}>
@@ -405,9 +420,6 @@ export default function Profile() {
                 <View style={{ flexDirection: 'column', gap: 8, justifyContent: 'center', marginLeft: 12 }}>
                   <TouchableOpacity onPress={() => router.push('/insights')} style={{ width: 34, height: 34, borderRadius: 8, backgroundColor: colors.surfaceLight, borderWidth: 1, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' }}>
                     <Ionicons name="bar-chart-outline" size={18} color={colors.white} />
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => router.push('/(tabs)/edit-profile')} style={{ width: 34, height: 34, borderRadius: 8, backgroundColor: colors.surfaceLight, borderWidth: 1, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' }}>
-                    <Ionicons name="pencil-outline" size={18} color={colors.white} />
                   </TouchableOpacity>
                   <TouchableOpacity onPress={shareProfile} style={{ width: 34, height: 34, borderRadius: 8, backgroundColor: colors.surfaceLight, borderWidth: 1, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' }}>
                     <Ionicons name="share-outline" size={18} color={colors.white} />
@@ -429,7 +441,25 @@ export default function Profile() {
                 </View>
               )}
 
-              <ProfileTabBar tabs={tabConfig} activeTab={activeTab} onTabChange={handleTabChange} swipeOffsetPx={swipeOffsetPx} />
+              <View style={{ position: 'relative', zIndex: 100 }}>
+                <ProfileTabBar tabs={tabConfig} activeTab={activeTab} onTabChange={handleTabChange} swipeOffsetPx={swipeOffsetPx} />
+                {filterOpen && (
+                  <View style={{ position: 'absolute', top: 44, left: 8, backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.border, elevation: 10 }}>
+                    {(['publications', 'reels', 'photos'] as const).map((opt) => (
+                      <TouchableOpacity
+                        key={opt}
+                        onPress={() => { setGridFilter(opt); setFilterOpen(false) }}
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10, minWidth: 140 }}
+                      >
+                        <Ionicons name={opt === 'reels' ? 'film-outline' : opt === 'photos' ? 'image-outline' : 'grid-outline'} size={16} color={gridFilter === opt ? colors.primary : colors.textMuted} />
+                        <Text style={{ color: gridFilter === opt ? colors.primary : colors.white, fontSize: 14, fontWeight: gridFilter === opt ? '700' : '400' }}>
+                          {opt === 'reels' ? 'Réel' : opt === 'photos' ? 'Photo' : 'Publications'}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
             </View>
           }
           />

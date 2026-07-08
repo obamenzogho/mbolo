@@ -94,7 +94,11 @@ export default function Search() {
         </View>
       </View>
 
-      {loading && <OrbitLoader />}
+      {loading && (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <OrbitLoader />
+        </View>
+      )}
 
       {showRecent && (
         <View style={{ paddingHorizontal: 16 }}>

@@ -1,18 +1,22 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import {
-  View, Text, TextInput, TouchableOpacity, Image, Alert,
-  KeyboardAvoidingView, Platform, ScrollView,
+  View, Text, TouchableOpacity, Image, Alert,
+  Platform, ScrollView, Keyboard,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { doc, getDoc, runTransaction } from 'firebase/firestore'
+import { doc, getDoc, runTransaction, updateDoc } from 'firebase/firestore'
 import { auth, db } from '../../src/lib/firebase'
 import { colors } from '../../src/lib/theme'
 import { router } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import OrbitLoader from '../../src/components/OrbitLoader'
 import { uploadToCloudinary } from '../../src/lib/cloudinary'
+import { captureException } from '../../src/lib/sentry'
 import { useUsernameCheck } from '../../src/hooks/useUsernameCheck'
+import { CollapsibleSection } from '../../src/components/profile/CollapsibleSection'
+import { FieldWithCounter } from '../../src/components/profile/FieldWithCounter'
+import { ProfilePreview } from '../../src/components/profile/ProfilePreview'
 
 export default function EditProfile() {
   const user = auth.currentUser
@@ -27,6 +31,46 @@ export default function EditProfile() {
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
   const [currentPseudo, setCurrentPseudo] = useState('')
+  const [editing, setEditing] = useState(false)
+  const [activeField, setActiveField] = useState<string | null>(null)
+  const [kbHeight, setKbHeight] = useState(0)
+  const focusCount = useRef(0)
+  const scrollRef = useRef<ScrollView>(null)
+  const scrollOff = useRef(0)
+  const fieldRefs = useRef<Record<string, View | null>>({})
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', (e) => setKbHeight(e.endCoordinates.height))
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKbHeight(0))
+    return () => { show.remove(); hide.remove() }
+  }, [])
+
+  const scrollToField = useCallback((field: string) => {
+    const node = fieldRefs.current[field]
+    if (!node) return
+    requestAnimationFrame(() => {
+      node.measureInWindow((_fx, fy) => {
+        scrollRef.current?.measureInWindow((_sx, sy) => {
+          const contentY = fy - sy + scrollOff.current
+          scrollRef.current?.scrollTo({ y: Math.max(0, contentY - 120), animated: true })
+        })
+      })
+    })
+  }, [])
+
+  const onFieldFocus = useCallback((field: string) => {
+    focusCount.current++
+    setEditing(true)
+    setActiveField(field)
+    scrollToField(field)
+  }, [scrollToField])
+
+  const onFieldBlur = useCallback(() => {
+    focusCount.current = Math.max(0, focusCount.current - 1)
+    if (focusCount.current === 0) { setEditing(false); setActiveField(null) }
+  }, [])
+
+  const previewProps = { nom, pseudo, bio, photoURL, externalLink }
   const usernameStatus = useUsernameCheck(pseudo, currentPseudo)
 
   useEffect(() => {
@@ -65,7 +109,9 @@ export default function EditProfile() {
       const url = await uploadToCloudinary(uri, 'image', { compress: true, quality: 0.8 })
       await updateDoc(doc(db, 'users', user!.uid), { photoURL: url })
       setPhotoURL(url)
-    } catch {
+    } catch (e) {
+      console.warn('[UPLOAD PHOTO]', e)
+      captureException(e instanceof Error ? e : new Error(String(e)), { context: 'pickAndUploadPhoto' })
       Alert.alert('Erreur', "Impossible d'uploader la photo")
     }
     setUploadingPhoto(false)
@@ -124,18 +170,7 @@ export default function EditProfile() {
     setSaving(false)
   }
 
-  const inputStyle = (focused: boolean) => ({
-    backgroundColor: '#111',
-    color: colors.white,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    borderWidth: 1,
-    borderColor: focused ? colors.primary : '#333',
-  })
 
-  const [focusedField, setFocusedField] = useState<string | null>(null)
 
   if (loading) {
     return (
@@ -168,11 +203,13 @@ export default function EditProfile() {
         </TouchableOpacity>
       </View>
 
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 24 }}
+          ref={scrollRef}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 24, paddingBottom: kbHeight || 24 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          onScroll={(e) => { scrollOff.current = e.nativeEvent.contentOffset.y }}
+          onScrollBeginDrag={() => { setEditing(false); setActiveField(null); focusCount.current = 0 }}
         >
           {/* PHOTO */}
           <View style={{ alignItems: 'center', marginBottom: 28 }}>
@@ -214,85 +251,41 @@ export default function EditProfile() {
             ) : null}
           </View>
 
-          {/* NOM COMPLET */}
-          <View style={{ marginBottom: 16 }}>
-            <Text style={{ color: '#888', fontSize: 13, marginBottom: 6, fontWeight: '600' }}>Nom complet</Text>
-            <TextInput
-              value={nom}
-              onChangeText={setNom}
-              placeholder="Ton nom"
-              placeholderTextColor="#555"
-              style={inputStyle(focusedField === 'nom')}
-              onFocus={() => setFocusedField('nom')}
-              onBlur={() => setFocusedField(null)}
-            />
-          </View>
-
-          {/* NOM D'UTILISATEUR */}
-          <View style={{ marginBottom: 16 }}>
-            <Text style={{ color: '#888', fontSize: 13, marginBottom: 6, fontWeight: '600' }}>Nom d'utilisateur</Text>
-            <TextInput
-              value={pseudo}
-              onChangeText={setPseudo}
-              placeholder="@nomutilisateur"
-              placeholderTextColor="#555"
-              autoCapitalize="none"
-              style={inputStyle(focusedField === 'pseudo')}
-              onFocus={() => setFocusedField('pseudo')}
-              onBlur={() => setFocusedField(null)}
-            />
+          <CollapsibleSection title="Informations personnelles" icon="person-outline">
+            {editing && activeField === 'nom' && <ProfilePreview {...previewProps} />}
+            <View ref={(el) => { fieldRefs.current['nom'] = el }}>
+              <FieldWithCounter label="Nom complet" value={nom} onChangeText={setNom} maxLength={40} placeholder="Ton nom" onFocus={() => onFieldFocus('nom')} onBlur={onFieldBlur} />
+            </View>
+            {editing && activeField === 'pseudo' && <ProfilePreview {...previewProps} />}
+            <View ref={(el) => { fieldRefs.current['pseudo'] = el }}>
+              <FieldWithCounter label="Nom d'utilisateur" value={pseudo} onChangeText={setPseudo} maxLength={30} autoCapitalize="none" placeholder="pseudo" onFocus={() => onFieldFocus('pseudo')} onBlur={onFieldBlur} />
+            </View>
             {usernameStatus === 'checking' && (
-              <Text style={{ color: '#888', fontSize: 12, marginTop: 4 }}>Vérification...</Text>
+              <Text style={{ color: '#888', fontSize: 12, marginTop: -8 }}>Vérification...</Text>
             )}
             {usernameStatus === 'available' && (
-              <Text style={{ color: '#4CAF50', fontSize: 12, marginTop: 4 }}>Disponible</Text>
+              <Text style={{ color: '#4CAF50', fontSize: 12, marginTop: -8 }}>Disponible</Text>
             )}
             {usernameStatus === 'taken' && (
-              <Text style={{ color: '#F44336', fontSize: 12, marginTop: 4 }}>Ce pseudo est déjà pris</Text>
+              <Text style={{ color: '#F44336', fontSize: 12, marginTop: -8 }}>Ce pseudo est déjà pris</Text>
             )}
             {usernameStatus === 'invalid' && (
-              <Text style={{ color: '#FF9800', fontSize: 12, marginTop: 4 }}>Min. 3 caractères, lettres/chiffres/./_ uniquement</Text>
+              <Text style={{ color: '#FF9800', fontSize: 12, marginTop: -8 }}>Min. 3 caractères, lettres/chiffres/./_ uniquement</Text>
             )}
-          </View>
+            {editing && activeField === 'bio' && <ProfilePreview {...previewProps} />}
+            <View ref={(el) => { fieldRefs.current['bio'] = el }}>
+              <FieldWithCounter label="Bio" value={bio} onChangeText={setBio} maxLength={150} multiline placeholder="Parle un peu de toi" onFocus={() => onFieldFocus('bio')} onBlur={onFieldBlur} />
+            </View>
+          </CollapsibleSection>
 
-          {/* BIO */}
-          <View style={{ marginBottom: 16 }}>
-            <Text style={{ color: '#888', fontSize: 13, marginBottom: 6, fontWeight: '600' }}>Bio</Text>
-            <TextInput
-              value={bio}
-              onChangeText={setBio}
-              placeholder="Parle un peu de toi..."
-              placeholderTextColor="#555"
-              multiline
-              numberOfLines={3}
-              maxLength={150}
-              style={[inputStyle(focusedField === 'bio'), { minHeight: 60, textAlignVertical: 'top' }]}
-              onFocus={() => setFocusedField('bio')}
-              onBlur={() => setFocusedField(null)}
-            />
-            <Text style={{ color: '#555', fontSize: 11, textAlign: 'right', marginTop: 4 }}>{bio.length}/150</Text>
-          </View>
+          <CollapsibleSection title="Liens & réseaux" icon="link-outline">
+            {editing && activeField === 'externalLink' && <ProfilePreview {...previewProps} />}
+            <View ref={(el) => { fieldRefs.current['externalLink'] = el }}>
+              <FieldWithCounter label="Lien externe" value={externalLink} onChangeText={setExternalLink} autoCapitalize="none" keyboardType="url" placeholder="https://..." onFocus={() => onFieldFocus('externalLink')} onBlur={onFieldBlur} />
+            </View>
+          </CollapsibleSection>
 
-          {/* LIEN EXTERNE */}
-          <View style={{ marginBottom: 16 }}>
-            <Text style={{ color: '#888', fontSize: 13, marginBottom: 6, fontWeight: '600' }}>Lien externe</Text>
-            <TextInput
-              value={externalLink}
-              onChangeText={setExternalLink}
-              placeholder="https://ton-site.com"
-              placeholderTextColor="#555"
-              keyboardType="url"
-              autoCapitalize="none"
-              style={inputStyle(focusedField === 'externalLink')}
-              onFocus={() => setFocusedField('externalLink')}
-              onBlur={() => setFocusedField(null)}
-            />
-            <Text style={{ color: '#555', fontSize: 11, marginTop: 4 }}>Apparaîtra sur ton profil</Text>
-          </View>
-
-          {/* GENRE */}
-          <View style={{ marginBottom: 16 }}>
-            <Text style={{ color: '#888', fontSize: 13, marginBottom: 8, fontWeight: '600' }}>Genre</Text>
+          <CollapsibleSection title="Genre" icon="people-outline" defaultOpen={false}>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {[
                 { key: 'homme', label: 'Homme', icon: 'man-outline' },
@@ -317,45 +310,43 @@ export default function EditProfile() {
                 </TouchableOpacity>
               ))}
             </View>
-          </View>
+          </CollapsibleSection>
 
-          {/* AFFICHER L'ÂGE */}
-          <TouchableOpacity
-            onPress={() => setShowAge(!showAge)}
-            style={{
-              flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-              backgroundColor: '#111', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 14,
-              borderWidth: 1, borderColor: '#333', marginBottom: 16,
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Ionicons name="eye-outline" size={20} color="#888" />
-              <Text style={{ color: colors.white, fontSize: 15 }}>Afficher mon âge</Text>
-            </View>
-            <View style={{ width: 48, height: 28, borderRadius: 14, backgroundColor: showAge ? colors.primary : '#333', justifyContent: 'center', padding: 2 }}>
-              <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: '#fff', transform: [{ translateX: showAge ? 20 : 0 }] }} />
-            </View>
-          </TouchableOpacity>
-
-          {/* COMPTE PRIVÉ */}
-          <TouchableOpacity
-            onPress={() => setPrivateAccount(!privateAccount)}
-            style={{
-              flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-              backgroundColor: '#111', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 14,
-              borderWidth: 1, borderColor: '#333', marginBottom: 16,
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Ionicons name="lock-closed-outline" size={20} color="#888" />
-              <Text style={{ color: colors.white, fontSize: 15 }}>Compte privé</Text>
-            </View>
-            <View style={{ width: 48, height: 28, borderRadius: 14, backgroundColor: privateAccount ? colors.primary : '#333', justifyContent: 'center', padding: 2 }}>
-              <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: '#fff', transform: [{ translateX: privateAccount ? 20 : 0 }] }} />
-            </View>
-          </TouchableOpacity>
+          <CollapsibleSection title="Confidentialité" icon="lock-closed-outline" defaultOpen={false}>
+            <TouchableOpacity
+              onPress={() => setShowAge(!showAge)}
+              style={{
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                backgroundColor: '#111', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 14,
+                borderWidth: 1, borderColor: '#333',
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Ionicons name="eye-outline" size={20} color="#888" />
+                <Text style={{ color: colors.white, fontSize: 15 }}>Afficher mon âge</Text>
+              </View>
+              <View style={{ width: 48, height: 28, borderRadius: 14, backgroundColor: showAge ? colors.primary : '#333', justifyContent: 'center', padding: 2 }}>
+                <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: '#fff', transform: [{ translateX: showAge ? 20 : 0 }] }} />
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setPrivateAccount(!privateAccount)}
+              style={{
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                backgroundColor: '#111', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 14,
+                borderWidth: 1, borderColor: '#333',
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Ionicons name="lock-closed-outline" size={20} color="#888" />
+                <Text style={{ color: colors.white, fontSize: 15 }}>Compte privé</Text>
+              </View>
+              <View style={{ width: 48, height: 28, borderRadius: 14, backgroundColor: privateAccount ? colors.primary : '#333', justifyContent: 'center', padding: 2 }}>
+                <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: '#fff', transform: [{ translateX: privateAccount ? 20 : 0 }] }} />
+              </View>
+            </TouchableOpacity>
+          </CollapsibleSection>
         </ScrollView>
-      </KeyboardAvoidingView>
     </SafeAreaView>
   )
 }
