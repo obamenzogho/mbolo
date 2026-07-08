@@ -20,7 +20,7 @@ export function CommentText({ text, mentionMap = {}, style }: CommentTextProps) 
             <Text
               key={i}
               style={{ color: colors.secondary, fontWeight: '600' }}
-              onPress={uid ? () => router.push({ pathname: '/(tabs)/user/[userId]', params: { userId: uid } }) : undefined}
+              onPress={uid ? () => router.push({ pathname: '/user/[userId]', params: { userId: uid } }) : undefined}
             >
               @{seg.value}
             </Text>

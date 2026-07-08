@@ -163,7 +163,7 @@ const SuggestionItem = memo(function SuggestionItem({ suggestion, onDismiss }: {
   return (
     <View style={styles.hPage}>
       <TouchableOpacity
-        onPress={() => router.push({ pathname: '/(tabs)/user/[userId]', params: { userId: suggestion.id } })}
+        onPress={() => router.push({ pathname: '/user/[userId]', params: { userId: suggestion.id } })}
         activeOpacity={0.8}
       >
         <View>

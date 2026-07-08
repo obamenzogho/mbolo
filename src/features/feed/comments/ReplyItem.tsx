@@ -75,7 +75,7 @@ function ReplyItemComponent({ reply, commentId, currentUserId, onLike, onDelete 
   return (
     <TouchableOpacity onLongPress={handleLongPress} activeOpacity={0.8}>
       <View style={styles.container}>
-        <TouchableOpacity onPress={() => router.push({ pathname: '/(tabs)/user/[userId]', params: { userId: reply.userId } })}>
+        <TouchableOpacity onPress={() => router.push({ pathname: '/user/[userId]', params: { userId: reply.userId } })}>
           {photoURL ? (
             <Image source={{ uri: photoURL }} style={styles.avatar} />
           ) : (

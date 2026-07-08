@@ -18,7 +18,7 @@ export default function PseudoResolver() {
       const snap = await getDoc(doc(db, 'usernames', normalized))
       const uid = snap.exists() ? snap.data()?.uid : null
       if (uid) {
-        router.replace({ pathname: '/(tabs)/user/[userId]', params: { userId: uid } })
+        router.replace({ pathname: '/user/[userId]', params: { userId: uid } })
       } else {
         setNotFound(true)
       }

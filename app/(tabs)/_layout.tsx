@@ -24,7 +24,6 @@ export default function TabsLayout() {
           <Tabs.Screen name="explore" options={{ href: null }} />
           <Tabs.Screen name="upload" options={{ href: null }} />
           <Tabs.Screen name="edit-profile" options={{ href: null }} />
-          <Tabs.Screen name="user/[userId]" options={{ href: null }} />
           <Tabs.Screen name="story-upload" options={{ href: null }} />
           <Tabs.Screen name="reel-upload" options={{ href: null }} />
           <Tabs.Screen name="camera" options={{ href: null }} />

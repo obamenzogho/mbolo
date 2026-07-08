@@ -123,7 +123,7 @@ function CommentItemComponent({
   return (
     <TouchableOpacity onLongPress={handleLongPress} activeOpacity={0.9}>
       <View style={[styles.container, (comment as any).hidden && { opacity: 0.45 }]}>
-        <TouchableOpacity onPress={() => router.push({ pathname: '/(tabs)/user/[userId]', params: { userId: comment.userId } })}>
+        <TouchableOpacity onPress={() => router.push({ pathname: '/user/[userId]', params: { userId: comment.userId } })}>
           {photoURL ? (
             <Image source={{ uri: photoURL }} style={styles.avatar} />
           ) : (

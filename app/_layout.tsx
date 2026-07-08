@@ -34,7 +34,7 @@ const handleNotificationNavigation = (router: ReturnType<typeof useRouter>, type
   switch (type) {
     case 'follow':
     case 'follow_request':
-      if (data.userId) router.push({ pathname: '/(tabs)/user/[userId]', params: { userId: data.userId } })
+      if (data.userId) router.push({ pathname: '/user/[userId]', params: { userId: data.userId } })
       break
     case 'like':
     case 'comment':
@@ -126,6 +126,7 @@ function RootContent() {
     >
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="user/[userId]" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="post" options={{ headerShown: false, presentation: 'modal' }} />
       <Stack.Screen name="search" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
       <Stack.Screen name="insights" options={{ headerShown: false, animation: 'slide_from_bottom' }} />

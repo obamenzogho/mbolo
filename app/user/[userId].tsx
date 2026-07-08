@@ -14,18 +14,17 @@ import { GestureDetector, Gesture } from 'react-native-gesture-handler'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { doc, onSnapshot } from 'firebase/firestore'
-import { auth, db } from '../../../src/lib/firebase'
-import { batchFetchUsers } from '../../../src/lib/firestore'
-import { Avatar } from '../../../src/components/ui/Avatar'
-import { colors } from '../../../src/lib/theme'
-import { captureException } from '../../../src/lib/sentry'
-import type { User as UserType, ProfileTab } from '../../../src/types'
-import { useLocalSearchParams, router, Redirect } from 'expo-router'
-import { useFollow } from '../../../src/hooks/useFollow'
-import { useGoBack } from '../../../src/hooks/useGoBack'
-import FollowButton from '../../../src/components/FollowButton'
-import OrbitLoader from '../../../src/components/OrbitLoader'
-import BottomSheet from '../../../src/components/ui/BottomSheet'
+import { auth, db } from '../../src/lib/firebase'
+import { batchFetchUsers } from '../../src/lib/firestore'
+import { Avatar } from '../../src/components/ui/Avatar'
+import { colors } from '../../src/lib/theme'
+import { captureException } from '../../src/lib/sentry'
+import type { User as UserType, ProfileTab } from '../../src/types'
+import { useFollow } from '../../src/hooks/useFollow'
+import { useGoBack } from '../../src/hooks/useGoBack'
+import FollowButton from '../../src/components/FollowButton'
+import OrbitLoader from '../../src/components/OrbitLoader'
+import BottomSheet from '../../src/components/ui/BottomSheet'
 import { getOrCreateConversation } from '@/features/chat/services/chatService'
 import { useProfileTabs } from '@/hooks/useProfileTabs'
 import { ProfileTabBar } from '@/components/ProfileTabBar'
@@ -445,7 +444,7 @@ export default function UserProfile() {
                     onPress={() => {
                       if (!isMe) {
                         closeFollowModal()
-                        setTimeout(() => router.push({ pathname: '/(tabs)/user/[userId]', params: { userId: item.id } }), 300)
+                        setTimeout(() => router.push({ pathname: '/user/[userId]', params: { userId: item.id } }), 300)
                       }
                     }}
                     style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 12 }}
@@ -489,7 +488,7 @@ export default function UserProfile() {
                     onPress={() => {
                       if (!isMe) {
                         closeFollowModal()
-                        setTimeout(() => router.push({ pathname: '/(tabs)/user/[userId]', params: { userId: item.id } }), 300)
+                        setTimeout(() => router.push({ pathname: '/user/[userId]', params: { userId: item.id } }), 300)
                       }
                     }}
                     style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 12 }}

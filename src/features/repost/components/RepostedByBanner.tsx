@@ -24,7 +24,7 @@ function RepostedByBannerComponent({
     <TouchableOpacity
       onPress={() =>
         router.push({
-          pathname: '/(tabs)/user/[userId]',
+          pathname: '/user/[userId]',
           params: { userId: reposterId },
         })
       }

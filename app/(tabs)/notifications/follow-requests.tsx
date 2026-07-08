@@ -130,7 +130,7 @@ export default function FollowRequests() {
           return (
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={() => router.push(`/(tabs)/user/${item.id}`)}
+              onPress={() => router.push(`/user/${item.id}`)}
               style={{
                 backgroundColor: colors.surface,
                 borderRadius: 16,

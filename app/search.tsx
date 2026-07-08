@@ -58,7 +58,7 @@ export default function Search() {
   const openUser = (id: string, pseudo: string) => {
     saveRecent(pseudo)
     Keyboard.dismiss()
-    router.push({ pathname: '/(tabs)/user/[userId]', params: { userId: id } })
+    router.push({ pathname: '/user/[userId]', params: { userId: id } })
   }
 
   const openHashtag = (tag: string) => {

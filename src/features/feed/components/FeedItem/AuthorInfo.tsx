@@ -38,7 +38,7 @@ export const AuthorInfo = memo(function AuthorInfo({ item, username, userPhotoUR
   useEffect(() => () => clearTimeout(followTimer.current), [])
 
   const goToProfile = useCallback(() => {
-    router.push({ pathname: '/(tabs)/user/[userId]', params: { userId: item.userId } })
+    router.push({ pathname: '/user/[userId]', params: { userId: item.userId } })
   }, [item.userId])
 
   const handleFollow = useCallback(() => {

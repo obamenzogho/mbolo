@@ -1,8 +1,8 @@
 import { memo } from 'react'
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { colors } from '../../../lib/theme'
-import type { Notification as NotificationType } from '../../../types'
+import { colors } from '../../lib/theme'
+import type { Notification as NotificationType } from '../../types'
 
 const ICON: Record<string, { name: keyof typeof Ionicons.glyphMap; color: string }> = {
   like:           { name: 'heart',            color: '#FF2D55' },

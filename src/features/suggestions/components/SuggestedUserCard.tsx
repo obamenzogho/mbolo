@@ -26,7 +26,7 @@ function SuggestedUserCardInner({
     if (onPress) {
       onPress(suggestion.id)
     } else {
-      router.push({ pathname: '/(tabs)/user/[userId]', params: { userId: suggestion.id } })
+      router.push({ pathname: '/user/[userId]', params: { userId: suggestion.id } })
     }
   }, [suggestion.id, onPress])
 
