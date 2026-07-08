@@ -3,30 +3,20 @@ import { View, Text, SectionList, TouchableOpacity } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router, useFocusEffect } from 'expo-router'
-import { collection, query, where, orderBy, onSnapshot, limit } from 'firebase/firestore'
+import { collection, query, where, orderBy, onSnapshot, limit, doc, getDoc } from 'firebase/firestore'
 import { auth, db } from '../../src/lib/firebase'
 import { batchFetchUsers } from '../../src/lib/firestore'
 import { colors } from '../../src/lib/theme'
 import QueryErrorMessage, { getIndexErrorMessage } from '../../src/components/ui/QueryErrorMessage'
 import OrbitLoader from '../../src/components/OrbitLoader'
-import { markAllNotificationsRead, markNotificationRead } from '../../src/services/notificationActions'
+import { NotificationRow } from '../../src/components/notifications/NotificationRow'
+import { markAsRead, markAllAsRead } from '../../src/services/notificationRead'
+import notificationService from '../../src/services/notificationService'
 import { groupByTime } from '../../src/lib/notificationGroups'
 import type { Notification as NotificationType } from '../../src/types'
 
-const iconMap: Record<string, any> = {
-  like: 'heart',
-  comment: 'chatbubble',
-  follow: 'person-add',
-  follow_request: 'person-add',
-  follow_accept: 'checkmark-circle',
-  message: 'chatbubble-ellipses',
-  repost: 'repeat',
-  tag: 'pricetag',
-  mention: 'at',
-}
-
 const handleNotifPress = (item: NotificationType) => {
-  markNotificationRead(item.id)
+  markAsRead(item.id)
   switch (item.type) {
     case 'follow':
     case 'follow_accept':
@@ -49,24 +39,10 @@ const handleNotifPress = (item: NotificationType) => {
   }
 }
 
-const messageForType = (type: string, name: string) => {
-  switch (type) {
-    case 'like': return `${name} a aimé ta vidéo`
-    case 'comment': return `${name} a commenté ta vidéo`
-    case 'follow': return `${name} a commencé à te suivre`
-    case 'follow_request': return `${name} veut te suivre`
-    case 'follow_accept': return `${name} a accepté ta demande`
-    case 'message': return `${name} t'a envoyé un message`
-    case 'repost': return `${name} a republié ta vidéo`
-    case 'tag': return `${name} t'a identifié dans une vidéo`
-    case 'mention': return `${name} t'a mentionné`
-    default: return ''
-  }
-}
-
 export default function Notifications() {
   const [notifications, setNotifications] = useState<NotificationType[]>([])
-  const [fromUserNames, setFromUserNames] = useState<Record<string, string>>({})
+  const [actors, setActors] = useState<Record<string, { name: string; avatar?: string }>>({})
+  const [videoThumbs, setVideoThumbs] = useState<Record<string, string>>({})
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [retryCount, setRetryCount] = useState(0)
   const [ready, setReady] = useState(false)
@@ -88,17 +64,36 @@ export default function Notifications() {
         const items = snap.docs.map((d: any) => ({ id: d.id, ...d.data() })) as NotificationType[]
         setNotifications(items)
 
-        const fromUserIds = [...new Set(items.map((n) => n.fromUserId).filter(Boolean))]
-        const unknownIds = fromUserIds.filter((id) => !fromUserNames[id])
+        const unreadCount = items.filter((n: any) => n.read === false).length
+        notificationService.setBadgeCount(unreadCount).catch(() => {})
 
-        if (unknownIds.length > 0) {
+        const fromUserIds = [...new Set(items.map((n) => n.fromUserId).filter(Boolean))]
+        const unknownActors = fromUserIds.filter((id) => !actors[id])
+
+        if (unknownActors.length > 0) {
           try {
-            const userMap = await batchFetchUsers(unknownIds)
-            const names: Record<string, string> = {}
-            userMap.forEach((user, id) => {
-              names[id] = user.nom || user.pseudo || 'Quelqu\'un'
+            const userMap = await batchFetchUsers(unknownActors)
+            const next: Record<string, { name: string; avatar?: string }> = {}
+            userMap.forEach((u, id) => {
+              next[id] = { name: u.nom || u.pseudo || 'Quelqu\'un', avatar: u.photoURL }
             })
-            setFromUserNames((prev) => ({ ...prev, ...names }))
+            setActors((prev) => ({ ...prev, ...next }))
+          } catch {}
+        }
+
+        const videoIds = [...new Set(items.map((n: any) => n.videoId || n.postId).filter(Boolean))]
+        const unknownVids = videoIds.filter((id) => !videoThumbs[id])
+        if (unknownVids.length > 0) {
+          try {
+            const results = await Promise.allSettled(unknownVids.map((id: string) => getDoc(doc(db, 'videos', id))))
+            const next: Record<string, string> = {}
+            results.forEach((r, i) => {
+              if (r.status === 'fulfilled' && r.value.exists()) {
+                const d = r.value.data() as any
+                next[unknownVids[i]] = d.thumbnailURL || d.coverURL || ''
+              }
+            })
+            setVideoThumbs((prev) => ({ ...prev, ...next }))
           } catch {}
         }
       },
@@ -119,9 +114,9 @@ export default function Notifications() {
   }, [subscribe, retryCount])
 
   useFocusEffect(useCallback(() => {
-    const t = setTimeout(() => markAllNotificationsRead(), 1500)
+    const t = setTimeout(() => userId && markAllAsRead(userId), 1500)
     return () => clearTimeout(t)
-  }, []))
+  }, [userId]))
 
   const handleRetry = useCallback(() => {
     setRetryCount((c) => c + 1)
@@ -136,11 +131,19 @@ export default function Notifications() {
   }
 
   const sections = groupByTime(notifications)
+  const hasUnread = notifications.some((n: any) => n.read === false)
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 }}>
+      <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <Text style={{ fontSize: 28, fontWeight: '800', color: colors.white }}>Notifications</Text>
+        {hasUnread && (
+          <TouchableOpacity onPress={() => userId && markAllAsRead(userId)} style={{ padding: 6 }}>
+            <Text style={{ color: colors.secondary, fontSize: 13, fontWeight: '600' }}>
+              Tout marquer comme lu
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {errorMessage && (
@@ -165,26 +168,17 @@ export default function Notifications() {
           </View>
         }
         renderItem={({ item }) => {
-          const name = fromUserNames[item.fromUserId] || 'Quelqu\'un'
-
+          const actor = actors[item.fromUserId] ?? { name: 'Quelqu\'un' }
+          const vidId = (item as any).videoId || (item as any).postId
           return (
-            <TouchableOpacity onPress={() => handleNotifPress(item)} activeOpacity={0.7}>
-              <View style={{
-                flexDirection: 'row', alignItems: 'center', gap: 12,
-                paddingVertical: 12, paddingHorizontal: 12, borderRadius: 10,
-                backgroundColor: item.read ? 'transparent' : 'rgba(0,200,83,0.08)',
-              }}>
-                <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceLight, justifyContent: 'center', alignItems: 'center' }}>
-                  <Ionicons name={iconMap[item.type] || 'notifications'} size={20} color={colors.primary} />
-                </View>
-                <Text style={{ color: colors.text, flex: 1, fontSize: 14 }}>
-                  {messageForType(item.type, name)}
-                </Text>
-                {!item.read && (
-                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary }} />
-                )}
-              </View>
-            </TouchableOpacity>
+            <NotificationRow
+              item={item}
+              actorName={actor.name}
+              actorAvatar={actor.avatar}
+              videoThumb={vidId ? videoThumbs[vidId] : undefined}
+              onPressActor={() => router.push({ pathname: '/(tabs)/user/[userId]', params: { userId: item.fromUserId } })}
+              onPress={() => handleNotifPress(item)}
+            />
           )
         }}
       />
