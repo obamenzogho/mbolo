@@ -12,9 +12,9 @@ import {
   orderBy,
   limit,
   getDocs,
-  startAfter,
   doc,
   getDoc,
+  documentId,
   type QueryDocumentSnapshot,
 } from 'firebase/firestore'
 import { useStore } from 'zustand'
@@ -25,6 +25,7 @@ import { generateThumbnailURL } from '../../../lib/cloudinary'
 import { getSeenVideos } from '../../../lib/feed'
 import { getBlockedUserIds } from '../../../lib/blockService'
 import { FEED_DEBUG } from '../store/feedStore'
+import { diversify } from '../services/rankVideos'
 import type { Video } from '../../../types'
 import type { FeedState } from '../store/feedStore'
 
@@ -44,6 +45,7 @@ export function useFollowingFeedData({ store, isActive = true }: { store: StoreA
   const seenVideosRef = useRef<Set<string>>(new Set())
   const seenLoadedRef = useRef(false)
   const extraFetchesRef = useRef(0)
+  const recentCreatorsRef = useRef<string[]>([])
   const videos = useStore(store, (s) => s.videos)
   const currentIndex = useStore(store, (s) => s.currentIndex)
   const isLoadingMore = useStore(store, (s) => s.isLoadingMore)
@@ -100,22 +102,39 @@ export function useFollowingFeedData({ store, isActive = true }: { store: StoreA
         batches.push(following.slice(i, i + BATCH_SIZE))
       }
 
-      const queries = batches.map((batch) => {
-        const constraints: any[] = [
+      // ✅ FIX pagination : un SEUL curseur temporel commun à tous les batches.
+      // startAfter(doc) n'a aucun sens entre requêtes parallèles indépendantes.
+      const buildConstraints = (batch: string[]) => {
+        const c: any[] = [
           where('userId', 'in', batch),
           orderBy('createdAt', 'desc'),
           limit(PAGE_SIZE),
         ]
-        if (lastDocRef.current) {
-          constraints.push(startAfter(lastDocRef.current))
-        }
-        if (lastTimestampRef.current) {
-          constraints.push(where('createdAt', '<', lastTimestampRef.current))
-        }
-        return getDocs(query(collection(db, 'videos'), ...constraints))
+        if (lastTimestampRef.current) c.push(where('createdAt', '<', lastTimestampRef.current))
+        return c
+      }
+
+      // Vidéos POSTÉES par les gens suivis
+      const authoredQueries = batches.map((batch) =>
+        getDocs(query(collection(db, 'videos'), ...buildConstraints(batch)))
+      )
+
+      // ✅ REPOSTS : docs de reposts des gens suivis, dans la même fenêtre temporelle
+      const repostQueries = batches.map((batch) => {
+        const c: any[] = [
+          where('userId', 'in', batch),
+          orderBy('createdAt', 'desc'),
+          limit(PAGE_SIZE),
+        ]
+        if (lastTimestampRef.current) c.push(where('createdAt', '<', lastTimestampRef.current))
+        return getDocs(query(collection(db, 'reposts'), ...c))
       })
 
-      const snapshots = await Promise.all(queries)
+      const [authoredSnaps, repostSnaps] = await Promise.all([
+        Promise.all(authoredQueries),
+        Promise.all(repostQueries),
+      ])
+      const snapshots = authoredSnaps
 
       const allDocs: { doc: any; createdAt: Date }[] = []
       for (const snap of snapshots) {
@@ -129,13 +148,57 @@ export function useFollowingFeedData({ store, isActive = true }: { store: StoreA
         }
       }
 
+      // ✅ Résout les vidéos repostées (batch-fetch par documentId, 30 max)
+      const repostEntries: { videoId: string; repostedAt: Date; reposterId: string }[] = []
+      for (const snap of repostSnaps) {
+        for (const d of snap.docs) {
+          const r = d.data()
+          if (!r.postId) continue
+          repostEntries.push({
+            videoId: r.postId,
+            repostedAt: r.createdAt?.toDate?.() ?? new Date(),
+            reposterId: r.userId,
+          })
+        }
+      }
+      if (repostEntries.length > 0) {
+        const ids = [...new Set(repostEntries.map((e) => e.videoId))]
+        const chunks: string[][] = []
+        for (let i = 0; i < ids.length; i += 30) chunks.push(ids.slice(i, i + 30))
+        const vSnaps = await Promise.all(
+          chunks.map((chunk) =>
+            getDocs(query(collection(db, 'videos'), where(documentId(), 'in', chunk)))
+          )
+        )
+        const vMap = new Map<string, any>()
+        vSnaps.forEach((s) => s.docs.forEach((d) => vMap.set(d.id, d)))
+        for (const e of repostEntries) {
+          const d = vMap.get(e.videoId)
+          if (!d) continue
+          const data = d.data()
+          if (data.corrupted || data.moderationStatus === 'hidden') continue
+          if (seenVideosRef.current.has(d.id)) continue
+          if (blockedIds.has(data.userId)) continue
+          // La date de tri = date du repost (c'est ça qui le fait remonter)
+          allDocs.push({ doc: d, createdAt: e.repostedAt })
+        }
+      }
+
       if (allDocs.length === 0) {
         setHasMore(false)
         return
       }
 
-      allDocs.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-      const topDocs = allDocs.slice(0, PAGE_SIZE)
+      // ✅ Dédoublonne (une vidéo postée ET repostée = une seule entrée, la plus récente)
+      const byId = new Map<string, { doc: any; createdAt: Date }>()
+      for (const entry of allDocs) {
+        const prev = byId.get(entry.doc.id)
+        if (!prev || entry.createdAt.getTime() > prev.createdAt.getTime()) {
+          byId.set(entry.doc.id, entry)
+        }
+      }
+      const deduped = [...byId.values()].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      const topDocs = deduped.slice(0, PAGE_SIZE)
 
       lastDocRef.current = topDocs[topDocs.length - 1].doc as QueryDocumentSnapshot
       lastTimestampRef.current = topDocs[topDocs.length - 1].createdAt
@@ -179,14 +242,18 @@ export function useFollowingFeedData({ store, isActive = true }: { store: StoreA
         return
       }
 
+      // ✅ Diversité par créateur : évite qu'un seul compte squatte le feed
+      const diversified = diversify(videoList, 3, recentCreatorsRef.current)
+      recentCreatorsRef.current = diversified.slice(-3).map((v) => v.userId)
+
       if (isFirstFetch.current) {
         isFirstFetch.current = false
-        setVideos(videoList)
+        setVideos(diversified)
       } else {
-        appendVideos(videoList)
+        appendVideos(diversified)
       }
 
-      setHasMore(allDocs.length > PAGE_SIZE)
+      setHasMore(deduped.length > PAGE_SIZE)
     } catch (e) {
       captureException(e instanceof Error ? e : new Error(String(e)), { context: 'useFollowingFeedData' })
     } finally {

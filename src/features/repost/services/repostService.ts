@@ -66,7 +66,7 @@ export async function getRepostedVideos(
 
   const result = await withFirestoreRetry(() => getDocs(q), { context: 'getRepostedVideos' })
   if (result.error) {
-    captureException(result.error, { context: 'getRepostedVideos' })
+    captureException(new Error(result.error.message), { context: 'getRepostedVideos', code: result.error.code })
     return { videos: [], lastDoc: null, hasMore: false }
   }
 

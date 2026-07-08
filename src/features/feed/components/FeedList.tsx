@@ -17,7 +17,8 @@ function isSuggestionItem(item: FeedListItem): item is { type: 'suggestion'; key
   return 'type' in item && item.type === 'suggestion'
 }
 
-function flatToVideoIdx(flatIdx: number, mode: FeedMode): number {
+function flatToVideoIdx(flatIdx: number, mode: FeedMode, hasSuggestions: boolean): number {
+  if (!hasSuggestions) return flatIdx
   if (mode === 'following') return Math.max(0, flatIdx - 1)
   return flatIdx - Math.floor((flatIdx + 1) / SUGGESTION_STRIDE)
 }
@@ -65,6 +66,9 @@ function FeedListComponent({
 }: FeedListProps) {
   const indexRef = useRef(currentIndex)
   indexRef.current = currentIndex
+  const hasSuggestions = !!suggestions && suggestions.length > 0
+  const hasSuggestionsRef = useRef(hasSuggestions)
+  hasSuggestionsRef.current = hasSuggestions
   const { height: SCREEN_HEIGHT } = useWindowDimensions()
   const insets = useSafeAreaInsets()
   const ITEM_HEIGHT = SCREEN_HEIGHT - insets.bottom
@@ -104,7 +108,7 @@ function FeedListComponent({
       if (videoItems.length === 0) return
       const top = videoItems[0]
       if (top && top.index != null) {
-        const videoIdx = flatToVideoIdx(top.index, feedType)
+        const videoIdx = flatToVideoIdx(top.index, feedType, hasSuggestionsRef.current)
         if (videoIdx !== indexRef.current) {
           setCurrentIndex(videoIdx)
           setIsScrolling(false)
@@ -138,7 +142,7 @@ function FeedListComponent({
         )
       }
       const video = item as Video
-      const videoIndex = flatToVideoIdx(index, feedType)
+      const videoIndex = flatToVideoIdx(index, feedType, hasSuggestions)
       return (
         <FeedItem
           item={video}

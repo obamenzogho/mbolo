@@ -30,7 +30,7 @@ export function scoreVideo(v: Video, taste: UserTaste, now = Date.now()): number
   return engagement * 1.0 + freshness * 4.0 + affinity * 3.0 + quality * 2.0
 }
 
-function diversify(sorted: Video[], minGap = MIN_GAP, recentCreators: string[] = []): Video[] {
+export function diversify(sorted: Video[], minGap = MIN_GAP, recentCreators: string[] = []): Video[] {
   const result: Video[] = []
   const lastSeenAt: Record<string, number> = {}
   recentCreators.forEach((uid, i) => {
