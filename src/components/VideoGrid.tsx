@@ -1,7 +1,7 @@
 import { useCallback, useRef } from 'react'
 import { View, Text, FlatList, Dimensions } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
-import { runOnJS } from 'react-native-reanimated'
+import { useSharedValue, runOnJS } from 'react-native-reanimated'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '@/lib/theme'
 import { VideoThumbnailCell } from '@/components/VideoThumbnailCell'
@@ -35,9 +35,9 @@ export function VideoGrid({
   onRefresh, loadMore, hasMore, isOwn,
   ListHeaderComponent, onThumbnailPress,
 }: VideoGridProps) {
-  const scrollOffsetRef = useRef(0)
   const refreshingRef = useRef(false)
   refreshingRef.current = refreshing
+  const scrollOffsetY = useSharedValue(0)
 
   const renderItem = useCallback(
     ({ item }: { item: VideoType }) => <VideoThumbnailCell item={item} isOwn={isOwn} onPress={onThumbnailPress} />,
@@ -47,7 +47,7 @@ export function VideoGrid({
   const keyExtractor = useCallback((item: VideoType) => item.id, [])
 
   const onScroll = useCallback((e: any) => {
-    scrollOffsetRef.current = e.nativeEvent.contentOffset.y
+    scrollOffsetY.value = e.nativeEvent.contentOffset.y
   }, [])
 
   const handleRefresh = useCallback(() => {
@@ -60,7 +60,7 @@ export function VideoGrid({
   const panGesture = Gesture.Pan()
     .minDistance(10)
     .onEnd((e, success) => {
-      if (success && scrollOffsetRef.current <= 0 && e.translationY > 80) {
+      if (success && scrollOffsetY.value <= 0 && e.translationY > 80) {
         runOnJS(handleRefresh)()
       }
     })

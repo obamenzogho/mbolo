@@ -289,9 +289,10 @@ export default function Profile() {
   const tabConfig: ProfileTab[] = ['grid', 'saved', 'liked', 'reposted', 'tagged']
 
   const translateX = useSharedValue(0)
+  const tabCount = tabConfig.length
   const swipeOffsetPx = useDerivedValue(() => {
     'worklet'
-    return -translateX.value / tabConfig.length
+    return -translateX.value / tabCount
   })
 
   const handleTabChange = useCallback((tab: ProfileTab) => {
@@ -394,7 +395,6 @@ export default function Profile() {
                       <TouchableOpacity onPress={async () => { const cityName = await detectCity(); if (cityName) { await updateDoc(doc(db, 'users', user!.uid), { city: cityName }); setProfile(prev => prev ? { ...prev, city: cityName } : prev) } }} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                         <Ionicons name="location-outline" size={13} color={colors.textSecondary} />
                         <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{profile.city}</Text>
-                        <Ionicons name="refresh-outline" size={12} color={colors.textFaint} />
                       </TouchableOpacity>
                     ) : (
                       <TouchableOpacity onPress={async () => { const cityName = await detectCity(); if (cityName) { await updateDoc(doc(db, 'users', user!.uid), { city: cityName }); setProfile(prev => prev ? { ...prev, city: cityName } : prev) } }} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>

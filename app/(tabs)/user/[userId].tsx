@@ -140,9 +140,10 @@ export default function UserProfile() {
   const tabConfig: ProfileTab[] = ['grid']
 
   const translateX = useSharedValue(0)
+  const tabCount = tabConfig.length
   const swipeOffsetPx = useDerivedValue(() => {
     'worklet'
-    return -translateX.value / tabConfig.length
+    return -translateX.value / tabCount
   })
 
   const handleTabChange = useCallback((tab: ProfileTab) => {

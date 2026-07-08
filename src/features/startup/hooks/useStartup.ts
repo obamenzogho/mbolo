@@ -29,7 +29,6 @@ export function useStartup() {
   const launchTimeRef = useRef(Date.now())
 
   const startTransition = useCallback(() => {
-    'worklet'
     logoOpacity.value = withTiming(0, { duration: LOGO_FADE_DURATION, easing: Easing.out(Easing.cubic) })
     logoScale.value = withTiming(0.8, { duration: LOGO_FADE_DURATION, easing: Easing.out(Easing.cubic) })
     feedOpacity.value = withDelay(
