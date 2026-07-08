@@ -71,7 +71,7 @@ service cloud.firestore {
     // moderationStatus, hiddenAt, hiddenReason are SERVER-ONLY (Cloud Functions).
     // No client can write these fields — enforced in create/update rules below.
     match /videos/{videoId} {
-      allow read: if request.auth != null && (!resource.data.exists || resource.data.moderationStatus != 'hidden');
+      allow read: if request.auth != null;
       allow create: if request.auth != null
         && request.resource.data.userId == request.auth.uid
         && !('moderationStatus' in request.resource.data);

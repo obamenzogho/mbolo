@@ -85,8 +85,8 @@
     "semantic_hash": ""
   },
   "app/(tabs)/video-editor.tsx": {
-    "mtime": 1783484587.3063543,
-    "ast_hash": "59a603e140a4a549d6e5780c7971c013",
+    "mtime": 1783425532.3908498,
+    "ast_hash": "b74e202e1dac937c7dd2d1afd9f94cb4",
     "semantic_hash": ""
   },
   "app/_layout.tsx": {
@@ -465,9 +465,9 @@
     "semantic_hash": ""
   },
   "src/lib/sentry.ts": {
-    "mtime": 1783484583.81329,
-    "ast_hash": "2bb68c854155e9da994744a94fea564e",
-    "semantic_hash": ""
+    "mtime": 1779763020.6015615,
+    "ast_hash": "efc6e9edc53407ae7e1aceb666132b82",
+    "semantic_hash": "efc6e9edc53407ae7e1aceb666132b82"
   },
   "src/lib/socialShare.ts": {
     "mtime": 1779763020.6015615,
@@ -755,8 +755,8 @@
     "semantic_hash": ""
   },
   "src/features/feed/hooks/useVideoPlayerPool.ts": {
-    "mtime": 1783484582.063258,
-    "ast_hash": "591c382d85855b52cbff8e1435f2e24b",
+    "mtime": 1783171246.6952646,
+    "ast_hash": "6d6021b22537e7139dac6c404329dae5",
     "semantic_hash": ""
   },
   "src/features/feed/hooks/useVisibleIndex.ts": {
@@ -1382,11 +1382,6 @@
   ".github/workflows/eas-build.yml": {
     "mtime": 1783458244.6880803,
     "ast_hash": "1dc3b0d936833e641c2b5df3afefdd6e",
-    "semantic_hash": ""
-  },
-  "app/settings/_layout.tsx": {
-    "mtime": 1783484580.9962385,
-    "ast_hash": "4954de44ff3ab49d84d57982801385e1",
     "semantic_hash": ""
   }
 }

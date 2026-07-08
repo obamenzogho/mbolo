@@ -12,7 +12,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { Video } from 'expo-av'
+import { useVideoPlayer, VideoView } from 'expo-video'
 import * as VideoThumbnails from 'expo-video-thumbnails'
 import { collection, addDoc, serverTimestamp, doc, updateDoc, increment, getDoc } from 'firebase/firestore'
 import { auth, db } from '../../src/lib/firebase'
@@ -56,6 +56,7 @@ export default function VideoEditorScreen() {
   const descriptionRef = useRef<TextInput>(null)
 
   const isVideo = mediaType === 'video'
+  const videoPlayer = useVideoPlayer(isVideo && mediaUri ? mediaUri : null, (p) => { p.loop = true; p.muted = false })
 
   // Generate thumbnail for video cover
   useEffect(() => {
@@ -211,13 +212,11 @@ export default function VideoEditorScreen() {
           {/* PREVIEW */}
           <View style={{ width: SCREEN_WIDTH, height: SCREEN_HEIGHT * 0.45, backgroundColor: '#111' }}>
             {isVideo ? (
-              <Video
-                source={{ uri: mediaUri }}
+              <VideoView
+                player={videoPlayer}
                 style={{ width: '100%', height: '100%' }}
-                useNativeControls
-                resizeMode="cover"
-                isLooping
-                shouldPlay
+                nativeControls
+                contentFit="cover"
               />
             ) : (
               <Image source={{ uri: mediaUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
@@ -331,13 +330,10 @@ export default function VideoEditorScreen() {
             )}
             <View style={{ width: 80, height: 100, borderRadius: 8, overflow: 'hidden' }}>
               {isVideo ? (
-                <Video
-                  source={{ uri: mediaUri }}
+                <VideoView
+                  player={videoPlayer}
                   style={{ width: '100%', height: '100%' }}
-                  resizeMode="cover"
-                  isLooping
-                  shouldPlay
-                  isMuted
+                  contentFit="cover"
                 />
               ) : (
                 <Image source={{ uri: mediaUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />

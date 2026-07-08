@@ -81,7 +81,7 @@ export function useVideoPlayerPool(
         if (slot.videoId) {
           removePlayerForVideo(currentId, slot.videoId)
         }
-        try { slot.player.replace(null) } catch {}
+        try { slot.player.replaceAsync(null) } catch {}
       }
       slotsRef.current = []
       mapRef.current.clear()
@@ -107,7 +107,7 @@ export function useVideoPlayerPool(
     slot.state = 'RECYCLING'
     slot.loadedQuality = null
     try { slot.player.currentTime = 0 } catch {}
-    try { slot.player.replace(null) } catch {}
+    try { slot.player.replaceAsync(null) } catch {}
     try { slot.player.pause() } catch {}
     slot.state = 'IDLE'
     slot.role = null

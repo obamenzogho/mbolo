@@ -709,3 +709,43 @@ Usage: lookup rapide pseudo → email au login (login.tsx:52)
 - Génère un graphe interactif visualisable
 **Conséquences :** Maintien du script graphify-cli.js, exécution après chaque modification de code
 
+---
+
+## ADR 2026-07-08: Fix route "settings" cassée
+
+**Problème :** Le `_layout.tsx` racine référençait `settings` comme route, mais `app/settings/` contenait `index.tsx`, `about.tsx`, `blocked-words.tsx` sans `_layout.tsx` → expo-router ne reconnaissait pas `settings` comme route valide, causant un warning en boucle.
+
+**Solution :** Création de `app/settings/_layout.tsx` avec un `<Stack>` simple. Les sous-routes `about` et `blocked-words` deviennent accessibles via `settings/about` et `settings/blocked-words`, et `router.push('/settings')` pointe sur `settings/index` automatiquement.
+
+---
+
+## ADR 2026-07-08: Fix VideoPlayer.replace synchrone
+
+**Problème :** `useVideoPlayerPool.ts` utilisait `player.replace(null)` synchrone dans `recycleSlot()` et le cleanup `useEffect`, déclenchant 10 warnings (`5 slots × 2 nettoyages`) au reload car `expo-video` requiert `replaceAsync` pour les opérations asynchrones.
+
+**Solution :** Remplacer les deux appels par `slot.player.replaceAsync(null)`. Les appels `loadSlot()` utilisaient déjà `replaceAsync` correctement.
+
+---
+
+## ADR 2026-07-08: Fix require cycle firebase ↔ sentry
+
+**Problème :** `sentry.ts` importait `auth` depuis `firebase.ts`, et `firebase.ts` importait `captureException` depuis `sentry.ts` → cycle de dépendances, risque de `auth` non initialisé au runtime.
+
+**Solution :** Suppression de l'import top-level dans `sentry.ts`, remplacé par un `require('./firebase')` lazy unique dans `captureException()`.
+
+---
+
+## ADR 2026-07-08: Migration video-editor expo-av → expo-video
+
+**Problème :** `video-editor.tsx` utilisait `expo-av` (`Video`, `shouldPlay`, `useNativeControls`), qui est déprécié et retiré dans le SDK 54.
+
+**Solution :** Remplacer par `expo-video` (`useVideoPlayer`, `VideoView`) avec `nativeControls`, `contentFit`, et un player partagé.
+
+---
+
+## ADR 2026-07-08: Fix Firestore rules — videos.read moderation filter
+
+**Problème :** Les requêtes `useProfileTabs` (`profileTabs/own`, `profileTabs/saved`, `profileTabs/liked`, `profileTabs/tagged`) échouaient avec `permission-denied` car la règle `moderationStatus != 'hidden'` était évaluée sur tous les documents du scan, bloquant la requête entière dès qu'un document caché était rencontré.
+
+**Solution :** Simplification de la règle en `allow read: if request.auth != null;`. La modération est déjà filtrée côté client via `.filter(v => v.moderationStatus !== 'hidden')`. La sécurité est maintenue car seuls les utilisateurs authentifiés peuvent lire.
+

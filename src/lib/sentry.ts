@@ -1,5 +1,4 @@
 import * as Sentry from '@sentry/react-native'
-import { auth } from './firebase'
 
 const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN || ''
 
@@ -69,6 +68,7 @@ export function captureException(error: Error, context?: Record<string, unknown>
     console.warn('[Sentry] Exception non envoyée (DSN manquant):', error.message)
     return
   }
+  const { auth } = require('./firebase') as typeof import('./firebase')
   Sentry.captureException(error, {
     extra: context,
     tags: {
