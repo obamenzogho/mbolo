@@ -186,7 +186,12 @@ export default function FeedScreen({ feedType = 'forYou', isActive = true }: Fee
   }, [isActive, pool, store])
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.black }}>
+    <View
+      style={{ flex: 1, backgroundColor: colors.black }}
+      onLayout={(e) =>
+        console.log('[FeedScreen:layout] feedType=', feedType, 'w=', e.nativeEvent.layout.width, 'h=', e.nativeEvent.layout.height)
+      }
+    >
       <FeedList
         videos={feedData.videos}
         suggestions={[]}

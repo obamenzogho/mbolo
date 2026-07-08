@@ -98,10 +98,12 @@ function FeedListComponent({
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: any[] }) => {
       const videoItems = viewableItems.filter((v) => v.item && !isSuggestionItem(v.item))
+      const topVideo = videoItems[0]?.item as Video | undefined
+      console.log('[FeedList:viewable] count=', videoItems.length, 'topVideoId=', topVideo?.id, 'currentIndex=', indexRef.current)
       if (videoItems.length === 0) return
-      const topVideo = videoItems[0].item as Video
       // index réel via l'ID, plus aucun calcul de décalage
-      const videoIdx = videosRef.current.findIndex((v) => v.id === topVideo.id)
+      const videoIdx = videosRef.current.findIndex((v) => v.id === topVideo!.id)
+      console.log('[FeedList:viewable] → videoIdx=', videoIdx)
       if (videoIdx !== -1 && videoIdx !== indexRef.current) {
         setCurrentIndex(videoIdx)
         setIsScrolling(false)
@@ -135,6 +137,9 @@ function FeedListComponent({
       }
       const video = item as Video
       const videoIndex = videos.findIndex((v) => v.id === video.id)
+      if (videoIndex === currentIndex) {
+        console.log('[FeedList:render] ACTIVE videoId=', video.id, 'videoIndex=', videoIndex)
+      }
       return (
         <FeedItem
           item={video}

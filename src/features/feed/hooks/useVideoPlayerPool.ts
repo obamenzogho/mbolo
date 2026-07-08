@@ -222,6 +222,7 @@ export function useVideoPlayerPool(
       const prevPrevId = prevPrevIdx >= 0 ? videos[prevPrevIdx].id : null
       const prevId = prevIdx >= 0 ? videos[prevIdx].id : null
       const currentId = videos[currentIndex].id
+      console.log('[Pool:syncPool] currentIndex=', currentIndex, 'currentId=', currentId, 'videosLen=', videos.length)
       const nextId = nextIdx < videos.length ? videos[nextIdx].id : null
       const nextNextId = nextNextIdx < videos.length ? videos[nextNextIdx].id : null
 

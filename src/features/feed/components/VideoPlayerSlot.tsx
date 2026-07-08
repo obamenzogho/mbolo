@@ -85,10 +85,17 @@ function VideoPlayerSlotComponent({ videoId, thumbnailURL, instanceId }: VideoPl
   const handleFirstFrameRender = useCallback(() => {
     if (firstFrameRef.current) return
     firstFrameRef.current = true
+    console.log('[Slot:firstFrame] videoId=', videoId, 'instanceId=', instanceId)
     // Instantly hide — video is already rendering, no need to fade
     setReady(true)
     thumbOpacity.value = 0
-  }, [thumbOpacity])
+  }, [thumbOpacity, videoId, instanceId])
+
+  useEffect(() => {
+    if (player) {
+      console.log('[Slot:player] videoId=', videoId, 'instanceId=', instanceId, 'status=', player.status)
+    }
+  }, [player, videoId, instanceId])
 
   const thumbAnimatedStyle = useAnimatedStyle(() => ({
     opacity: thumbOpacity.value,
@@ -97,7 +104,12 @@ function VideoPlayerSlotComponent({ videoId, thumbnailURL, instanceId }: VideoPl
   const displayUri = firstFrameUri || thumbnailURL
 
   return (
-    <View style={StyleSheet.absoluteFill}>
+    <View
+      style={StyleSheet.absoluteFill}
+      onLayout={(e) =>
+        console.log('[Slot:layout] videoId=', videoId, 'w=', e.nativeEvent.layout.width, 'h=', e.nativeEvent.layout.height)
+      }
+    >
       {player ? (
         <VideoView
           key={videoId}
