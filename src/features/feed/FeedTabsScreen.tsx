@@ -60,10 +60,10 @@ export default function FeedTabsScreen({ isTabFocused = true }: FeedTabsScreenPr
         onPageScroll={handlePageScroll}
         onPageSelected={handlePageSelected}
       >
-        <View key="forYou" style={StyleSheet.absoluteFill}>
+        <View key="forYou" style={{ flex: 1 }}>
           <FeedScreen feedType="forYou" isActive={isTabFocused && activeTab === 0} />
         </View>
-        <View key="following" style={StyleSheet.absoluteFill}>
+        <View key="following" style={{ flex: 1 }}>
           <FeedScreen feedType="following" isActive={isTabFocused && activeTab === 1} />
         </View>
       </AnimatedPagerView>
