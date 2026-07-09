@@ -195,11 +195,13 @@ export function useVideoPlayerPool(
 
   function pauseNonCurrentSlots(currentVideoId: string | null) {
     for (const slot of slotsRef.current) {
-      if (slot.videoId !== currentVideoId && slot.state === 'PLAYING') {
-        slot.state = 'PAUSED'
-        try { slot.player.currentTime = 0 } catch {}
-        try { slot.player.pause() } catch {}
-      }
+      if (slot.videoId === currentVideoId) continue
+      // Pause INCONDITIONNELLE : on ne se fie pas au state suivi (il dérive
+      // car play/pause sont async côté expo-video). On coupe toujours l'audio
+      // du player sortant, même si son slot.state n'est plus 'PLAYING'.
+      if (slot.state === 'PLAYING') slot.state = 'PAUSED'
+      try { slot.player.pause() } catch {}
+      try { slot.player.currentTime = 0 } catch {}
     }
   }
 

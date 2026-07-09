@@ -106,7 +106,9 @@ function FeedListComponent({
       console.log('[FeedList:viewable] → videoIdx=', videoIdx)
       if (videoIdx !== -1 && videoIdx !== indexRef.current) {
         setCurrentIndex(videoIdx)
-        setIsScrolling(false)
+        // Ne pas forcer isScrolling=false ici : le scroll n'est pas terminé.
+        // handleMomentumScrollEnd s'en charge au snap, ce qui évite que
+        // l'ancienne et la nouvelle vidéo se chevauchent pendant le geste.
       }
     },
   ).current
