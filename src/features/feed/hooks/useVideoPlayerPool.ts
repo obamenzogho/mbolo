@@ -196,11 +196,12 @@ export function useVideoPlayerPool(
   function pauseNonCurrentSlots(currentVideoId: string | null) {
     for (const slot of slotsRef.current) {
       if (slot.videoId === currentVideoId) continue
-      // Pause INCONDITIONNELLE : on ne se fie pas au state suivi (il dérive
-      // car play/pause sont async côté expo-video). On coupe toujours l'audio
-      // du player sortant, même si son slot.state n'est plus 'PLAYING'.
+      // Pause INCONDITIONNELLE + volume=0 : on ne se fie pas au state suivi (il
+      // dérive car play/pause sont async côté expo-video). On coupe toujours
+      // l'audio du player sortant via le volume natif (plus fiable que pause()).
       if (slot.state === 'PLAYING') slot.state = 'PAUSED'
       try { slot.player.pause() } catch {}
+      try { slot.player.volume = 0 } catch {}
       try { slot.player.currentTime = 0 } catch {}
     }
   }
@@ -212,6 +213,7 @@ export function useVideoPlayerPool(
     if (slot.role === 'CURRENT' && !isScrollingRef.current) {
       pauseNonCurrentSlots(slot.videoId)
       slot.state = 'PLAYING'
+      try { slot.player.volume = 1 } catch {}
       try { slot.player.play() } catch {}
     }
   }
@@ -291,6 +293,7 @@ export function useVideoPlayerPool(
         if (currentSlot && currentSlot.state === 'READY') {
           pauseNonCurrentSlots(currentId)
           currentSlot.state = 'PLAYING'
+          try { currentSlot.player.volume = 1 } catch {}
           try { currentSlot.player.play() } catch {}
         }
       }
@@ -303,6 +306,7 @@ export function useVideoPlayerPool(
     for (const slot of slotsRef.current) {
       if (slot.state === 'PLAYING') slot.state = 'PAUSED'
       try { slot.player.pause() } catch {}
+      try { slot.player.volume = 0 } catch {}
     }
   }, [])
 
@@ -313,6 +317,7 @@ export function useVideoPlayerPool(
       for (const slot of slotsRef.current) {
         if (slot.state === 'PLAYING') slot.state = 'PAUSED'
         try { slot.player.pause() } catch {}
+        try { slot.player.volume = 0 } catch {}
       }
     }
   }, [])

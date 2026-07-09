@@ -64,6 +64,7 @@ function FeedItemComponent({
     if (!player) return
     if (!isActive) {
       try { player.pause() } catch {}
+      try { player.volume = 0 } catch {}
     }
   }, [isActive, player])
 
