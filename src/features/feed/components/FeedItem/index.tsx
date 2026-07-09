@@ -1,4 +1,4 @@
-import { memo, useCallback, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { View, Text, TouchableOpacity, Animated, StyleSheet } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -59,6 +59,13 @@ function FeedItemComponent({
     clearTimeout(repostToastTimer.current)
     repostToastTimer.current = setTimeout(() => setRepostToast(null), 2000)
   }, [])
+
+  useEffect(() => {
+    if (!player) return
+    if (!isActive) {
+      try { player.pause() } catch {}
+    }
+  }, [isActive, player])
 
   const handleLikePress = useCallback(() => { toggleLike(); animateLikeIcon() }, [toggleLike, animateLikeIcon])
   const handleComment = useCallback(() => onPressComment?.(item.id), [onPressComment, item.id])
