@@ -131,6 +131,10 @@ export default function FeedScreen({ feedType = 'forYou', isActive = true }: Fee
   }, [])
 
   useEffect(() => {
+    pool.setActive(isActive)
+  }, [isActive, pool])
+
+  useEffect(() => {
     if (!isActive) return
     pool.syncPool(feedData.videos, currentIndex, isScrolling)
   }, [isActive, currentIndex, isScrolling, feedData.videos, pool])
@@ -145,9 +149,8 @@ export default function FeedScreen({ feedType = 'forYou', isActive = true }: Fee
 
   useEffect(() => {
     if (isActive) return
-    const s = store.getState()
-    const video = s.videos[s.currentIndex]
-    if (video) pool.getPlayer(video.id)?.pause()
+    pool.setActive(false)
+    pool.pauseAll()
   }, [])
 
   useEffect(() => {
@@ -177,16 +180,11 @@ export default function FeedScreen({ feedType = 'forYou', isActive = true }: Fee
     const s = store.getState()
     const video = s.videos[s.currentIndex]
     if (!isActive) {
-      if (video) pool.getPlayer(video.id)?.pause()
+      pool.pauseAll()
     } else {
-      requestAnimationFrame(() => {
-        const cur = store.getState()
-        const v = cur.videos[cur.currentIndex]
-        if (!v) return
-        s.setPendingActivation(true)
-        pool.syncPool(cur.videos, cur.currentIndex, false)
-        pool.getPlayer(v.id)?.play()
-      })
+      s.setPendingActivation(true)
+      pool.syncPool(s.videos, s.currentIndex, false)
+      if (video) pool.getPlayer(video.id)?.play()
     }
   }, [isActive, pool, store])
 

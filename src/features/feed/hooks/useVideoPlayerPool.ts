@@ -6,7 +6,9 @@
    Stratégie Instagram-like :
    - NEXT / NEXT_NEXT sont pré-chargés en qualité LOW (360p)
    - Quand l'utilisateur arrive sur une vidéo préchargée, elle lit immédiatement
-   - Les vidéos non préchargées utilisent la qualité réseau */
+   - Les vidéos non préchargées utilisent la qualité réseau
+   - isActive : un feed inactif (onglet non visible) ne joue JAMAIS, même si un
+     replaceAsync en vol se résout après la désactivation. */
 
 import { useRef, useCallback, useEffect, useMemo } from 'react'
 import { createVideoPlayer } from 'expo-video'
@@ -56,6 +58,7 @@ export function useVideoPlayerPool(
   const slotsRef = useRef<Slot[]>([])
   const mapRef = useRef<Map<string, number>>(new Map())
   const isScrollingRef = useRef(false)
+  const isActiveRef = useRef(true)
 
   if (slotsRef.current.length === 0) {
     try {
@@ -201,6 +204,9 @@ export function useVideoPlayerPool(
   }
 
   function autoPlayIfCurrent(slot: Slot) {
+    // Garde d'activité : un feed inactif ne joue jamais, même si le replaceAsync
+    // se résout après le changement d'onglet (cause du double son).
+    if (!isActiveRef.current) return
     if (slot.role === 'CURRENT' && !isScrollingRef.current) {
       pauseNonCurrentSlots(slot.videoId)
       slot.state = 'PLAYING'
@@ -222,7 +228,6 @@ export function useVideoPlayerPool(
       const prevPrevId = prevPrevIdx >= 0 ? videos[prevPrevIdx].id : null
       const prevId = prevIdx >= 0 ? videos[prevIdx].id : null
       const currentId = videos[currentIndex].id
-      console.log('[Pool:syncPool] currentIndex=', currentIndex, 'currentId=', currentId, 'videosLen=', videos.length)
       const nextId = nextIdx < videos.length ? videos[nextIdx].id : null
       const nextNextId = nextNextIdx < videos.length ? videos[nextNextIdx].id : null
 
@@ -276,8 +281,8 @@ export function useVideoPlayerPool(
 
       pauseNonCurrentSlots(currentId)
 
-      // 3. Activation selon isScrolling
-      if (!isScrolling) {
+      // 3. Activation selon isScrolling ET isActive
+      if (!isScrolling && isActiveRef.current) {
         const currentSlot = currentId ? getSlot(currentId) : null
 
         // Joue CURRENT si prêt
@@ -291,6 +296,25 @@ export function useVideoPlayerPool(
     [],
   )
 
+  /** Met en pause TOUS les slots du pool (pas juste le current). */
+  const pauseAll = useCallback(() => {
+    for (const slot of slotsRef.current) {
+      if (slot.state === 'PLAYING') slot.state = 'PAUSED'
+      try { slot.player.pause() } catch {}
+    }
+  }, [])
+
+  /** Bascule l'état actif du feed. Sur désactivation, coupe tout le pool. */
+  const setActive = useCallback((active: boolean) => {
+    isActiveRef.current = active
+    if (!active) {
+      for (const slot of slotsRef.current) {
+        if (slot.state === 'PLAYING') slot.state = 'PAUSED'
+        try { slot.player.pause() } catch {}
+      }
+    }
+  }, [])
+
   const getPlayer = useCallback((videoId: string): VideoPlayer | null => {
     const slot = getSlot(videoId)
     return slot?.player ?? null
@@ -302,7 +326,7 @@ export function useVideoPlayerPool(
   }, [])
 
   return useMemo(
-    () => ({ syncPool, getPlayer, getPlayerState }),
-    [syncPool, getPlayer, getPlayerState],
+    () => ({ syncPool, getPlayer, getPlayerState, setActive, pauseAll }),
+    [syncPool, getPlayer, getPlayerState, setActive, pauseAll],
   )
 }

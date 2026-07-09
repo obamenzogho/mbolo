@@ -3,10 +3,10 @@
    Crossfade animé image → vidéo via Reanimated. Gère le chargement firstFrame depuis le cache. */
 
 import { memo, useRef, useState, useEffect, useCallback } from 'react'
-import { View, Image } from 'react-native'
+import { View, Image, StyleSheet } from 'react-native'
 import { VideoView } from 'expo-video'
 import type { VideoPlayer } from 'expo-video'
-import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated'
+import Animated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { VideoCache } from '../services/VideoCache'
@@ -56,20 +56,45 @@ function VideoPlayerSlotComponent({ videoId, thumbnailURL, instanceId }: VideoPl
   const [ready, setReady] = useState(false)
   const [firstFrameUri, setFirstFrameUri] = useState<string | null>(null)
   const thumbOpacity = useSharedValue(1)
+  const firstFrameRef = useRef(false)
   const prevVideoId = useRef(videoId)
-  const fadingRef = useRef(false)
 
   const player = usePlayerForVideo(instanceId, videoId)
 
+  const revealVideo = useCallback(() => {
+    if (firstFrameRef.current) return
+    firstFrameRef.current = true
+    console.log('[Slot:reveal] videoId=', videoId, 'instanceId=', instanceId)
+    setReady(true)
+    thumbOpacity.value = 0
+  }, [thumbOpacity, videoId, instanceId])
+
   useEffect(() => {
     if (prevVideoId.current !== videoId) {
-      fadingRef.current = false
+      firstFrameRef.current = false
       setReady(false)
       setFirstFrameUri(null)
       thumbOpacity.value = 1
       prevVideoId.current = videoId
     }
   }, [videoId])
+
+  // Fallback cross-platform (Web + natif) : onFirstFrameRender ne se déclenche
+  // pas sur Web et peut manquer sur natif si la frame est rendue avant l'attache
+  // du listener. On révèle dès que le player est prêt à lire.
+  useEffect(() => {
+    if (!player) return
+    const handler = ({ status }: { status: string }) => {
+      if (status === 'readyToPlay') revealVideo()
+    }
+    player.addListener('statusChange', handler)
+    return () => player.removeListener('statusChange', handler)
+  }, [player, revealVideo])
+
+  // Si le player est déjà prêt au montage (préchargé par le pool), on révèle direct.
+  useEffect(() => {
+    if (player && player.status === 'readyToPlay') revealVideo()
+  }, [player, revealVideo])
 
   useEffect(() => {
     let cancelled = false
@@ -82,21 +107,6 @@ function VideoPlayerSlotComponent({ videoId, thumbnailURL, instanceId }: VideoPl
     return () => { cancelled = true }
   }, [videoId])
 
-  const handleFirstFrameRender = useCallback(() => {
-    if (fadingRef.current) return
-    fadingRef.current = true
-    console.log('[Slot:firstFrame] videoId=', videoId, 'instanceId=', instanceId)
-    // crossfade 400ms — la vidéo commence à rendre sa première frame
-    thumbOpacity.value = withTiming(0, { duration: 400 })
-    setTimeout(() => setReady(true), 500)
-  }, [thumbOpacity, videoId, instanceId])
-
-  useEffect(() => {
-    if (player) {
-      console.log('[Slot:player] videoId=', videoId, 'instanceId=', instanceId, 'status=', player.status)
-    }
-  }, [player, videoId, instanceId])
-
   const thumbAnimatedStyle = useAnimatedStyle(() => ({
     opacity: thumbOpacity.value,
   }))
@@ -104,30 +114,31 @@ function VideoPlayerSlotComponent({ videoId, thumbnailURL, instanceId }: VideoPl
   const displayUri = firstFrameUri || thumbnailURL
 
   return (
-    <View style={{ width: '100%', height: '100%' }}>
+    <View style={StyleSheet.absoluteFill}>
       {player ? (
         <VideoView
           key={videoId}
           player={player}
-          style={{ width: '100%', height: '100%' }}
+          style={StyleSheet.absoluteFill}
           contentFit="cover"
+          surfaceType="textureView"
           nativeControls={false}
-          onFirstFrameRender={handleFirstFrameRender}
+          onFirstFrameRender={revealVideo}
         />
       ) : null}
 
       {!ready && (
-        <Animated.View style={[{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }, thumbAnimatedStyle]}>
+        <Animated.View style={[StyleSheet.absoluteFill, thumbAnimatedStyle]} pointerEvents="none">
           {displayUri ? (
             <Image
               source={{ uri: displayUri }}
-              style={{ width: '100%', height: '100%' }}
+              style={StyleSheet.absoluteFill}
               resizeMode="cover"
             />
           ) : (
             <LinearGradient
               colors={['#1a1a1a', '#0d0d0d']}
-              style={{ width: '100%', height: '100%' }}
+              style={StyleSheet.absoluteFill}
             >
               <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
                 <Ionicons name="videocam-outline" size={48} color="#333" />
