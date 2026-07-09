@@ -72,12 +72,21 @@ export function useFeedData({ store }: { store: StoreApi<FeedState> }) {
         tasteLoadedRef.current = true
       }
 
-      const constraints = [orderBy('hotScore', 'desc'), limit(PAGE_SIZE)]   // ✅ hotScore (top global servi par le serveur)
+      // hotScore servi par le serveur (Cloud Functions). Si le champ n'existe
+      // pas encore (functions non déployées), on retombe sur createdAt.
+      let constraints: any[] = [orderBy('hotScore', 'desc'), limit(PAGE_SIZE)]
       if (lastDocRef.current) {
         constraints.push(startAfter(lastDocRef.current))
       }
-      const q = query(collection(db, 'videos'), ...constraints)
-      const snap = await getDocs(q)
+      let q = query(collection(db, 'videos'), ...constraints)
+      let snap = await getDocs(q)
+
+      if (snap.empty && !lastDocRef.current) {
+        if (FEED_DEBUG) console.log('[FEED_DEBUG] FEEDDATA: hotScore vide, fallback createdAt')
+        constraints = [orderBy('createdAt', 'desc'), limit(PAGE_SIZE)]
+        q = query(collection(db, 'videos'), ...constraints)
+        snap = await getDocs(q)
+      }
 
       if (snap.empty) {
         setHasMore(false)

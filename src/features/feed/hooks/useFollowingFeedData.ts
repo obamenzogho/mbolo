@@ -64,6 +64,7 @@ export function useFollowingFeedData({ store, isActive = true }: { store: StoreA
         const data = uSnap.data()
         const list: string[] = data.following || []
         followingRef.current = list
+        if (FEED_DEBUG) console.log('[FEED_DEBUG] FOLLOWINGFEED: following list len=', list.length)
         return list
       }
     } catch (e) {
@@ -136,6 +137,8 @@ export function useFollowingFeedData({ store, isActive = true }: { store: StoreA
       ])
       const snapshots = authoredSnaps
 
+      if (FEED_DEBUG) console.log('[FEED_DEBUG] FOLLOWINGFEED: authored snaps=', authoredSnaps.length, 'repostSnaps=', repostSnaps.length)
+
       const allDocs: { doc: any; createdAt: Date }[] = []
       for (const snap of snapshots) {
         for (const d of snap.docs) {
@@ -183,6 +186,8 @@ export function useFollowingFeedData({ store, isActive = true }: { store: StoreA
           allDocs.push({ doc: d, createdAt: e.repostedAt })
         }
       }
+
+      if (FEED_DEBUG) console.log('[FEED_DEBUG] FOLLOWINGFEED: total allDocs=', allDocs.length)
 
       if (allDocs.length === 0) {
         setHasMore(false)
