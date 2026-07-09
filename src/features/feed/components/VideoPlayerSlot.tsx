@@ -3,10 +3,10 @@
    Crossfade animé image → vidéo via Reanimated. Gère le chargement firstFrame depuis le cache. */
 
 import { memo, useRef, useState, useEffect, useCallback } from 'react'
-import { View, Image, StyleSheet } from 'react-native'
+import { View, Image } from 'react-native'
 import { VideoView } from 'expo-video'
 import type { VideoPlayer } from 'expo-video'
-import Animated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated'
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { VideoCache } from '../services/VideoCache'
@@ -56,14 +56,14 @@ function VideoPlayerSlotComponent({ videoId, thumbnailURL, instanceId }: VideoPl
   const [ready, setReady] = useState(false)
   const [firstFrameUri, setFirstFrameUri] = useState<string | null>(null)
   const thumbOpacity = useSharedValue(1)
-  const firstFrameRef = useRef(false)
   const prevVideoId = useRef(videoId)
+  const fadingRef = useRef(false)
 
   const player = usePlayerForVideo(instanceId, videoId)
 
   useEffect(() => {
     if (prevVideoId.current !== videoId) {
-      firstFrameRef.current = false
+      fadingRef.current = false
       setReady(false)
       setFirstFrameUri(null)
       thumbOpacity.value = 1
@@ -83,12 +83,12 @@ function VideoPlayerSlotComponent({ videoId, thumbnailURL, instanceId }: VideoPl
   }, [videoId])
 
   const handleFirstFrameRender = useCallback(() => {
-    if (firstFrameRef.current) return
-    firstFrameRef.current = true
+    if (fadingRef.current) return
+    fadingRef.current = true
     console.log('[Slot:firstFrame] videoId=', videoId, 'instanceId=', instanceId)
-    // Instantly hide — video is already rendering, no need to fade
-    setReady(true)
-    thumbOpacity.value = 0
+    // crossfade 400ms — la vidéo commence à rendre sa première frame
+    thumbOpacity.value = withTiming(0, { duration: 400 })
+    setTimeout(() => setReady(true), 500)
   }, [thumbOpacity, videoId, instanceId])
 
   useEffect(() => {
@@ -104,17 +104,12 @@ function VideoPlayerSlotComponent({ videoId, thumbnailURL, instanceId }: VideoPl
   const displayUri = firstFrameUri || thumbnailURL
 
   return (
-    <View
-      style={StyleSheet.absoluteFill}
-      onLayout={(e) =>
-        console.log('[Slot:layout] videoId=', videoId, 'w=', e.nativeEvent.layout.width, 'h=', e.nativeEvent.layout.height)
-      }
-    >
+    <View style={{ width: '100%', height: '100%' }}>
       {player ? (
         <VideoView
           key={videoId}
           player={player}
-          style={StyleSheet.absoluteFill}
+          style={{ width: '100%', height: '100%' }}
           contentFit="cover"
           nativeControls={false}
           onFirstFrameRender={handleFirstFrameRender}
@@ -122,17 +117,17 @@ function VideoPlayerSlotComponent({ videoId, thumbnailURL, instanceId }: VideoPl
       ) : null}
 
       {!ready && (
-        <Animated.View style={[StyleSheet.absoluteFill, thumbAnimatedStyle]}>
+        <Animated.View style={[{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }, thumbAnimatedStyle]}>
           {displayUri ? (
             <Image
               source={{ uri: displayUri }}
-              style={StyleSheet.absoluteFill}
+              style={{ width: '100%', height: '100%' }}
               resizeMode="cover"
             />
           ) : (
             <LinearGradient
               colors={['#1a1a1a', '#0d0d0d']}
-              style={StyleSheet.absoluteFill}
+              style={{ width: '100%', height: '100%' }}
             >
               <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
                 <Ionicons name="videocam-outline" size={48} color="#333" />

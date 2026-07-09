@@ -179,9 +179,14 @@ export default function FeedScreen({ feedType = 'forYou', isActive = true }: Fee
     if (!isActive) {
       if (video) pool.getPlayer(video.id)?.pause()
     } else {
-      s.setPendingActivation(true)
-      pool.syncPool(s.videos, s.currentIndex, false)
-      if (video) pool.getPlayer(video.id)?.play()
+      requestAnimationFrame(() => {
+        const cur = store.getState()
+        const v = cur.videos[cur.currentIndex]
+        if (!v) return
+        s.setPendingActivation(true)
+        pool.syncPool(cur.videos, cur.currentIndex, false)
+        pool.getPlayer(v.id)?.play()
+      })
     }
   }, [isActive, pool, store])
 

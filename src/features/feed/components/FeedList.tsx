@@ -146,6 +146,7 @@ function FeedListComponent({
           index={videoIndex}
           instanceId={instanceId}
           isActive={videoIndex === currentIndex}
+          itemHeight={ITEM_HEIGHT}
           onLongPress={onLongPress ? () => onLongPress(video.id) : undefined}
           onPressComment={onPressComment ? () => onPressComment(video.id) : undefined}
           onPressShare={onPressShare ? () => onPressShare(video.id) : undefined}
@@ -153,7 +154,7 @@ function FeedListComponent({
         />
       )
     },
-    [instanceId, onLongPress, onPressComment, onPressShare, onPressMore, suggestions, onDismissSuggestion, feedType, data, currentIndex, videos],
+    [instanceId, onLongPress, onPressComment, onPressShare, onPressMore, suggestions, onDismissSuggestion, feedType, data, currentIndex, videos, ITEM_HEIGHT],
   )
 
   const keyExtractor = useCallback((item: FeedListItem) => {

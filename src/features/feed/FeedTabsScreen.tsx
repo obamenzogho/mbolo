@@ -20,12 +20,22 @@ export default function FeedTabsScreen({ isTabFocused = true }: FeedTabsScreenPr
   const scrollPosition = useRef(new Animated.Value(0)).current
   const [activeTab, setActiveTab] = useState<0 | 1>(0)
   const lastScrollLog = useRef(0)
+  const activeTabRef = useRef<0 | 1>(0)
 
   const handlePageScroll = useCallback(
     (e: { nativeEvent: { position: number; offset: number } }) => {
       const { position, offset } = e.nativeEvent
       const value = position + offset
       scrollPosition.setValue(value)
+
+      // bascule activeTab à 50% du swipe pour que l'ancien onglet ait le temps de pause()
+      if (value > 0.5 && activeTabRef.current !== 1) {
+        activeTabRef.current = 1
+        setActiveTab(1)
+      } else if (value <= 0.5 && activeTabRef.current !== 0) {
+        activeTabRef.current = 0
+        setActiveTab(0)
+      }
 
       if (FEED_DEBUG) {
         const now = Date.now()
@@ -40,11 +50,14 @@ export default function FeedTabsScreen({ isTabFocused = true }: FeedTabsScreenPr
 
   const handlePageSelected = useCallback((e: { nativeEvent: { position: number } }) => {
     const page = e.nativeEvent.position
+    activeTabRef.current = page as 0 | 1
     setActiveTab(page as 0 | 1)
     if (FEED_DEBUG) console.log('[FEED_DEBUG] TABS: page selected →', page)
   }, [])
 
   const handleTabPress = useCallback((index: 0 | 1) => {
+    activeTabRef.current = index
+    setActiveTab(index)
     pagerRef.current?.setPage(index)
   }, [])
 
@@ -60,10 +73,10 @@ export default function FeedTabsScreen({ isTabFocused = true }: FeedTabsScreenPr
         onPageScroll={handlePageScroll}
         onPageSelected={handlePageSelected}
       >
-        <View key="forYou" style={{ flex: 1 }}>
+        <View key="forYou" style={{ width: '100%', height: '100%' }}>
           <FeedScreen feedType="forYou" isActive={isTabFocused && activeTab === 0} />
         </View>
-        <View key="following" style={{ flex: 1 }}>
+        <View key="following" style={{ width: '100%', height: '100%' }}>
           <FeedScreen feedType="following" isActive={isTabFocused && activeTab === 1} />
         </View>
       </AnimatedPagerView>

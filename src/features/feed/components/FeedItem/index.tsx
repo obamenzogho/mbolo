@@ -30,12 +30,13 @@ interface FeedItemProps {
   username?: string
   userPhotoURL?: string
   isActive?: boolean
+  itemHeight?: number
 }
 
 function FeedItemComponent({
   item, index, instanceId = 'feed',
   onPressComment, onPressShare, onPressMore, onLongPress,
-  username, userPhotoURL, isActive: isActiveProp,
+  username, userPhotoURL, isActive: isActiveProp, itemHeight,
 }: FeedItemProps) {
   const isActive = isActiveProp ?? false
   const insets = useSafeAreaInsets()
@@ -69,7 +70,7 @@ function FeedItemComponent({
   const BOTTOM_PADDING = BOTTOM_ACTIONS + 7
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, itemHeight ? { height: itemHeight } : undefined]}>
       <VideoPlayerSlot videoId={item.id} instanceId={instanceId} thumbnailURL={item.thumbnailURL} />
 
       <VideoOverlay
