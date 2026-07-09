@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  collection, addDoc, doc, updateDoc, deleteDoc, getDocs,
+  collection, addDoc, doc, updateDoc, deleteDoc, getDoc, getDocs,
   query, where, serverTimestamp, increment, arrayUnion,
 } from 'firebase/firestore'
 import { db, auth } from '../lib/firebase'
@@ -140,6 +140,25 @@ export function useStories() {
   }, [user, getUserStories])
 
   /**
+   * Récupère les viewers d'une story par leurs IDs
+   */
+  const getStoryViewers = useCallback(async (viewerIds: string[]): Promise<{ uid: string; displayName: string; photoURL: string }[]> => {
+    const results: { uid: string; displayName: string; photoURL: string }[] = []
+    for (const uid of viewerIds) {
+      try {
+        const snap = await getDoc(doc(db, 'users', uid))
+        if (snap.exists()) {
+          const d = snap.data()
+          results.push({ uid, displayName: d.displayName ?? d.username ?? '?', photoURL: d.photoURL ?? '' })
+        }
+      } catch (e) {
+        captureException(e instanceof Error ? e : new Error(String(e)), { context: 'getStoryViewers', uid })
+      }
+    }
+    return results
+  }, [])
+
+  /**
    * Marque une story comme vue par un utilisateur
    */
   const markAsViewed = useCallback(async (storyId: string, viewerId: string) => {
@@ -199,6 +218,7 @@ export function useStories() {
     deleteStory,
     getMyStories,
     getUserStories,
+    getStoryViewers,
     markAsViewed,
     cleanExpiredStories,
   }

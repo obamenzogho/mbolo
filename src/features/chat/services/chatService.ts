@@ -64,15 +64,19 @@ export async function sendMessage(
   conversationId: string,
   senderId: string,
   text: string,
+  extra?: { type?: string; storyRef?: { storyId: string; mediaUrl: string; mediaType: string; ownerId: string } },
 ) {
+  const msgData: Record<string, any> = {
+    senderId,
+    text,
+    type: extra?.type ?? 'text',
+    createdAt: serverTimestamp(),
+    storyRef: extra?.storyRef ?? null,
+  }
+
   const msgRef = await addDoc(
     collection(db, 'conversations', conversationId, 'messages'),
-    {
-      senderId,
-      text,
-      type: 'text',
-      createdAt: serverTimestamp(),
-    },
+    msgData,
   )
 
   const convRef = doc(db, 'conversations', conversationId)

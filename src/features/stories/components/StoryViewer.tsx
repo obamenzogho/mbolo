@@ -8,9 +8,15 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import {
   View, Text, Image, Dimensions, Pressable, Animated, StyleSheet, PanResponder,
+  TextInput, Modal, FlatList, Keyboard,
 } from 'react-native'
-import { VideoView, useVideoPlayer } from 'expo-video'
+import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
+import { auth } from '@/lib/firebase'
+import { captureException } from '@/lib/sentry'
+import { sendMessage, getOrCreateConversation } from '@/features/chat/services/chatService'
+import { useStories } from '@/hooks/useStories'
+import { VideoView, useVideoPlayer } from 'expo-video'
 import type { StoryGroup } from '../hooks/useStoriesFeed'
 import type { Story } from '../../../hooks/useStories'
 
@@ -28,10 +34,19 @@ export default function StoryViewer({ groups, initialGroupIndex, onClose, onView
   const [groupIdx, setGroupIdx] = useState(initialGroupIndex)
   const [storyIdx, setStoryIdx] = useState(groups[initialGroupIndex]?.firstUnseenIndex ?? 0)
   const [paused, setPaused] = useState(false)
+  const [replyText, setReplyText] = useState('')
+  const [sending, setSending] = useState(false)
+  const [showViewers, setShowViewers] = useState(false)
+  const [viewers, setViewers] = useState<{ uid: string; displayName: string; photoURL: string }[]>([])
+
+  const user = auth.currentUser
+  const router = useRouter()
+  const { getStoryViewers } = useStories()
 
   const group = groups[groupIdx]
   const story: Story | undefined = group?.stories[storyIdx]
   const isVideo = story?.mediaType === 'video'
+  const isMine = user && story?.userId === user.uid
 
   const progress = useRef(new Animated.Value(0)).current
   const animRef = useRef<Animated.CompositeAnimation | null>(null)
@@ -69,6 +84,38 @@ export default function StoryViewer({ groups, initialGroupIndex, onClose, onView
       setStoryIdx(pg.stories.length - 1)
     }
   }, [storyIdx, groupIdx, groups, progress])
+
+  // Envoyer une réponse en DM -------------------------------------------------
+  const handleSendReply = useCallback(async () => {
+    if (!user || !story || !replyText.trim()) return
+    setSending(true)
+    try {
+      const conv = await getOrCreateConversation(user.uid, story.userId)
+      await sendMessage(conv.id, user.uid, replyText.trim(), {
+        type: 'story_reply',
+        storyRef: {
+          storyId: story.id,
+          mediaUrl: story.mediaUrl,
+          mediaType: story.mediaType,
+          ownerId: story.userId,
+        },
+      })
+      setReplyText('')
+      Keyboard.dismiss()
+    } catch (e) {
+      captureException(e instanceof Error ? e : new Error(String(e)), { context: 'storyReply' })
+    } finally {
+      setSending(false)
+    }
+  }, [user, story, replyText])
+
+  // Ouvrir le bottom sheet "Vu par" -------------------------------------------
+  const openViewers = useCallback(async () => {
+    if (!story) return
+    const data = await getStoryViewers(story.viewedBy)
+    setViewers(data)
+    setShowViewers(true)
+  }, [story, getStoryViewers])
 
   // Marque comme vue + (re)lance la progression à chaque story affichée -------
   useEffect(() => {
@@ -141,7 +188,7 @@ export default function StoryViewer({ groups, initialGroupIndex, onClose, onView
 
   if (!group || !story) return null
 
-  return (
+  return (<>
     <Animated.View style={[styles.container, { transform: [{ translateY }] }]} {...pan.panHandlers}>
       {/* Barres segmentées */}
       <View style={styles.bars}>
@@ -210,7 +257,64 @@ export default function StoryViewer({ groups, initialGroupIndex, onClose, onView
           />
         </View>
       </View>
+
+      {/* Barre "Vu par" (mes stories) ou champ reply (autres) */}
+      {isMine ? (
+        <Pressable style={styles.seenBar} onPress={openViewers}>
+          <Ionicons name="eye-outline" size={20} color="#ccc" />
+          <Text style={styles.seenText}>Vu par {story.viewedBy.length > 0 ? `${story.viewedBy.length} personne${story.viewedBy.length > 1 ? 's' : ''}` : 'personne'}</Text>
+          <Ionicons name="chevron-up" size={18} color="#ccc" />
+        </Pressable>
+      ) : (
+        <View style={styles.replyBar}>
+          <TextInput
+            style={styles.replyInput}
+            placeholder="Répondre à cette story..."
+            placeholderTextColor="#999"
+            value={replyText}
+            onChangeText={setReplyText}
+            onFocus={() => setPausedState(true)}
+            onBlur={() => setPausedState(false)}
+          />
+          <Pressable
+            style={[styles.sendBtn, (!replyText.trim() || sending) && { opacity: 0.4 }]}
+            disabled={!replyText.trim() || sending}
+            onPress={handleSendReply}
+          >
+            <Ionicons name="send" size={20} color="#fff" />
+          </Pressable>
+        </View>
+      )}
     </Animated.View>
+
+    {/* Modal Vu par */}
+    <Modal visible={showViewers} transparent animationType="slide" onRequestClose={() => setShowViewers(false)}>
+      <Pressable style={styles.modalOverlay} onPress={() => setShowViewers(false)}>
+        <Pressable style={styles.modalContent} onPress={() => {}}>
+          <View style={styles.modalHandle} />
+          <Text style={styles.modalTitle}>Vu par</Text>
+          {viewers.length === 0 ? (
+            <Text style={styles.noViewers}>Personne n'a encore vu cette story</Text>
+          ) : (
+            <FlatList
+              data={viewers}
+              keyExtractor={(item) => item.uid}
+              renderItem={({ item }) => (
+                <View style={styles.viewerRow}>
+                  {item.photoURL ? (
+                    <Image source={{ uri: item.photoURL }} style={styles.viewerAvatar} />
+                  ) : (
+                    <View style={[styles.viewerAvatar, { backgroundColor: '#333' }]} />
+                  )}
+                  <Text style={styles.viewerName}>{item.displayName}</Text>
+                </View>
+              )}
+            />
+          )}
+        </Pressable>
+      </Pressable>
+    </Modal>
+    </>
   )
 }
 
@@ -221,7 +325,20 @@ const styles = StyleSheet.create({
   header: { position: 'absolute', top: 62, left: 12, right: 12, flexDirection: 'row', alignItems: 'center', zIndex: 10 },
   avatar: { width: 36, height: 36, borderRadius: 18, marginRight: 10 },
   username: { color: '#fff', fontWeight: '600', fontSize: 15 },
-  caption: { position: 'absolute', bottom: 80, left: 20, right: 20, zIndex: 10 },
+  caption: { position: 'absolute', bottom: 100, left: 20, right: 20, zIndex: 10 },
   captionText: { color: '#fff', fontSize: 16, textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.7)', textShadowRadius: 4 },
   tapRow: { flex: 1, flexDirection: 'row' },
+  seenBar: { position: 'absolute', bottom: 40, left: 20, right: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, zIndex: 10, paddingVertical: 8 },
+  seenText: { color: '#ccc', fontSize: 13 },
+  replyBar: { position: 'absolute', bottom: 30, left: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 10 },
+  replyInput: { flex: 1, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 24, paddingHorizontal: 16, paddingVertical: 10, color: '#fff', fontSize: 14 },
+  sendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#1877F2', alignItems: 'center', justifyContent: 'center' },
+  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+  modalContent: { backgroundColor: '#1a1a2e', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 40, maxHeight: H * 0.5 },
+  modalHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#555', alignSelf: 'center', marginTop: 10, marginBottom: 16 },
+  modalTitle: { color: '#fff', fontSize: 17, fontWeight: '600', textAlign: 'center', marginBottom: 16 },
+  noViewers: { color: '#888', textAlign: 'center', paddingVertical: 30 },
+  viewerRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 10, gap: 12 },
+  viewerAvatar: { width: 40, height: 40, borderRadius: 20 },
+  viewerName: { color: '#fff', fontSize: 15 },
 })
