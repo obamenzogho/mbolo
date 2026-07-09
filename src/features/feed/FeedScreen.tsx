@@ -178,13 +178,12 @@ export default function FeedScreen({ feedType = 'forYou', isActive = true }: Fee
     if (prevActiveRef.current === isActive) return
     prevActiveRef.current = isActive
     const s = store.getState()
-    const video = s.videos[s.currentIndex]
     if (!isActive) {
       pool.pauseAll()
     } else {
       s.setPendingActivation(true)
       pool.syncPool(s.videos, s.currentIndex, false)
-      if (video) pool.getPlayer(video.id)?.play()
+      // Pas de play() direct : syncPool joue le CURRENT si isActive && !isScrolling
     }
   }, [isActive, pool, store])
 
