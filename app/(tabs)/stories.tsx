@@ -202,7 +202,7 @@ export default function StoriesScreen() {
         }
       />
 
-      <View style={{ marginHorizontal: 16, height: 1, backgroundColor: 'rgba(255,255,255,0.15)' }} />
+      <View style={{ marginHorizontal: 16, height: 1, backgroundColor: 'rgba(255,255,255,0.3)' }} />
 
       {highlights.length > 0 && (
         <>
