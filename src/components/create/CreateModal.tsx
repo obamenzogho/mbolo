@@ -29,11 +29,6 @@ const OPTIONS = [
     label: 'Story',
     route: '/story-upload',
   },
-  {
-    icon: 'document-text-outline',
-    label: 'Brouillons',
-    route: '/(tabs)/drafts',
-  },
 ]
 
 function CreateModalComponent({ onClose }: CreateModalProps) {

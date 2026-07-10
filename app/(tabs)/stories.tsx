@@ -7,9 +7,9 @@ import {
   FlatList,
   ScrollView,
   Modal,
-  StyleSheet,
-  ActivityIndicator,
   Alert,
+  ActivityIndicator,
+  StyleSheet,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
@@ -20,257 +20,135 @@ import { colors } from '@/lib/theme'
 import { useNewsFeed } from '@/features/news/hooks/useNewsFeed'
 import { PostCard } from '@/features/news/components/PostCard'
 import NewsCommentsModal from '@/features/news/components/NewsCommentsModal'
+import { ContentActionsSheet } from '@/components/ContentActionsSheet'
 import { useStoriesFeed } from '@/features/stories/hooks/useStoriesFeed'
 import StoryViewer from '@/features/stories/components/StoryViewer'
 import { useStories } from '@/hooks/useStories'
-import { ContentActionsSheet } from '@/components/ContentActionsSheet'
-import type { NewsPost } from '@/features/news/types'
 import type { StoryGroup } from '@/features/stories/hooks/useStoriesFeed'
+import type { NewsPost } from '@/features/news/types'
 
-function StoryItem({
-  group,
-  onPress,
-}: {
-  group: StoryGroup
-  onPress: () => void
-}) {
+function StoryCircle({ group, onPress }: { group: StoryGroup; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} style={styles.storyItem}>
-      <View
-        style={[
-          styles.storyRing,
-          {
-            borderColor: group.hasUnseen
-              ? colors.primary
-              : '#4C4E52',
-          },
-        ]}
-      >
+      <View style={[styles.storyRing, { borderColor: group.hasUnseen ? colors.primary : '#4C4E52' }]}>
         {group.avatarUrl ? (
-          <Image
-            source={{ uri: group.avatarUrl }}
-            style={styles.storyAvatar}
-          />
+          <Image source={{ uri: group.avatarUrl }} style={styles.storyAvatar} />
         ) : (
           <View style={[styles.storyAvatar, styles.avatarFallback]}>
-            <Ionicons name="person" size={28} color="#777" />
+            <Ionicons name="person" size={24} color="#777" />
           </View>
         )}
       </View>
-
-      <Text numberOfLines={1} style={styles.storyName}>
-        {group.username}
-      </Text>
+      <Text numberOfLines={1} style={styles.storyName}>{group.username}</Text>
     </Pressable>
   )
 }
 
-export default function NewsScreen() {
+export default function ActusScreen() {
   const uid = auth.currentUser?.uid ?? ''
+  const { markAsViewed } = useStories()
 
   const {
-    posts,
-    loading,
-    refreshing,
-    loadingMore,
-    refresh,
-    loadMore,
-    toggleLike,
-    toggleSave,
-    registerShare,
-    deletePost,
-    removePostsFromUser,
+    posts, loading, refreshing, loadingMore,
+    refresh, loadMore, toggleLike, toggleSave, registerShare, deletePost, removePostsFromUser,
   } = useNewsFeed()
 
-  const { markAsViewed } = useStories()
   const [followingIds, setFollowingIds] = useState<string[]>([])
-  const [viewerGroupIndex, setViewerGroupIndex] =
-    useState<number | null>(null)
-  const [commentPost, setCommentPost] =
-    useState<NewsPost | null>(null)
-  const [actionsPost, setActionsPost] =
-    useState<NewsPost | null>(null)
+  const [viewerGroupIndex, setViewerGroupIndex] = useState<number | null>(null)
 
   useEffect(() => {
     if (!uid) return
-
-    return onSnapshot(
-      doc(db, 'users', uid),
-      (snapshot: any) => {
-        const following = snapshot.data()?.following
-        setFollowingIds(
-          Array.isArray(following) ? following : [],
-        )
-      },
-    )
+    return onSnapshot(doc(db, 'users', uid), (snap) => {
+      setFollowingIds(Array.isArray(snap.data()?.following) ? snap.data()!.following : [])
+    })
   }, [uid])
 
-  const {
-    groups: storyGroups,
-    loading: storiesLoading,
-  } = useStoriesFeed(followingIds)
+  const { groups: storyGroups, loading: storiesLoading } = useStoriesFeed(followingIds)
 
-  const myStoryGroup = useMemo(
-    () => storyGroups.find((group) => group.userId === uid),
-    [storyGroups, uid],
-  )
-
-  const otherStoryGroups = useMemo(
-    () => storyGroups.filter((group) => group.userId !== uid),
-    [storyGroups, uid],
-  )
+  const myStoryGroup = useMemo(() => storyGroups.find((g) => g.userId === uid), [storyGroups, uid])
+  const otherStoryGroups = useMemo(() => storyGroups.filter((g) => g.userId !== uid), [storyGroups, uid])
 
   const openStory = (userId: string) => {
-    const index = storyGroups.findIndex(
-      (group) => group.userId === userId,
-    )
-
-    if (index !== -1) {
-      setViewerGroupIndex(index)
-    }
+    const idx = storyGroups.findIndex((g) => g.userId === userId)
+    if (idx !== -1) setViewerGroupIndex(idx)
   }
+
+  const [commentPost, setCommentPost] = useState<NewsPost | null>(null)
+  const [actionsPost, setActionsPost] = useState<NewsPost | null>(null)
 
   const header = (
     <>
-      <View style={styles.topBar}>
-        <Text style={styles.screenTitle}>Actus</Text>
-
-        <View style={styles.topActions}>
-          <Pressable
-            onPress={() => router.push('/news-compose')}
-            style={styles.circleButton}
-          >
-            <Ionicons name="add" size={25} color="#fff" />
-          </Pressable>
-
-          <Pressable
-            onPress={() => router.push('/(tabs)/explore')}
-            style={styles.circleButton}
-          >
-            <Ionicons name="search" size={21} color="#fff" />
-          </Pressable>
-        </View>
-      </View>
-
       <View style={styles.composer}>
         {auth.currentUser?.photoURL ? (
-          <Image
-            source={{ uri: auth.currentUser.photoURL }}
-            style={styles.composerAvatar}
-          />
+          <Image source={{ uri: auth.currentUser.photoURL }} style={styles.composerAvatar} />
         ) : (
-          <View
-            style={[
-              styles.composerAvatar,
-              styles.avatarFallback,
-            ]}
-          >
-            <Ionicons name="person" size={20} color="#777" />
+          <View style={[styles.composerAvatar, styles.avatarFallback]}>
+            <Ionicons name="person" size={18} color="#777" />
           </View>
         )}
-
-        <Pressable
-          onPress={() => router.push('/news-compose')}
-          style={styles.composerInput}
-        >
-          <Text style={styles.composerPlaceholder}>
-            Quoi de neuf ?
-          </Text>
+        <Pressable onPress={() => router.push('/news-compose')} style={styles.composerInput}>
+          <Text style={styles.composerPlaceholder}>Quoi de neuf ?</Text>
         </Pressable>
-
-        <Pressable
-          onPress={() => router.push('/news-compose')}
-          hitSlop={10}
-        >
-          <Ionicons name="images" size={25} color="#45BD62" />
+        <Pressable onPress={() => router.push('/news-compose')} hitSlop={10}>
+          <Ionicons name="images" size={24} color="#45BD62" />
         </Pressable>
       </View>
 
-      <View style={styles.sectionSeparator} />
-
-      <View style={styles.storiesHeader}>
-        <Text style={styles.sectionTitle}>Stories</Text>
-
-        <Pressable onPress={() => router.push('/story-upload')}>
-          <Text style={styles.seeAll}>Créer</Text>
-        </Pressable>
-      </View>
+      <View style={styles.separator} />
 
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.storiesContent}
+        contentContainerStyle={styles.storiesRow}
       >
         <Pressable
-          onPress={() =>
-            myStoryGroup
-              ? openStory(uid)
-              : router.push('/story-upload')
-          }
+          onPress={() => myStoryGroup ? openStory(uid) : router.push('/story-upload')}
           style={styles.storyItem}
         >
           <View>
-            <View
-              style={[
-                styles.storyRing,
-                {
-                  borderColor: myStoryGroup?.hasUnseen
-                    ? colors.primary
-                    : '#4C4E52',
-                },
-              ]}
-            >
+            <View style={[styles.storyRing, { borderColor: myStoryGroup?.hasUnseen ? colors.primary : '#4C4E52' }]}>
               {auth.currentUser?.photoURL ? (
-                <Image
-                  source={{ uri: auth.currentUser.photoURL }}
-                  style={styles.storyAvatar}
-                />
+                <Image source={{ uri: auth.currentUser.photoURL }} style={styles.storyAvatar} />
               ) : (
-                <View
-                  style={[
-                    styles.storyAvatar,
-                    styles.avatarFallback,
-                  ]}
-                >
-                  <Ionicons name="person" size={28} color="#777" />
+                <View style={[styles.storyAvatar, styles.avatarFallback]}>
+                  <Ionicons name="person" size={24} color="#777" />
                 </View>
               )}
             </View>
-
             <View style={styles.storyAdd}>
-              <Ionicons name="add" size={15} color="#fff" />
+              <Ionicons name="add" size={14} color="#fff" />
             </View>
           </View>
-
-          <Text numberOfLines={1} style={styles.storyName}>
-            Votre story
-          </Text>
+          <Text numberOfLines={1} style={styles.storyName}>Votre story</Text>
         </Pressable>
 
         {otherStoryGroups.map((group) => (
-          <StoryItem
-            key={group.userId}
-            group={group}
-            onPress={() => openStory(group.userId)}
-          />
+          <StoryCircle key={group.userId} group={group} onPress={() => openStory(group.userId)} />
         ))}
 
         {storiesLoading && (
-          <View style={styles.storiesLoader}>
-            <ActivityIndicator color={colors.primary} />
+          <View style={{ width: 60, height: 68, alignItems: 'center', justifyContent: 'center' }}>
+            <ActivityIndicator color={colors.primary} size="small" />
           </View>
         )}
       </ScrollView>
 
-      <View style={styles.sectionSeparator} />
+      <View style={styles.separator} />
     </>
   )
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
+      <View style={styles.topBar}>
+        <Text style={styles.title}>Actus</Text>
+        <Pressable onPress={() => router.push('/(tabs)/explore')} style={styles.iconBtn}>
+          <Ionicons name="search" size={22} color="#fff" />
+        </Pressable>
+      </View>
+
       <FlatList
         data={posts}
-        keyExtractor={(post) => post.id}
+        keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <PostCard
             post={item}
@@ -279,38 +157,12 @@ export default function NewsScreen() {
             onSave={toggleSave}
             onShare={registerShare}
             onComment={setCommentPost}
-            onPress={(post) => router.push({
-              pathname: '/post-detail',
-              params: { postId: post.id },
-            })}
-            onEdit={(post) => {
-              router.push({
-                pathname: '/news-compose',
-                params: { editPostId: post.id },
-              })
-            }}
+            onEdit={(post) => router.push({ pathname: '/news-compose', params: { editPostId: post.id } })}
             onDelete={(post) => {
-              Alert.alert(
-                'Supprimer la publication ?',
-                'Cette action est définitive.',
-                [
-                  { text: 'Annuler', style: 'cancel' },
-                  {
-                    text: 'Supprimer',
-                    style: 'destructive',
-                    onPress: async () => {
-                      const ok = await deletePost(post.id)
-
-                      if (!ok) {
-                        Alert.alert(
-                          'Erreur',
-                          'Impossible de supprimer la publication.',
-                        )
-                      }
-                    },
-                  },
-                ],
-              )
+              Alert.alert('Supprimer ?', 'Cette action est définitive.', [
+                { text: 'Annuler', style: 'cancel' },
+                { text: 'Supprimer', style: 'destructive', onPress: () => deletePost(post.id) },
+              ])
             }}
             onMore={setActionsPost}
           />
@@ -324,52 +176,23 @@ export default function NewsScreen() {
         ListEmptyComponent={
           loading ? (
             <View style={styles.empty}>
-              <ActivityIndicator
-                size="large"
-                color={colors.primary}
-              />
-              <Text style={styles.emptyText}>
-                Chargement des actualités…
-              </Text>
+              <ActivityIndicator size="large" color={colors.primary} />
             </View>
           ) : (
             <View style={styles.empty}>
-              <Ionicons
-                name="newspaper-outline"
-                size={52}
-                color="#555"
-              />
-              <Text style={styles.emptyTitle}>
-                Aucune publication
-              </Text>
-              <Text style={styles.emptyText}>
-                Soyez la première personne à publier une actualité.
-              </Text>
-              <Pressable
-                onPress={() => router.push('/news-compose')}
-                style={styles.emptyButton}
-              >
-                <Text style={styles.emptyButtonText}>
-                  Créer une publication
-                </Text>
+              <Ionicons name="newspaper-outline" size={48} color="#555" />
+              <Text style={styles.emptyTitle}>Aucune publication</Text>
+              <Text style={styles.emptyText}>Publiez la première actualité.</Text>
+              <Pressable onPress={() => router.push('/news-compose')} style={styles.emptyBtn}>
+                <Text style={styles.emptyBtnText}>Créer une publication</Text>
               </Pressable>
             </View>
           )
         }
-        ListFooterComponent={
-          loadingMore ? (
-            <View style={styles.footerLoader}>
-              <ActivityIndicator color={colors.primary} />
-            </View>
-          ) : null
-        }
+        ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} /> : null}
       />
 
-      <NewsCommentsModal
-        post={commentPost}
-        visible={commentPost !== null}
-        onClose={() => setCommentPost(null)}
-      />
+      <NewsCommentsModal post={commentPost} visible={commentPost !== null} onClose={() => setCommentPost(null)} />
 
       {actionsPost && (
         <ContentActionsSheet
@@ -379,27 +202,17 @@ export default function NewsScreen() {
           contentOwnerId={actionsPost.userId}
           contentOwnerName={actionsPost.userName}
           onClose={() => setActionsPost(null)}
-          onBlocked={() => {
-            removePostsFromUser(actionsPost.userId)
-            setActionsPost(null)
-          }}
+          onBlocked={() => { removePostsFromUser(actionsPost.userId); setActionsPost(null) }}
         />
       )}
 
-      <Modal
-        visible={viewerGroupIndex !== null}
-        animationType="fade"
-        presentationStyle="fullScreen"
-        onRequestClose={() => setViewerGroupIndex(null)}
-      >
+      <Modal visible={viewerGroupIndex !== null} animationType="fade" presentationStyle="fullScreen" onRequestClose={() => setViewerGroupIndex(null)}>
         {viewerGroupIndex !== null && (
           <StoryViewer
             groups={storyGroups}
             initialGroupIndex={viewerGroupIndex}
             onClose={() => setViewerGroupIndex(null)}
-            onViewed={(storyId) => {
-              if (uid) markAsViewed(storyId, uid)
-            }}
+            onViewed={(storyId) => { if (uid) markAsViewed(storyId, uid) }}
           />
         )}
       </Modal>
@@ -408,177 +221,45 @@ export default function NewsScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: '#08090A',
-  },
+  screen: { flex: 1, backgroundColor: '#08090A' },
   topBar: {
-    height: 58,
-    paddingHorizontal: 14,
+    height: 54,
+    paddingHorizontal: 16,
     backgroundColor: '#111214',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#2A2B2E',
   },
-  screenTitle: {
-    color: '#fff',
-    fontSize: 28,
-    fontWeight: '800',
-    letterSpacing: -0.7,
-  },
-  topActions: {
-    flexDirection: 'row',
-    gap: 9,
-  },
-  circleButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#292B2F',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  title: { color: '#fff', fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
+  iconBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#292B2F', alignItems: 'center', justifyContent: 'center' },
+
   composer: {
-    minHeight: 72,
     paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: '#111214',
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 10,
-    backgroundColor: '#111214',
-    flexDirection: 'row',
-    alignItems: 'center',
   },
-  composerAvatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-  },
-  avatarFallback: {
-    backgroundColor: '#25272A',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  composerInput: {
-    flex: 1,
-    height: 42,
-    paddingHorizontal: 15,
-    borderRadius: 21,
-    borderWidth: 1,
-    borderColor: '#3A3C40',
-    justifyContent: 'center',
-  },
-  composerPlaceholder: {
-    color: '#C8C8C8',
-    fontSize: 15,
-  },
-  sectionSeparator: {
-    height: 8,
-    backgroundColor: '#08090A',
-  },
-  storiesHeader: {
-    paddingHorizontal: 14,
-    paddingTop: 13,
-    paddingBottom: 5,
-    backgroundColor: '#111214',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  sectionTitle: {
-    color: '#fff',
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  seeAll: {
-    color: colors.primary,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  storiesContent: {
-    minHeight: 110,
-    paddingHorizontal: 14,
-    paddingTop: 9,
-    paddingBottom: 13,
-    backgroundColor: '#111214',
-  },
-  storyItem: {
-    width: 76,
-    marginRight: 10,
-    alignItems: 'center',
-  },
-  storyRing: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    borderWidth: 3,
-    padding: 3,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  storyAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-  },
-  storyAdd: {
-    position: 'absolute',
-    right: 0,
-    bottom: 0,
-    width: 23,
-    height: 23,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#111214',
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  storyName: {
-    maxWidth: 74,
-    marginTop: 6,
-    color: '#D8D8D8',
-    fontSize: 11,
-    textAlign: 'center',
-  },
-  storiesLoader: {
-    width: 60,
-    height: 68,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  empty: {
-    minHeight: 320,
-    paddingHorizontal: 34,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyTitle: {
-    color: '#fff',
-    fontSize: 19,
-    fontWeight: '700',
-    marginTop: 14,
-  },
-  emptyText: {
-    color: '#888',
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: 'center',
-    marginTop: 7,
-  },
-  emptyButton: {
-    marginTop: 18,
-    height: 42,
-    borderRadius: 21,
-    paddingHorizontal: 20,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyButtonText: {
-    color: '#fff',
-    fontWeight: '700',
-  },
-  footerLoader: {
-    height: 70,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  composerAvatar: { width: 40, height: 40, borderRadius: 20 },
+  avatarFallback: { backgroundColor: '#25272A', alignItems: 'center', justifyContent: 'center' },
+  composerInput: { flex: 1, height: 40, paddingHorizontal: 14, borderRadius: 20, borderWidth: 1, borderColor: '#3A3C40', justifyContent: 'center' },
+  composerPlaceholder: { color: '#C8C8C8', fontSize: 14 },
+
+  separator: { height: 6, backgroundColor: '#08090A' },
+
+  storiesRow: { paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#111214' },
+  storyItem: { width: 70, marginRight: 10, alignItems: 'center' },
+  storyRing: { width: 64, height: 64, borderRadius: 32, borderWidth: 3, padding: 2, alignItems: 'center', justifyContent: 'center' },
+  storyAvatar: { width: 52, height: 52, borderRadius: 26 },
+  storyAdd: { position: 'absolute', right: -2, bottom: -2, width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#111214', backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  storyName: { maxWidth: 68, marginTop: 5, color: '#D8D8D8', fontSize: 11, textAlign: 'center' },
+
+  empty: { minHeight: 300, paddingHorizontal: 32, alignItems: 'center', justifyContent: 'center' },
+  emptyTitle: { color: '#fff', fontSize: 18, fontWeight: '700', marginTop: 12 },
+  emptyText: { color: '#888', fontSize: 13, marginTop: 5, textAlign: 'center' },
+  emptyBtn: { marginTop: 16, height: 40, paddingHorizontal: 18, borderRadius: 20, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  emptyBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 })
