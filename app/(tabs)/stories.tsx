@@ -155,25 +155,25 @@ export default function StoriesScreen() {
 
       <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} onPress={() => setMenuVisible(false)}>
-          <Pressable style={{ position: 'absolute', top: 60, right: 16, backgroundColor: '#1a1a2e', borderRadius: 12, overflow: 'hidden', minWidth: 200 }}>
+          <Pressable style={{ position: 'absolute', top: 60, right: 16, backgroundColor: '#2a2a2a', borderRadius: 12, overflow: 'hidden', minWidth: 200, elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 8 }}>
             <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12 }} onPress={() => { setMenuVisible(false); router.push('/story-upload') }}>
-              <Ionicons name="camera" size={20} color={colors.text} />
-              <Text style={{ color: colors.text, fontSize: 15 }}>Créer une story</Text>
+              <Ionicons name="camera" size={20} color="#fff" />
+              <Text style={{ color: '#fff', fontSize: 15 }}>Créer une story</Text>
             </TouchableOpacity>
             <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.1)' }} />
             <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12 }} onPress={() => setMenuVisible(false)}>
-              <Ionicons name="settings-outline" size={20} color={colors.text} />
-              <Text style={{ color: colors.text, fontSize: 15 }}>Paramètres des stories</Text>
+              <Ionicons name="settings-outline" size={20} color="#fff" />
+              <Text style={{ color: '#fff', fontSize: 15 }}>Paramètres des stories</Text>
             </TouchableOpacity>
             <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.1)' }} />
             <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12 }} onPress={() => setMenuVisible(false)}>
-              <Ionicons name="archive-outline" size={20} color={colors.text} />
-              <Text style={{ color: colors.text, fontSize: 15 }}>Archives</Text>
+              <Ionicons name="archive-outline" size={20} color="#fff" />
+              <Text style={{ color: '#fff', fontSize: 15 }}>Archives</Text>
             </TouchableOpacity>
             <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.1)' }} />
             <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12 }} onPress={() => setMenuVisible(false)}>
-              <Ionicons name="people-outline" size={20} color={colors.text} />
-              <Text style={{ color: colors.text, fontSize: 15 }}>Liste des viewers</Text>
+              <Ionicons name="people-outline" size={20} color="#fff" />
+              <Text style={{ color: '#fff', fontSize: 15 }}>Liste des viewers</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>
