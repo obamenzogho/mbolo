@@ -38,6 +38,7 @@ export default function StoryViewer({ groups, initialGroupIndex, onClose, onView
   const [sending, setSending] = useState(false)
   const [showViewers, setShowViewers] = useState(false)
   const [viewers, setViewers] = useState<{ uid: string; displayName: string; photoURL: string }[]>([])
+  const [showComment, setShowComment] = useState(false)
 
   const user = auth.currentUser
   const router = useRouter()
@@ -186,11 +187,16 @@ export default function StoryViewer({ groups, initialGroupIndex, onClose, onView
 
   const pan = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_, g) => !closing.current && g.dy > 10 && Math.abs(g.dy) > Math.abs(g.dx),
-      onPanResponderMove: (_, g) => { if (g.dy > 0) translateY.setValue(g.dy) },
+      onMoveShouldSetPanResponder: (_, g) => !closing.current && (Math.abs(g.dy) > 10 && Math.abs(g.dy) > Math.abs(g.dx)),
+      onPanResponderMove: (_, g) => {
+        if (g.dy > 0) translateY.setValue(g.dy)
+      },
       onPanResponderRelease: (_, g) => {
         if (g.dy > 100) {
           animateClose()
+        } else if (g.dy < -80) {
+          setShowComment(true)
+          Animated.spring(translateY, { toValue: 0, useNativeDriver: true }).start()
         } else {
           Animated.spring(translateY, { toValue: 0, useNativeDriver: true }).start()
         }
@@ -326,6 +332,36 @@ export default function StoryViewer({ groups, initialGroupIndex, onClose, onView
         </Pressable>
       </Pressable>
     </Modal>
+
+    {/* Comment overlay (swipe up) */}
+    <Modal visible={showComment} transparent animationType="slide" onRequestClose={() => setShowComment(false)}>
+      <Pressable style={styles.commentOverlay} onPress={() => setShowComment(false)}>
+        <Pressable style={styles.commentSheet} onPress={() => {}}>
+          <View style={styles.modalHandle} />
+          <Text style={styles.modalTitle}>Commenter</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingBottom: 24 }}>
+            <TextInput
+              style={styles.commentInput}
+              placeholder="Écrire un commentaire..."
+              placeholderTextColor="#999"
+              value={replyText}
+              onChangeText={setReplyText}
+              autoFocus
+            />
+            <Pressable
+              style={[styles.sendBtn, (!replyText.trim() || sending) && { opacity: 0.4 }]}
+              disabled={!replyText.trim() || sending}
+              onPress={() => {
+                handleSendReply()
+                setShowComment(false)
+              }}
+            >
+              <Ionicons name="send" size={20} color="#fff" />
+            </Pressable>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
     </>
   )
 }
@@ -353,4 +389,7 @@ const styles = StyleSheet.create({
   viewerRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 10, gap: 12 },
   viewerAvatar: { width: 40, height: 40, borderRadius: 20 },
   viewerName: { color: '#fff', fontSize: 15 },
+  commentOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' },
+  commentSheet: { backgroundColor: '#1a1a2e', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 8 },
+  commentInput: { flex: 1, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 24, paddingHorizontal: 16, paddingVertical: 12, color: '#fff', fontSize: 15 },
 })
