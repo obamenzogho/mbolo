@@ -175,13 +175,6 @@ export default function StoriesScreen() {
                 colors={['transparent', 'rgba(0,0,0,0.7)']}
                 style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%' }}
               />
-              <View style={{ position: 'absolute', top: 8, left: 8 }}>
-                <StoryRing
-                  avatarUrl={user?.photoURL || undefined}
-                  hasUnseen={false}
-                  size={52}
-                />
-              </View>
               <Text numberOfLines={1} style={{ position: 'absolute', bottom: 8, left: 8, right: 8, color: '#fff', fontSize: 14, fontWeight: '600', textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 2 }}>
                 Votre story
               </Text>
