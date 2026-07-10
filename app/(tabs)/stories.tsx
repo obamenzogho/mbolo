@@ -267,7 +267,7 @@ export default function StoriesScreen() {
         </>
       )}
 
-      <Modal visible={viewerGroupIndex !== null} animationType="fade" transparent={false} onRequestClose={() => setViewerGroupIndex(null)}>
+      <Modal visible={viewerGroupIndex !== null} animationType="none" transparent onRequestClose={() => setViewerGroupIndex(null)}>
         {viewerGroupIndex !== null && (
           <StoryViewer
             groups={groups}

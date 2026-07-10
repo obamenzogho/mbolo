@@ -171,14 +171,26 @@ export default function StoryViewer({ groups, initialGroupIndex, onClose, onView
     }
   }, [isVideo, player, progress, goNextStory])
 
-  // Swipe down pour fermer ----------------------------------------------------
+  // Swipe down pour fermer (style WhatsApp) -----------------------------------
+  const closing = useRef(false)
+
+  const animateClose = useCallback(() => {
+    if (closing.current) return
+    closing.current = true
+    Animated.timing(translateY, {
+      toValue: H,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => onClose())
+  }, [translateY, onClose])
+
   const pan = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_, g) => g.dy > 10 && Math.abs(g.dy) > Math.abs(g.dx),
+      onMoveShouldSetPanResponder: (_, g) => !closing.current && g.dy > 10 && Math.abs(g.dy) > Math.abs(g.dx),
       onPanResponderMove: (_, g) => { if (g.dy > 0) translateY.setValue(g.dy) },
       onPanResponderRelease: (_, g) => {
-        if (g.dy > 120) {
-          onClose()
+        if (g.dy > 100) {
+          animateClose()
         } else {
           Animated.spring(translateY, { toValue: 0, useNativeDriver: true }).start()
         }
@@ -189,7 +201,7 @@ export default function StoryViewer({ groups, initialGroupIndex, onClose, onView
   if (!group || !story) return null
 
   return (<>
-    <Animated.View style={[styles.container, { transform: [{ translateY }] }]} {...pan.panHandlers}>
+    <Animated.View style={[styles.container, { transform: [{ translateY }], opacity: translateY.interpolate({ inputRange: [0, H], outputRange: [1, 0.3] }) }]} {...pan.panHandlers}>
       {/* Barres segmentées */}
       <View style={styles.bars}>
         {group.stories.map((_, i) => (
