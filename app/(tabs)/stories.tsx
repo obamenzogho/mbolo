@@ -189,13 +189,14 @@ export default function StoriesScreen() {
             <TouchableOpacity
               onPress={() => router.push('/story-upload')}
               style={{
-                position: 'absolute', bottom: 0, right: 2,
-                width: 26, height: 26, borderRadius: 13,
+                position: 'absolute', top: '50%', left: '50%',
+                marginLeft: -20, marginTop: -20,
+                width: 48, height: 48, borderRadius: 24,
                 backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center',
                 borderWidth: 2, borderColor: colors.black,
               }}
             >
-              <Ionicons name="add" size={16} color="#fff" />
+              <Ionicons name="add" size={28} color="#fff" />
             </TouchableOpacity>
           </View>
         }
