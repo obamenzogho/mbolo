@@ -26,6 +26,21 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return out
 }
 
+const MOCK_STORIES: Record<string, Story[]> = {
+  mock_user_1: [
+    { id: 'mock_1', userId: 'mock_user_1', username: 'Sophie', avatarUrl: 'https://i.pravatar.cc/150?u=sophie', mediaUrl: 'https://picsum.photos/seed/story1/400/700', mediaType: 'image', createdAt: new Date(Date.now() - 1000 * 60 * 30), expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 23), savedToHighlight: false, views: 12, viewedBy: [] },
+    { id: 'mock_2', userId: 'mock_user_1', username: 'Sophie', avatarUrl: 'https://i.pravatar.cc/150?u=sophie', mediaUrl: 'https://picsum.photos/seed/story2/400/700', mediaType: 'image', caption: 'Magnifique coucher de soleil 🌅', createdAt: new Date(Date.now() - 1000 * 60 * 15), expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 23), savedToHighlight: false, views: 8, viewedBy: [] },
+  ],
+  mock_user_2: [
+    { id: 'mock_3', userId: 'mock_user_2', username: 'Lucas', avatarUrl: 'https://i.pravatar.cc/150?u=lucas', mediaUrl: 'https://picsum.photos/seed/story3/400/700', mediaType: 'image', caption: 'Nouveau chapitre 🚀', createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2), expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 22), savedToHighlight: false, views: 25, viewedBy: ['mock_user_1'] },
+    { id: 'mock_4', userId: 'mock_user_2', username: 'Lucas', avatarUrl: 'https://i.pravatar.cc/150?u=lucas', mediaUrl: 'https://picsum.photos/seed/story4/400/700', mediaType: 'image', createdAt: new Date(Date.now() - 1000 * 60 * 60 * 1), expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 23), savedToHighlight: false, views: 18, viewedBy: [] },
+  ],
+  mock_user_3: [
+    { id: 'mock_5', userId: 'mock_user_3', username: 'Emma', avatarUrl: 'https://i.pravatar.cc/150?u=emma', mediaUrl: 'https://picsum.photos/seed/story5/400/700', mediaType: 'image', createdAt: new Date(Date.now() - 1000 * 60 * 60 * 4), expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 20), savedToHighlight: false, views: 42, viewedBy: ['mock_user_1', 'mock_user_2'] },
+    { id: 'mock_6', userId: 'mock_user_3', username: 'Emma', avatarUrl: 'https://i.pravatar.cc/150?u=emma', mediaUrl: 'https://picsum.photos/seed/story6/400/700', mediaType: 'image', createdAt: new Date(Date.now() - 1000 * 60 * 60 * 3), expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 21), savedToHighlight: false, views: 30, viewedBy: [] },
+  ],
+}
+
 export function useStoriesFeed(followingIds: string[]) {
   const uid = auth.currentUser?.uid ?? ''
   const [rawStories, setRawStories] = useState<Record<string, Story[]>>({})
@@ -85,8 +100,17 @@ export function useStoriesFeed(followingIds: string[]) {
   }, [targetIds])
 
   const groups = useMemo<StoryGroup[]>(() => {
+    const merged = { ...rawStories }
+    for (const [mockUid, mockStories] of Object.entries(MOCK_STORIES)) {
+      if (!merged[mockUid]) merged[mockUid] = mockStories
+    }
+    if (!merged[uid]) {
+      merged[uid] = [
+        { id: 'mock_me_1', userId: uid, username: 'Moi', avatarUrl: auth.currentUser?.photoURL || 'https://i.pravatar.cc/150?u=me', mediaUrl: 'https://picsum.photos/seed/mystory1/400/700', mediaType: 'image', caption: 'Ma story du jour!', createdAt: new Date(Date.now() - 1000 * 60 * 5), expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 23), savedToHighlight: false, views: 3, viewedBy: ['mock_user_1', 'mock_user_2'] },
+      ]
+    }
     const out: StoryGroup[] = []
-    for (const [userId, stories] of Object.entries(rawStories)) {
+    for (const [userId, stories] of Object.entries(merged)) {
       if (!stories.length) continue
       const ordered = [...stories].sort((a, b) => {
         const at = (a.createdAt as any)?.seconds ?? 0
