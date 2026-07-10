@@ -37,13 +37,17 @@ export default function StoriesScreen() {
   const { groups, loading } = useStoriesFeed(followingIds)
 
   const [viewerGroupIndex, setViewerGroupIndex] = useState<number | null>(null)
+  const [viewerStoryId, setViewerStoryId] = useState<string | undefined>()
   const [menuVisible, setMenuVisible] = useState(false)
 
   // Deep-link depuis story_reply : ouvre le viewer sur la story ciblée
   useEffect(() => {
     if (!openStoryId || !groups.length) return
     const idx = groups.findIndex((g) => g.stories.some((s) => s.id === openStoryId))
-    if (idx !== -1) setViewerGroupIndex(idx)
+    if (idx !== -1) {
+      setViewerGroupIndex(idx)
+      setViewerStoryId(openStoryId)
+    }
   }, [openStoryId, groups])
 
   useEffect(() => { cleanExpiredStories() }, [])
@@ -53,7 +57,10 @@ export default function StoriesScreen() {
 
   const openViewerForUser = (userId: string) => {
     const idx = groups.findIndex((g) => g.userId === userId)
-    if (idx !== -1) setViewerGroupIndex(idx)
+    if (idx !== -1) {
+      setViewerStoryId(undefined)
+      setViewerGroupIndex(idx)
+    }
   }
 
   const ready = !loading && !highlightsLoading
@@ -275,12 +282,13 @@ export default function StoriesScreen() {
         </>
       )}
 
-      <Modal visible={viewerGroupIndex !== null} animationType="none" transparent onRequestClose={() => setViewerGroupIndex(null)}>
+      <Modal visible={viewerGroupIndex !== null} animationType="none" presentationStyle="fullScreen" transparent onRequestClose={() => { setViewerGroupIndex(null); setViewerStoryId(undefined) }}>
         {viewerGroupIndex !== null && (
           <StoryViewer
             groups={groups}
             initialGroupIndex={viewerGroupIndex}
-            onClose={() => setViewerGroupIndex(null)}
+            initialStoryId={viewerStoryId}
+            onClose={() => { setViewerGroupIndex(null); setViewerStoryId(undefined) }}
             onViewed={(storyId) => markAsViewed(storyId, uid)}
           />
         )}

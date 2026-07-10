@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  collection, addDoc, doc, updateDoc, deleteDoc, getDoc, getDocs,
-  query, where, serverTimestamp, increment, arrayUnion,
+  collection, addDoc, doc, updateDoc, deleteDoc, getDocs, getDoc,
+  query, where, serverTimestamp, runTransaction,
 } from 'firebase/firestore'
 import { db, auth } from '../lib/firebase'
 import { uploadToCloudinary } from '../lib/cloudinary'
@@ -24,22 +24,17 @@ export interface Story {
   viewedBy: string[]
 }
 
-/**
- * Hook pour gérer les stories
- * - Upload vers Cloudinary + Firestore
- * - Suppression (Storage + Firestore)
- * - Récupération des stories actives
- * - Marquer comme vue
- * - Nettoyage automatique des stories expirées
- */
+function toDate(value: any): Date {
+  if (value?.toDate) return value.toDate()
+  if (value?.seconds) return new Date(value.seconds * 1000)
+  return new Date(value)
+}
+
 export function useStories() {
   const user = auth.currentUser
   const [myStories, setMyStories] = useState<Story[]>([])
   const [loading, setLoading] = useState(false)
 
-  /**
-   * Upload un média vers Cloudinary et crée le document story
-   */
   const uploadStory = useCallback(async (
     mediaUri: string,
     mediaType: 'image' | 'video',
@@ -50,15 +45,13 @@ export function useStories() {
     if (!user) throw new Error('Non authentifié')
 
     const isVideo = mediaType === 'video'
-
     const mediaUrl = await uploadToCloudinary(mediaUri, isVideo ? 'video' : 'image', {
       folder: 'stories',
       timeout: 120000,
     })
 
-    // 2. Créer le document dans Firestore
     const now = new Date()
-    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000) // 24h
+    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000)
 
     const storyDoc = await addDoc(collection(db, 'stories'), {
       userId: user.uid,
@@ -79,46 +72,25 @@ export function useStories() {
     return storyDoc.id
   }, [user])
 
-  /**
-   * Supprime une story (Cloudinary + Firestore)
-   */
   const deleteStory = useCallback(async (storyId: string) => {
     try {
-      // Récupérer le document pour avoir mediaUrl
-      const storyRef = doc(db, 'stories', storyId)
-      const snap = await getDocs(query(collection(db, 'stories'), where('__name__', '==', storyId)))
-      if (!snap.empty) {
-        const data = snap.docs[0].data()
-        // Supprimer de Cloudinary (extraction du public_id)
-        if (data.mediaUrl) {
-          const parts = data.mediaUrl.split('/')
-          const filename = parts[parts.length - 1]
-          const publicId = `stories/${filename.split('.')[0]}`
-          // Note: Cloudinary delete via API nécessite une clé secrète côté serveur
-          // On supprime juste le document Firestore
-        }
-      }
-      await deleteDoc(storyRef)
+      await deleteDoc(doc(db, 'stories', storyId))
     } catch (e) {
       captureException(e instanceof Error ? e : new Error(String(e)), { context: 'deleteStory' })
-      console.error('deleteStory error:', e)
     }
   }, [])
 
-  /**
-   * Récupère les stories non expirées d'un utilisateur
-   */
   const getUserStories = useCallback(async (userId: string): Promise<Story[]> => {
     try {
       const q = query(
         collection(db, 'stories'),
-        where('userId', '==', userId)
+        where('userId', '==', userId),
       )
       const snap = await getDocs(q)
       const now = new Date()
       return snap.docs
         .map((d: any) => ({ id: d.id, ...d.data() } as Story))
-        .filter((s: Story) => s.expiresAt && new Date(s.expiresAt) > now)
+        .filter((s: Story) => s.expiresAt && toDate(s.expiresAt) > now)
         .sort((a: Story, b: Story) => {
           const aTime = (a.createdAt as any)?.seconds || 0
           const bTime = (b.createdAt as any)?.seconds || 0
@@ -126,79 +98,83 @@ export function useStories() {
         })
     } catch (e) {
       captureException(e instanceof Error ? e : new Error(String(e)), { context: 'getUserStories' })
-      console.error('getUserStories error:', e)
       return []
     }
   }, [])
 
-  /**
-   * Récupère mes stories non expirées
-   */
   const getMyStories = useCallback(async (): Promise<Story[]> => {
     if (!user) return []
     return getUserStories(user.uid)
   }, [user, getUserStories])
 
-  /**
-   * Récupère les viewers d'une story par leurs IDs
-   */
-  const getStoryViewers = useCallback(async (viewerIds: string[]): Promise<{ uid: string; displayName: string; photoURL: string }[]> => {
-    const results: { uid: string; displayName: string; photoURL: string }[] = []
-    for (const uid of viewerIds) {
-      try {
+  const getStoryViewers = useCallback(async (viewerIds: string[]) => {
+    const uniqueIds = [...new Set(viewerIds.filter(Boolean))]
+
+    const results = await Promise.allSettled(
+      uniqueIds.map(async (uid) => {
         const snap = await getDoc(doc(db, 'users', uid))
-        if (snap.exists()) {
-          const d = snap.data()
-          results.push({ uid, displayName: d.displayName ?? d.username ?? '?', photoURL: d.photoURL ?? '' })
+        if (!snap.exists()) return null
+
+        const data = snap.data()
+        return {
+          uid,
+          displayName: data.nom || data.pseudo || data.displayName || 'Utilisateur',
+          photoURL: data.photoURL || '',
         }
-      } catch (e) {
-        captureException(e instanceof Error ? e : new Error(String(e)), { context: 'getStoryViewers', uid })
-      }
-    }
-    return results
+      }),
+    )
+
+    return results.flatMap((result) =>
+      result.status === 'fulfilled' && result.value ? [result.value] : [],
+    )
   }, [])
 
-  /**
-   * Marque une story comme vue par un utilisateur
-   */
   const markAsViewed = useCallback(async (storyId: string, viewerId: string) => {
+    if (!storyId || !viewerId) return
+
     try {
       const storyRef = doc(db, 'stories', storyId)
-      await updateDoc(storyRef, {
-        views: increment(1),
-        viewedBy: arrayUnion(viewerId),
+
+      await runTransaction(db, async (transaction) => {
+        const snap = await transaction.get(storyRef)
+        if (!snap.exists()) return
+
+        const data = snap.data()
+        if (data.userId === viewerId) return
+
+        const viewedBy: string[] = Array.isArray(data.viewedBy) ? data.viewedBy : []
+        if (viewedBy.includes(viewerId)) return
+
+        transaction.update(storyRef, {
+          viewedBy: [...viewedBy, viewerId],
+          views: viewedBy.length + 1,
+        })
       })
     } catch (e) {
-      captureException(e instanceof Error ? e : new Error(String(e)), { context: 'markAsViewed' })
-      console.error('markAsViewed error:', e)
+      captureException(e instanceof Error ? e : new Error(String(e)), { context: 'markAsViewed', storyId })
     }
   }, [])
 
-  /**
-   * Nettoie les stories expirées non sauvegardées
-   */
   const cleanExpiredStories = useCallback(async () => {
     if (!user) return
     try {
       const q = query(
         collection(db, 'stories'),
-        where('userId', '==', user.uid)
+        where('userId', '==', user.uid),
       )
       const snap = await getDocs(q)
       const now = new Date()
       for (const d of snap.docs as any[]) {
         const data = d.data() as Story
-        if (new Date(data.expiresAt) < now && !data.savedToHighlight) {
+        if (toDate(data.expiresAt) < now && !data.savedToHighlight) {
           await deleteDoc(doc(db, 'stories', d.id))
         }
       }
     } catch (e) {
       captureException(e instanceof Error ? e : new Error(String(e)), { context: 'cleanExpiredStories' })
-      console.error('cleanExpiredStories error:', e)
     }
   }, [user])
 
-  // Charger mes stories au montage
   useEffect(() => {
     if (user) {
       setLoading(true)
@@ -206,7 +182,6 @@ export function useStories() {
         setMyStories(stories)
         setLoading(false)
       })
-      // Nettoyage automatique
       cleanExpiredStories()
     }
   }, [user, getMyStories, cleanExpiredStories])

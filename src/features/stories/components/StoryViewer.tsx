@@ -1,15 +1,10 @@
-/* StoryViewer — lecteur plein écran façon WhatsApp.
-   - Barres de progression segmentées (une par story du groupe courant).
-   - Image : 5s. Vidéo : durée réelle (expo-video), progress piloté par timeUpdate.
-   - Appui long = pause. Tap gauche/droite = prev/next. Swipe down = close.
-   - Enchaîne automatiquement les groupes (users) suivants.
-   - Marque chaque story comme vue à l'affichage. */
-
 import { useEffect, useRef, useState, useCallback } from 'react'
 import {
-  View, Text, Image, Dimensions, Pressable, Animated, StyleSheet, PanResponder,
+  View, Text, Image, Pressable, Animated, StyleSheet, PanResponder,
   TextInput, Modal, FlatList, Keyboard, KeyboardAvoidingView, Platform,
+  useWindowDimensions,
 } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { auth } from '@/lib/firebase'
@@ -20,19 +15,28 @@ import { VideoView, useVideoPlayer } from 'expo-video'
 import type { StoryGroup } from '../hooks/useStoriesFeed'
 import type { Story } from '../../../hooks/useStories'
 
-const { width: W, height: H } = Dimensions.get('window')
 const IMAGE_DURATION = 5000
 
 interface StoryViewerProps {
   groups: StoryGroup[]
   initialGroupIndex: number
+  initialStoryId?: string
   onClose: () => void
   onViewed: (storyId: string) => void
 }
 
-export default function StoryViewer({ groups, initialGroupIndex, onClose, onViewed }: StoryViewerProps) {
+export default function StoryViewer({ groups, initialGroupIndex, initialStoryId, onClose, onViewed }: StoryViewerProps) {
+  const { height } = useWindowDimensions()
+  const insets = useSafeAreaInsets()
+
   const [groupIdx, setGroupIdx] = useState(initialGroupIndex)
-  const [storyIdx, setStoryIdx] = useState(groups[initialGroupIndex]?.firstUnseenIndex ?? 0)
+  const initialGroup = groups[initialGroupIndex]
+  const initialStoryIndex = initialStoryId
+    ? initialGroup?.stories.findIndex((item) => item.id === initialStoryId)
+    : initialGroup?.firstUnseenIndex
+  const [storyIdx, setStoryIdx] = useState(
+    initialStoryIndex != null && initialStoryIndex >= 0 ? initialStoryIndex : 0,
+  )
   const [paused, setPaused] = useState(false)
   const [replyText, setReplyText] = useState('')
   const [sending, setSending] = useState(false)
@@ -53,10 +57,41 @@ export default function StoryViewer({ groups, initialGroupIndex, onClose, onView
   const animRef = useRef<Animated.CompositeAnimation | null>(null)
   const translateY = useRef(new Animated.Value(0)).current
 
-  const player = useVideoPlayer(isVideo ? story?.mediaUrl ?? null : null, (p) => {
-    p.loop = false
-    p.timeUpdateEventInterval = 0.1
+  const player = useVideoPlayer(null, (instance) => {
+    instance.loop = false
+    instance.timeUpdateEventInterval = 0.1
   })
+
+  // Charger le média à chaque changement de story -----------------------------
+  useEffect(() => {
+    let cancelled = false
+
+    const load = async () => {
+      try {
+        player.pause()
+        await player.replaceAsync(
+          isVideo && story?.mediaUrl ? story.mediaUrl : null,
+        )
+
+        if (!cancelled && isVideo) {
+          player.currentTime = 0
+          player.play()
+        }
+      } catch (error) {
+        captureException(
+          error instanceof Error ? error : new Error(String(error)),
+          { context: 'StoryViewer.loadMedia', storyId: story?.id },
+        )
+      }
+    }
+
+    load()
+
+    return () => {
+      cancelled = true
+      try { player.pause() } catch {}
+    }
+  }, [story?.id, story?.mediaUrl, isVideo, player])
 
   // Navigation ----------------------------------------------------------------
   const goNextStory = useCallback(() => {
@@ -124,10 +159,7 @@ export default function StoryViewer({ groups, initialGroupIndex, onClose, onView
     onViewed(story.id)
     progress.setValue(0)
 
-    if (isVideo) {
-      try { player.currentTime = 0; player.play() } catch {}
-      return
-    }
+    if (isVideo) return
 
     const anim = Animated.timing(progress, {
       toValue: 1,
@@ -179,11 +211,11 @@ export default function StoryViewer({ groups, initialGroupIndex, onClose, onView
     if (closing.current) return
     closing.current = true
     Animated.timing(translateY, {
-      toValue: H,
+      toValue: height,
       duration: 250,
       useNativeDriver: true,
     }).start(() => onClose())
-  }, [translateY, onClose])
+  }, [translateY, onClose, height])
 
   const pan = useRef(
     PanResponder.create({
@@ -207,9 +239,9 @@ export default function StoryViewer({ groups, initialGroupIndex, onClose, onView
   if (!group || !story) return null
 
   return (<>
-    <Animated.View style={[styles.container, { transform: [{ translateY }], opacity: translateY.interpolate({ inputRange: [0, H], outputRange: [1, 0.3] }) }]} {...pan.panHandlers}>
+    <Animated.View style={[styles.container, { transform: [{ translateY }], opacity: translateY.interpolate({ inputRange: [0, height], outputRange: [1, 0.3] }) }]} {...pan.panHandlers}>
       {/* Barres segmentées */}
-      <View style={styles.bars}>
+      <View style={[styles.bars, { top: insets.top + 8 }]}>
         {group.stories.map((_, i) => (
           <View key={i} style={styles.barBg}>
             <Animated.View
@@ -228,7 +260,7 @@ export default function StoryViewer({ groups, initialGroupIndex, onClose, onView
       </View>
 
       {/* Header user */}
-      <View style={styles.header}>
+      <View style={[styles.header, { top: insets.top + 20 }]}>
         {group.avatarUrl ? (
           <Image source={{ uri: group.avatarUrl }} style={styles.avatar} />
         ) : (
@@ -284,7 +316,7 @@ export default function StoryViewer({ groups, initialGroupIndex, onClose, onView
           <Ionicons name="chevron-up" size={18} color="#ccc" />
         </Pressable>
       ) : (
-        <View style={styles.replyBar}>
+        <View style={[styles.replyBar, { bottom: Math.max(insets.bottom, 12) + 12 }]}>
           <TextInput
             style={styles.replyInput}
             placeholder="Répondre à cette story..."
@@ -369,10 +401,10 @@ export default function StoryViewer({ groups, initialGroupIndex, onClose, onView
 }
 
 const styles = StyleSheet.create({
-  container: { position: 'absolute', top: 0, left: 0, width: W, height: H, backgroundColor: '#000' },
-  bars: { position: 'absolute', top: 50, left: 8, right: 8, flexDirection: 'row', gap: 4, zIndex: 10 },
+  container: { ...StyleSheet.absoluteFillObject, backgroundColor: '#000' },
+  bars: { position: 'absolute', left: 8, right: 8, flexDirection: 'row', gap: 4, zIndex: 10 },
   barBg: { flex: 1, height: 3, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 2, overflow: 'hidden' },
-  header: { position: 'absolute', top: 62, left: 12, right: 12, flexDirection: 'row', alignItems: 'center', zIndex: 10 },
+  header: { position: 'absolute', left: 12, right: 12, flexDirection: 'row', alignItems: 'center', zIndex: 10 },
   avatar: { width: 36, height: 36, borderRadius: 18, marginRight: 10 },
   username: { color: '#fff', fontWeight: '600', fontSize: 15 },
   caption: { position: 'absolute', bottom: 100, left: 20, right: 20, zIndex: 10 },
@@ -380,11 +412,11 @@ const styles = StyleSheet.create({
   tapRow: { flex: 1, flexDirection: 'row' },
   seenBar: { position: 'absolute', bottom: 40, left: 20, right: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, zIndex: 10, paddingVertical: 8 },
   seenText: { color: '#ccc', fontSize: 13 },
-  replyBar: { position: 'absolute', bottom: 30, left: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 10 },
+  replyBar: { position: 'absolute', left: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 10 },
   replyInput: { flex: 1, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 24, paddingHorizontal: 16, paddingVertical: 10, color: '#fff', fontSize: 14 },
   sendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#1877F2', alignItems: 'center', justifyContent: 'center' },
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
-  modalContent: { backgroundColor: '#1a1a2e', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 40, maxHeight: H * 0.5 },
+  modalContent: { backgroundColor: '#1a1a2e', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 40, maxHeight: '50%' },
   modalHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#555', alignSelf: 'center', marginTop: 10, marginBottom: 16 },
   modalTitle: { color: '#fff', fontSize: 17, fontWeight: '600', textAlign: 'center', marginBottom: 16 },
   noViewers: { color: '#888', textAlign: 'center', paddingVertical: 30 },

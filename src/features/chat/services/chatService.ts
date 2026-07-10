@@ -60,30 +60,52 @@ export async function blockConversation(conversationId: string, userId: string) 
   })
 }
 
+interface StoryReplyReference {
+  storyId: string
+  mediaUrl: string
+  mediaType: 'image' | 'video'
+  ownerId: string
+}
+
+interface SendMessageExtra {
+  type?: 'text' | 'story_reply'
+  storyRef?: StoryReplyReference
+}
+
 export async function sendMessage(
   conversationId: string,
   senderId: string,
   text: string,
-  extra?: { type?: string; storyRef?: { storyId: string; mediaUrl: string; mediaType: string; ownerId: string } },
+  extra?: SendMessageExtra,
 ) {
-  const msgData: Record<string, any> = {
+  const cleanText = text.trim()
+  if (!cleanText) throw new Error('Message vide')
+
+  const type = extra?.type ?? 'text'
+
+  const message: Record<string, any> = {
     senderId,
-    text,
-    type: extra?.type ?? 'text',
+    text: cleanText,
+    type,
     createdAt: serverTimestamp(),
-    storyRef: extra?.storyRef ?? null,
+  }
+
+  if (type === 'story_reply' && extra?.storyRef) {
+    message.storyRef = extra.storyRef
   }
 
   const msgRef = await addDoc(
     collection(db, 'conversations', conversationId, 'messages'),
-    msgData,
+    message,
   )
 
-  const convRef = doc(db, 'conversations', conversationId)
-  await updateDoc(convRef, {
+  await updateDoc(doc(db, 'conversations', conversationId), {
     lastMessage: {
-      text,
+      text: type === 'story_reply'
+        ? `Réponse à une story : ${cleanText}`
+        : cleanText,
       senderId,
+      type,
       createdAt: serverTimestamp(),
     },
     updatedAt: serverTimestamp(),

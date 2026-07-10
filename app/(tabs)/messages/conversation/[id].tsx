@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { View, Text, FlatList, TouchableOpacity, KeyboardAvoidingView, Platform, Keyboard, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useLocalSearchParams, router } from 'expo-router'
 import { doc, getDoc } from 'firebase/firestore'
 import * as Clipboard from 'expo-clipboard'
 import { auth, db } from '@/lib/firebase'
@@ -26,7 +26,6 @@ import type { User as UserType, Message } from '@/types'
 
 export default function ConversationDetail() {
   const { id } = useLocalSearchParams<{ id: string }>()
-  const router = useRouter()
   const { goBack } = useGoBack()
   const userId = auth.currentUser?.uid
   const { conversation, messages, loading } = useConversation(id)
