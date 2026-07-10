@@ -153,13 +153,14 @@ export default function StoriesScreen() {
         </TouchableOpacity>
       </View>
 
-      <FlatList
-        data={otherGroups}
-        keyExtractor={(item) => item.userId}
-        renderItem={renderOtherGroup}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 12, gap: 2, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.3)' }}
+      <View style={{ height: 200, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.3)' }}>
+        <FlatList
+          data={otherGroups}
+          keyExtractor={(item) => item.userId}
+          renderItem={renderOtherGroup}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 12, gap: 2 }}
         ListHeaderComponent={
           <View style={{ marginRight: 10 }}>
             <TouchableOpacity
@@ -200,7 +201,8 @@ export default function StoriesScreen() {
             </View>
           ) : null
         }
-      />
+        />
+      </View>
 
       {highlights.length > 0 && (
         <>
