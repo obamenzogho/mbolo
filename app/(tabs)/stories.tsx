@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import {
-  View, Text, FlatList, TouchableOpacity, Image, Modal,
+  View, Text, FlatList, TouchableOpacity, Image, Modal, Pressable,
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -36,6 +36,7 @@ export default function StoriesScreen() {
   const { groups, loading } = useStoriesFeed(followingIds)
 
   const [viewerGroupIndex, setViewerGroupIndex] = useState<number | null>(null)
+  const [menuVisible, setMenuVisible] = useState(false)
 
   useEffect(() => { cleanExpiredStories() }, [])
 
@@ -143,15 +144,40 @@ export default function StoriesScreen() {
       >
         <Text style={{ color: colors.text, fontSize: 24, fontWeight: '700' }}>Stories</Text>
         <TouchableOpacity
-          onPress={() => router.push('/story-upload')}
+          onPress={() => setMenuVisible(true)}
           style={{
             width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
-            borderWidth: 2, borderColor: colors.primary,
           }}
         >
-          <Ionicons name="add" size={22} color={colors.primary} />
+          <Ionicons name="ellipsis-horizontal" size={22} color={colors.text} />
         </TouchableOpacity>
       </View>
+
+      <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} onPress={() => setMenuVisible(false)}>
+          <Pressable style={{ position: 'absolute', top: 60, right: 16, backgroundColor: '#1a1a2e', borderRadius: 12, overflow: 'hidden', minWidth: 200 }}>
+            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12 }} onPress={() => { setMenuVisible(false); router.push('/story-upload') }}>
+              <Ionicons name="camera" size={20} color={colors.text} />
+              <Text style={{ color: colors.text, fontSize: 15 }}>Créer une story</Text>
+            </TouchableOpacity>
+            <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.1)' }} />
+            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12 }} onPress={() => setMenuVisible(false)}>
+              <Ionicons name="settings-outline" size={20} color={colors.text} />
+              <Text style={{ color: colors.text, fontSize: 15 }}>Paramètres des stories</Text>
+            </TouchableOpacity>
+            <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.1)' }} />
+            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12 }} onPress={() => setMenuVisible(false)}>
+              <Ionicons name="archive-outline" size={20} color={colors.text} />
+              <Text style={{ color: colors.text, fontSize: 15 }}>Archives</Text>
+            </TouchableOpacity>
+            <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.1)' }} />
+            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12 }} onPress={() => setMenuVisible(false)}>
+              <Ionicons name="people-outline" size={20} color={colors.text} />
+              <Text style={{ color: colors.text, fontSize: 15 }}>Liste des viewers</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <View style={{ height: 200, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.3)' }}>
         <FlatList
