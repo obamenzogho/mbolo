@@ -256,6 +256,8 @@ export default function ConversationDetail() {
               isMine={msg.senderId === userId}
               createdAt={msg.createdAt}
               read={isRead}
+              type={msg.type}
+              storyRef={msg.storyRef}
               onLongPress={() => handleMessageLongPress(msg)}
             />
           )

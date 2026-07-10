@@ -110,12 +110,20 @@ export interface Reply {
   createdAt: Date
 }
 
+export interface StoryRef {
+  storyId: string
+  mediaUrl: string
+  mediaType: string
+  ownerId: string
+}
+
 export interface Message {
   id: string
   senderId: string
   text: string
-  type: 'text' | 'image'
+  type: 'text' | 'image' | 'story_reply'
   mediaUrl?: string
+  storyRef?: StoryRef
   createdAt: Date
 }
 
