@@ -159,7 +159,7 @@ export default function StoriesScreen() {
         renderItem={renderOtherGroup}
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 12, gap: 2 }}
+        contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 12, gap: 2, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.3)' }}
         ListHeaderComponent={
           <View style={{ marginRight: 10 }}>
             <TouchableOpacity
@@ -201,8 +201,6 @@ export default function StoriesScreen() {
           ) : null
         }
       />
-
-      <View style={{ marginHorizontal: 16, height: 1, backgroundColor: 'rgba(255,255,255,0.3)' }} />
 
       {highlights.length > 0 && (
         <>
