@@ -68,7 +68,7 @@ export default function StoriesScreen() {
     if (hasUnseen) {
       return (
         <LinearGradient
-          colors={['#F58529', '#DD2A7B', '#8134AF']}
+          colors={['#4361EE', '#3A0CA3']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center' }}
         >
