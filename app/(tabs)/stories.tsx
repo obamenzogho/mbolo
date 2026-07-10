@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, Image, Modal, Pressable,
 } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -17,6 +17,7 @@ import OrbitLoader from '../../src/components/OrbitLoader'
 
 export default function StoriesScreen() {
   const router = useRouter()
+  const { openStoryId } = useLocalSearchParams<{ openStoryId?: string }>()
   const user = auth.currentUser
   const uid = user?.uid ?? ''
 
@@ -37,6 +38,13 @@ export default function StoriesScreen() {
 
   const [viewerGroupIndex, setViewerGroupIndex] = useState<number | null>(null)
   const [menuVisible, setMenuVisible] = useState(false)
+
+  // Deep-link depuis story_reply : ouvre le viewer sur la story ciblée
+  useEffect(() => {
+    if (!openStoryId || !groups.length) return
+    const idx = groups.findIndex((g) => g.stories.some((s) => s.id === openStoryId))
+    if (idx !== -1) setViewerGroupIndex(idx)
+  }, [openStoryId, groups])
 
   useEffect(() => { cleanExpiredStories() }, [])
 
