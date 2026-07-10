@@ -1,6 +1,9 @@
 import React, { useCallback, useMemo, useRef } from 'react'
 import { View, Text } from 'react-native'
-import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet'
+import BottomSheet, {
+  BottomSheetBackdrop,
+  BottomSheetView,
+} from '@gorhom/bottom-sheet'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { colors } from '../../lib/theme'
@@ -11,28 +14,44 @@ interface CreateModalProps {
 }
 
 const OPTIONS = [
-  { icon: 'camera-outline', label: 'Caméra', route: '/(tabs)/camera' },
-  { icon: 'time-outline', label: 'Story', route: '/story-upload' },
-  { icon: 'document-text-outline', label: 'Brouillons', route: '/(tabs)/drafts' },
+  {
+    icon: 'newspaper-outline',
+    label: 'Publication',
+    route: '/news-compose',
+  },
+  {
+    icon: 'videocam-outline',
+    label: 'Vidéo',
+    route: '/(tabs)/camera',
+  },
+  {
+    icon: 'time-outline',
+    label: 'Story',
+    route: '/story-upload',
+  },
+  {
+    icon: 'document-text-outline',
+    label: 'Brouillons',
+    route: '/(tabs)/drafts',
+  },
 ]
 
 function CreateModalComponent({ onClose }: CreateModalProps) {
   const sheetRef = useRef<BottomSheet>(null)
   const insets = useSafeAreaInsets()
-
-  const snapPoints = useMemo(() => ['45%'], [])
+  const snapPoints = useMemo(() => ['52%'], [])
 
   const renderBackdrop = useCallback(
     (props: any) => (
       <BottomSheetBackdrop
         {...props}
-        disappearsOnIndex={-1}
         appearsOnIndex={0}
-        opacity={0.7}
-        onPress={onClose}
+        disappearsOnIndex={-1}
+        pressBehavior="close"
+        opacity={0.65}
       />
     ),
-    [onClose],
+    [],
   )
 
   const handleChange = useCallback((index: number) => {
@@ -41,7 +60,7 @@ function CreateModalComponent({ onClose }: CreateModalProps) {
 
   const handleOptionPress = useCallback((route: string) => {
     onClose()
-    router.push(route as any)
+    setTimeout(() => router.push(route as any), 100)
   }, [onClose])
 
   return (
@@ -51,21 +70,33 @@ function CreateModalComponent({ onClose }: CreateModalProps) {
       snapPoints={snapPoints}
       enablePanDownToClose
       backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: '#111', borderTopLeftRadius: 24, borderTopRightRadius: 24 }}
-      handleIndicatorStyle={{ backgroundColor: '#444', width: 40 }}
       onChange={handleChange}
+      backgroundStyle={{ backgroundColor: '#17181B' }}
+      handleIndicatorStyle={{ backgroundColor: '#62656A' }}
     >
-      <BottomSheetView style={{ paddingHorizontal: 24, paddingBottom: insets.bottom + 16 }}>
-        <Text style={{ color: colors.white, fontSize: 20, fontWeight: '800', marginBottom: 24, textAlign: 'center' }}>
+      <BottomSheetView
+        style={{
+          paddingHorizontal: 20,
+          paddingBottom: Math.max(insets.bottom, 20),
+        }}
+      >
+        <Text
+          style={{
+            color: colors.text,
+            fontSize: 21,
+            fontWeight: '700',
+            marginBottom: 18,
+          }}
+        >
           Créer
         </Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16, justifyContent: 'center' }}>
-          {OPTIONS.map((option, index) => (
+
+        <View style={{ gap: 4 }}>
+          {OPTIONS.map((option) => (
             <CreateOption
               key={option.label}
-              icon={option.icon}
+              icon={option.icon as any}
               label={option.label}
-              index={index}
               onPress={() => handleOptionPress(option.route)}
             />
           ))}

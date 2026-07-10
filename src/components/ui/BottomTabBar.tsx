@@ -20,7 +20,7 @@ const VISIBLE_TABS = [
 type TabName = (typeof VISIBLE_TABS)[number]
 
 const TAB_ICONS: Record<TabName, keyof typeof Ionicons.glyphMap> = {
-  stories: 'albums',
+  stories: 'newspaper',
   messages: 'chatbubbles',
   feed: 'home',
   notifications: 'notifications',
@@ -28,7 +28,7 @@ const TAB_ICONS: Record<TabName, keyof typeof Ionicons.glyphMap> = {
 }
 
 const TAB_LABELS: Record<TabName, string> = {
-  stories: 'Stories',
+  stories: 'Actus',
   messages: 'Messages',
   feed: 'Accueil',
   notifications: 'Notifications',

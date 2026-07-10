@@ -1,298 +1,516 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
-  View, Text, FlatList, TouchableOpacity, Image, Modal, Pressable,
+  View,
+  Text,
+  Image,
+  Pressable,
+  FlatList,
+  ScrollView,
+  Modal,
+  StyleSheet,
+  ActivityIndicator,
 } from 'react-native'
-import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import { LinearGradient } from 'expo-linear-gradient'
 import { doc, onSnapshot } from 'firebase/firestore'
-import { auth, db } from '../../src/lib/firebase'
-import { colors } from '../../src/lib/theme'
-import { useStoriesFeed } from '../../src/features/stories/hooks/useStoriesFeed'
-import { useStories } from '../../src/hooks/useStories'
-import { useHighlights } from '@/features/highlights/hooks/useHighlights'
-import StoryViewer from '../../src/features/stories/components/StoryViewer'
-import OrbitLoader from '../../src/components/OrbitLoader'
+import { auth, db } from '@/lib/firebase'
+import { colors } from '@/lib/theme'
+import { useNewsFeed } from '@/features/news/hooks/useNewsFeed'
+import { PostCard } from '@/features/news/components/PostCard'
+import { useStoriesFeed } from '@/features/stories/hooks/useStoriesFeed'
+import StoryViewer from '@/features/stories/components/StoryViewer'
+import { useStories } from '@/hooks/useStories'
+import type { StoryGroup } from '@/features/stories/hooks/useStoriesFeed'
 
-export default function StoriesScreen() {
-  const router = useRouter()
-  const { openStoryId } = useLocalSearchParams<{ openStoryId?: string }>()
-  const user = auth.currentUser
-  const uid = user?.uid ?? ''
+function StoryItem({
+  group,
+  onPress,
+}: {
+  group: StoryGroup
+  onPress: () => void
+}) {
+  return (
+    <Pressable onPress={onPress} style={styles.storyItem}>
+      <View
+        style={[
+          styles.storyRing,
+          {
+            borderColor: group.hasUnseen
+              ? colors.primary
+              : '#4C4E52',
+          },
+        ]}
+      >
+        {group.avatarUrl ? (
+          <Image
+            source={{ uri: group.avatarUrl }}
+            style={styles.storyAvatar}
+          />
+        ) : (
+          <View style={[styles.storyAvatar, styles.avatarFallback]}>
+            <Ionicons name="person" size={28} color="#777" />
+          </View>
+        )}
+      </View>
 
-  const { markAsViewed, cleanExpiredStories } = useStories()
-  const { highlights, loading: highlightsLoading } = useHighlights(uid)
+      <Text numberOfLines={1} style={styles.storyName}>
+        {group.username}
+      </Text>
+    </Pressable>
+  )
+}
 
+export default function NewsScreen() {
+  const uid = auth.currentUser?.uid ?? ''
+
+  const {
+    posts,
+    loading,
+    refreshing,
+    loadingMore,
+    refresh,
+    loadMore,
+    toggleLike,
+    registerShare,
+  } = useNewsFeed()
+
+  const { markAsViewed } = useStories()
   const [followingIds, setFollowingIds] = useState<string[]>([])
+  const [viewerGroupIndex, setViewerGroupIndex] =
+    useState<number | null>(null)
+
   useEffect(() => {
     if (!uid) return
-    const unsub = onSnapshot(doc(db, 'users', uid), (snap: any) => {
-      const data = snap.data()
-      setFollowingIds(Array.isArray(data?.following) ? data.following : [])
-    })
-    return unsub
+
+    return onSnapshot(
+      doc(db, 'users', uid),
+      (snapshot: any) => {
+        const following = snapshot.data()?.following
+        setFollowingIds(
+          Array.isArray(following) ? following : [],
+        )
+      },
+    )
   }, [uid])
 
-  const { groups, loading } = useStoriesFeed(followingIds)
+  const {
+    groups: storyGroups,
+    loading: storiesLoading,
+  } = useStoriesFeed(followingIds)
 
-  const [viewerGroupIndex, setViewerGroupIndex] = useState<number | null>(null)
-  const [viewerStoryId, setViewerStoryId] = useState<string | undefined>()
-  const [menuVisible, setMenuVisible] = useState(false)
+  const myStoryGroup = useMemo(
+    () => storyGroups.find((group) => group.userId === uid),
+    [storyGroups, uid],
+  )
 
-  // Deep-link depuis story_reply : ouvre le viewer sur la story ciblée
-  useEffect(() => {
-    if (!openStoryId || !groups.length) return
-    const idx = groups.findIndex((g) => g.stories.some((s) => s.id === openStoryId))
-    if (idx !== -1) {
-      setViewerGroupIndex(idx)
-      setViewerStoryId(openStoryId)
-    }
-  }, [openStoryId, groups])
+  const otherStoryGroups = useMemo(
+    () => storyGroups.filter((group) => group.userId !== uid),
+    [storyGroups, uid],
+  )
 
-  useEffect(() => { cleanExpiredStories() }, [])
+  const openStory = (userId: string) => {
+    const index = storyGroups.findIndex(
+      (group) => group.userId === userId,
+    )
 
-  const myGroup = useMemo(() => groups.find((g) => g.userId === uid), [groups, uid])
-  const otherGroups = useMemo(() => groups.filter((g) => g.userId !== uid), [groups, uid])
-
-  const openViewerForUser = (userId: string) => {
-    const idx = groups.findIndex((g) => g.userId === userId)
-    if (idx !== -1) {
-      setViewerStoryId(undefined)
-      setViewerGroupIndex(idx)
+    if (index !== -1) {
+      setViewerGroupIndex(index)
     }
   }
 
-  const ready = !loading && !highlightsLoading
+  const header = (
+    <>
+      <View style={styles.topBar}>
+        <Text style={styles.screenTitle}>Actus</Text>
 
-  const StoryRing = ({
-    avatarUrl, hasUnseen, size = 68,
-  }: { avatarUrl?: string; hasUnseen: boolean; size?: number }) => {
-    const inner = size - 8
-    const AvatarImg = avatarUrl
-      ? <Image source={{ uri: avatarUrl }} style={{ width: inner, height: inner, borderRadius: inner / 2 }} />
-      : (
-        <View style={{
-          width: inner, height: inner, borderRadius: inner / 2, backgroundColor: '#333',
-          alignItems: 'center', justifyContent: 'center',
-        }}
-        >
-          <Ionicons name="person" size={inner / 2} color="#888" />
-        </View>
-      )
-
-    if (hasUnseen) {
-      return (
-        <LinearGradient
-          colors={['#4361EE', '#3A0CA3']}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          style={{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center' }}
-        >
-          <View style={{
-            width: inner + 4, height: inner + 4, borderRadius: (inner + 4) / 2,
-            backgroundColor: colors.black, alignItems: 'center', justifyContent: 'center',
-          }}
+        <View style={styles.topActions}>
+          <Pressable
+            onPress={() => router.push('/news-compose')}
+            style={styles.circleButton}
           >
-            {AvatarImg}
+            <Ionicons name="add" size={25} color="#fff" />
+          </Pressable>
+
+          <Pressable
+            onPress={() => router.push('/(tabs)/explore')}
+            style={styles.circleButton}
+          >
+            <Ionicons name="search" size={21} color="#fff" />
+          </Pressable>
+        </View>
+      </View>
+
+      <View style={styles.composer}>
+        {auth.currentUser?.photoURL ? (
+          <Image
+            source={{ uri: auth.currentUser.photoURL }}
+            style={styles.composerAvatar}
+          />
+        ) : (
+          <View
+            style={[
+              styles.composerAvatar,
+              styles.avatarFallback,
+            ]}
+          >
+            <Ionicons name="person" size={20} color="#777" />
           </View>
-        </LinearGradient>
-      )
-    }
-    return (
-      <View style={{
-        width: size, height: size, borderRadius: size / 2,
-        borderWidth: 2, borderColor: '#555', alignItems: 'center', justifyContent: 'center',
-      }}
+        )}
+
+        <Pressable
+          onPress={() => router.push('/news-compose')}
+          style={styles.composerInput}
+        >
+          <Text style={styles.composerPlaceholder}>
+            Quoi de neuf ?
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => router.push('/news-compose')}
+          hitSlop={10}
+        >
+          <Ionicons name="images" size={25} color="#45BD62" />
+        </Pressable>
+      </View>
+
+      <View style={styles.sectionSeparator} />
+
+      <View style={styles.storiesHeader}>
+        <Text style={styles.sectionTitle}>Stories</Text>
+
+        <Pressable onPress={() => router.push('/story-upload')}>
+          <Text style={styles.seeAll}>Créer</Text>
+        </Pressable>
+      </View>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.storiesContent}
       >
-        {AvatarImg}
-      </View>
-    )
-  }
+        <Pressable
+          onPress={() =>
+            myStoryGroup
+              ? openStory(uid)
+              : router.push('/story-upload')
+          }
+          style={styles.storyItem}
+        >
+          <View>
+            <View
+              style={[
+                styles.storyRing,
+                {
+                  borderColor: myStoryGroup?.hasUnseen
+                    ? colors.primary
+                    : '#4C4E52',
+                },
+              ]}
+            >
+              {auth.currentUser?.photoURL ? (
+                <Image
+                  source={{ uri: auth.currentUser.photoURL }}
+                  style={styles.storyAvatar}
+                />
+              ) : (
+                <View
+                  style={[
+                    styles.storyAvatar,
+                    styles.avatarFallback,
+                  ]}
+                >
+                  <Ionicons name="person" size={28} color="#777" />
+                </View>
+              )}
+            </View>
 
-  const StoryCard = ({
-    avatarUrl, previewUrl, username, hasUnseen, size = 110,
-  }: { avatarUrl?: string; previewUrl?: string; username: string; hasUnseen: boolean; size?: number }) => (
-    <View style={{ width: size, height: size * 1.6, borderRadius: 16, overflow: 'hidden' }}>
-      {previewUrl ? (
-        <Image source={{ uri: previewUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-      ) : (
-        <View style={{ width: '100%', height: '100%', backgroundColor: '#1a1a2e' }} />
-      )}
-      <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.7)']}
-        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%' }}
-      />
-      <View style={{ position: 'absolute', top: 8, left: 8 }}>
-        <StoryRing avatarUrl={avatarUrl} hasUnseen={hasUnseen} size={52} />
-      </View>
-      <Text numberOfLines={1} style={{ position: 'absolute', bottom: 8, left: 8, right: 8, color: '#fff', fontSize: 14, fontWeight: '600', textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 2 }}>
-        {username}
-      </Text>
-    </View>
+            <View style={styles.storyAdd}>
+              <Ionicons name="add" size={15} color="#fff" />
+            </View>
+          </View>
+
+          <Text numberOfLines={1} style={styles.storyName}>
+            Votre story
+          </Text>
+        </Pressable>
+
+        {otherStoryGroups.map((group) => (
+          <StoryItem
+            key={group.userId}
+            group={group}
+            onPress={() => openStory(group.userId)}
+          />
+        ))}
+
+        {storiesLoading && (
+          <View style={styles.storiesLoader}>
+            <ActivityIndicator color={colors.primary} />
+          </View>
+        )}
+      </ScrollView>
+
+      <View style={styles.sectionSeparator} />
+    </>
   )
-
-  const renderOtherGroup = ({ item }: { item: typeof otherGroups[number] }) => (
-    <TouchableOpacity onPress={() => openViewerForUser(item.userId)} style={{ marginRight: 10 }}>
-      <StoryCard
-        avatarUrl={item.avatarUrl}
-        previewUrl={item.stories[0]?.mediaUrl}
-        username={item.username}
-        hasUnseen={item.hasUnseen}
-      />
-    </TouchableOpacity>
-  )
-
-  if (!ready) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.black, alignItems: 'center', justifyContent: 'center' }}>
-        <OrbitLoader />
-      </SafeAreaView>
-    )
-  }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.black }}>
-      <View style={{
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: 16, paddingVertical: 12,
-      }}
-      >
-        <Text style={{ color: colors.text, fontSize: 24, fontWeight: '700' }}>Stories</Text>
-        <TouchableOpacity
-          onPress={() => setMenuVisible(true)}
-          style={{
-            width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
-          }}
-        >
-          <Ionicons name="ellipsis-horizontal" size={22} color={colors.text} />
-        </TouchableOpacity>
-      </View>
-
-      <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} onPress={() => setMenuVisible(false)}>
-          <Pressable style={{ position: 'absolute', top: 60, right: 16, backgroundColor: '#2a2a2a', borderRadius: 12, overflow: 'hidden', minWidth: 200, elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 8 }}>
-            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12 }} onPress={() => { setMenuVisible(false); router.push('/story-upload') }}>
-              <Ionicons name="camera" size={20} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: 15 }}>Créer une story</Text>
-            </TouchableOpacity>
-            <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.1)' }} />
-            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12 }} onPress={() => setMenuVisible(false)}>
-              <Ionicons name="settings-outline" size={20} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: 15 }}>Paramètres des stories</Text>
-            </TouchableOpacity>
-            <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.1)' }} />
-            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12 }} onPress={() => setMenuVisible(false)}>
-              <Ionicons name="archive-outline" size={20} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: 15 }}>Archives</Text>
-            </TouchableOpacity>
-            <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.1)' }} />
-            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12 }} onPress={() => setMenuVisible(false)}>
-              <Ionicons name="people-outline" size={20} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: 15 }}>Liste des viewers</Text>
-            </TouchableOpacity>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      <View style={{ height: 200, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.3)' }}>
-        <FlatList
-          data={otherGroups}
-          keyExtractor={(item) => item.userId}
-          renderItem={renderOtherGroup}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 12, gap: 2 }}
-        ListHeaderComponent={
-          <View style={{ marginRight: 10 }}>
-            <TouchableOpacity
-              onPress={() => myGroup && openViewerForUser(uid)}
-              style={{ width: 110, height: 176, borderRadius: 16, overflow: 'hidden' }}
-            >
-              {myGroup?.stories[0]?.mediaUrl ? (
-                <Image source={{ uri: myGroup.stories[0].mediaUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-              ) : (
-                <View style={{ width: '100%', height: '100%', backgroundColor: '#1a1a2e' }} />
-              )}
-              <LinearGradient
-                colors={['transparent', 'rgba(0,0,0,0.7)']}
-                style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%' }}
-              />
-              <Text numberOfLines={1} style={{ position: 'absolute', bottom: 8, left: 8, right: 8, color: '#fff', fontSize: 14, fontWeight: '600', textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 2 }}>
-                Votre story
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => router.push('/story-upload')}
-              style={{
-                position: 'absolute', bottom: 28, left: '50%',
-                marginLeft: -20,
-                width: 40, height: 40, borderRadius: 20,
-                backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center',
-                borderWidth: 2, borderColor: colors.black,
-              }}
-            >
-              <Ionicons name="add" size={24} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        }
+    <SafeAreaView style={styles.screen} edges={['top']}>
+      <FlatList
+        data={posts}
+        keyExtractor={(post) => post.id}
+        renderItem={({ item }) => (
+          <PostCard
+            post={item}
+            currentUserId={uid}
+            onLike={toggleLike}
+            onShare={registerShare}
+          />
+        )}
+        ListHeaderComponent={header}
+        refreshing={refreshing}
+        onRefresh={refresh}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          !myGroup ? (
-            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 40 }}>
-              <Text style={{ color: colors.textSecondary }}>Aucune story pour le moment</Text>
+          loading ? (
+            <View style={styles.empty}>
+              <ActivityIndicator
+                size="large"
+                color={colors.primary}
+              />
+              <Text style={styles.emptyText}>
+                Chargement des actualités…
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.empty}>
+              <Ionicons
+                name="newspaper-outline"
+                size={52}
+                color="#555"
+              />
+              <Text style={styles.emptyTitle}>
+                Aucune publication
+              </Text>
+              <Text style={styles.emptyText}>
+                Soyez la première personne à publier une actualité.
+              </Text>
+              <Pressable
+                onPress={() => router.push('/news-compose')}
+                style={styles.emptyButton}
+              >
+                <Text style={styles.emptyButtonText}>
+                  Créer une publication
+                </Text>
+              </Pressable>
+            </View>
+          )
+        }
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={styles.footerLoader}>
+              <ActivityIndicator color={colors.primary} />
             </View>
           ) : null
         }
-        />
-      </View>
+      />
 
-      {highlights.length > 0 && (
-        <>
-          <Text style={{
-            color: colors.text, fontSize: 16, fontWeight: '600',
-            paddingHorizontal: 16, marginTop: 8, marginBottom: 8,
-          }}
-          >
-            Mises en avant
-          </Text>
-          <FlatList
-            data={highlights}
-            keyExtractor={(item) => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16 }}
-            renderItem={({ item }) => (
-              <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} style={{ alignItems: 'center', marginRight: 16, width: 72 }}>
-                <View style={{
-                  width: 64, height: 64, borderRadius: 32, borderWidth: 2,
-                  borderColor: '#555', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
-                }}
-                >
-                  {item.coverUrl ? (
-                    <Image source={{ uri: item.coverUrl }} style={{ width: 60, height: 60, borderRadius: 30 }} />
-                  ) : (
-                    <Ionicons name="bookmark" size={24} color="#888" />
-                  )}
-                </View>
-                <Text numberOfLines={1} style={{ color: colors.text, fontSize: 12, marginTop: 6, maxWidth: 72 }}>
-                  {item.title}
-                </Text>
-              </TouchableOpacity>
-            )}
-          />
-        </>
-      )}
-
-      <Modal visible={viewerGroupIndex !== null} animationType="none" presentationStyle="fullScreen" transparent onRequestClose={() => { setViewerGroupIndex(null); setViewerStoryId(undefined) }}>
+      <Modal
+        visible={viewerGroupIndex !== null}
+        animationType="fade"
+        presentationStyle="fullScreen"
+        onRequestClose={() => setViewerGroupIndex(null)}
+      >
         {viewerGroupIndex !== null && (
           <StoryViewer
-            groups={groups}
+            groups={storyGroups}
             initialGroupIndex={viewerGroupIndex}
-            initialStoryId={viewerStoryId}
-            onClose={() => { setViewerGroupIndex(null); setViewerStoryId(undefined) }}
-            onViewed={(storyId) => markAsViewed(storyId, uid)}
+            onClose={() => setViewerGroupIndex(null)}
+            onViewed={(storyId) => {
+              if (uid) markAsViewed(storyId, uid)
+            }}
           />
         )}
       </Modal>
     </SafeAreaView>
   )
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: '#08090A',
+  },
+  topBar: {
+    height: 58,
+    paddingHorizontal: 14,
+    backgroundColor: '#111214',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  screenTitle: {
+    color: '#fff',
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: -0.7,
+  },
+  topActions: {
+    flexDirection: 'row',
+    gap: 9,
+  },
+  circleButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#292B2F',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  composer: {
+    minHeight: 72,
+    paddingHorizontal: 14,
+    gap: 10,
+    backgroundColor: '#111214',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  composerAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+  },
+  avatarFallback: {
+    backgroundColor: '#25272A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  composerInput: {
+    flex: 1,
+    height: 42,
+    paddingHorizontal: 15,
+    borderRadius: 21,
+    borderWidth: 1,
+    borderColor: '#3A3C40',
+    justifyContent: 'center',
+  },
+  composerPlaceholder: {
+    color: '#C8C8C8',
+    fontSize: 15,
+  },
+  sectionSeparator: {
+    height: 8,
+    backgroundColor: '#08090A',
+  },
+  storiesHeader: {
+    paddingHorizontal: 14,
+    paddingTop: 13,
+    paddingBottom: 5,
+    backgroundColor: '#111214',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  sectionTitle: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  seeAll: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  storiesContent: {
+    minHeight: 110,
+    paddingHorizontal: 14,
+    paddingTop: 9,
+    paddingBottom: 13,
+    backgroundColor: '#111214',
+  },
+  storyItem: {
+    width: 76,
+    marginRight: 10,
+    alignItems: 'center',
+  },
+  storyRing: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    borderWidth: 3,
+    padding: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  storyAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+  },
+  storyAdd: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    width: 23,
+    height: 23,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#111214',
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  storyName: {
+    maxWidth: 74,
+    marginTop: 6,
+    color: '#D8D8D8',
+    fontSize: 11,
+    textAlign: 'center',
+  },
+  storiesLoader: {
+    width: 60,
+    height: 68,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  empty: {
+    minHeight: 320,
+    paddingHorizontal: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyTitle: {
+    color: '#fff',
+    fontSize: 19,
+    fontWeight: '700',
+    marginTop: 14,
+  },
+  emptyText: {
+    color: '#888',
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginTop: 7,
+  },
+  emptyButton: {
+    marginTop: 18,
+    height: 42,
+    borderRadius: 21,
+    paddingHorizontal: 20,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  footerLoader: {
+    height: 70,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+})

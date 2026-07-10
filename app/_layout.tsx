@@ -128,6 +128,7 @@ function RootContent() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="user/[userId]" options={{ headerShown: false, animation: 'slide_from_right' }} />
       <Stack.Screen name="post" options={{ headerShown: false, presentation: 'modal' }} />
+      <Stack.Screen name="news-compose" options={{ headerShown: false, presentation: 'modal' }} />
       <Stack.Screen name="search" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
       <Stack.Screen name="insights" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
       <Stack.Screen name="hashtag/[tag]" options={{ headerShown: false, animation: 'slide_from_bottom' }} />

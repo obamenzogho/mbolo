@@ -7,7 +7,7 @@ import { useHaptics } from '../../hooks/useHaptics'
 interface CreateOptionProps {
   icon: string
   label: string
-  index: number
+  index?: number
   onPress: () => void
 }
 
