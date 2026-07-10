@@ -8,7 +8,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import {
   View, Text, Image, Dimensions, Pressable, Animated, StyleSheet, PanResponder,
-  TextInput, Modal, FlatList, Keyboard,
+  TextInput, Modal, FlatList, Keyboard, KeyboardAvoidingView, Platform,
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -335,32 +335,34 @@ export default function StoryViewer({ groups, initialGroupIndex, onClose, onView
 
     {/* Comment overlay (swipe up) */}
     <Modal visible={showComment} transparent animationType="slide" onRequestClose={() => setShowComment(false)}>
-      <Pressable style={styles.commentOverlay} onPress={() => setShowComment(false)}>
-        <Pressable style={styles.commentSheet} onPress={() => {}}>
-          <View style={styles.modalHandle} />
-          <Text style={styles.modalTitle}>Commenter</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingBottom: 24 }}>
-            <TextInput
-              style={styles.commentInput}
-              placeholder="Écrire un commentaire..."
-              placeholderTextColor="#999"
-              value={replyText}
-              onChangeText={setReplyText}
-              autoFocus
-            />
-            <Pressable
-              style={[styles.sendBtn, (!replyText.trim() || sending) && { opacity: 0.4 }]}
-              disabled={!replyText.trim() || sending}
-              onPress={() => {
-                handleSendReply()
-                setShowComment(false)
-              }}
-            >
-              <Ionicons name="send" size={20} color="#fff" />
-            </Pressable>
-          </View>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <Pressable style={styles.commentOverlay} onPress={() => setShowComment(false)}>
+          <Pressable style={styles.commentSheet} onPress={() => {}}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>Commenter</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingBottom: 24 }}>
+              <TextInput
+                style={styles.commentInput}
+                placeholder="Écrire un commentaire..."
+                placeholderTextColor="#999"
+                value={replyText}
+                onChangeText={setReplyText}
+                autoFocus
+              />
+              <Pressable
+                style={[styles.sendBtn, (!replyText.trim() || sending) && { opacity: 0.4 }]}
+                disabled={!replyText.trim() || sending}
+                onPress={() => {
+                  handleSendReply()
+                  setShowComment(false)
+                }}
+              >
+                <Ionicons name="send" size={20} color="#fff" />
+              </Pressable>
+            </View>
+          </Pressable>
         </Pressable>
-      </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
     </>
   )
