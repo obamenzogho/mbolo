@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import {
   Platform,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { router } from 'expo-router'
+import { router, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import {
@@ -53,6 +53,11 @@ function inferFormat(media: SelectedMedia[]): NewsPostFormat {
 }
 
 export default function NewsComposeScreen() {
+  const { editPostId } = useLocalSearchParams<{
+    editPostId?: string
+  }>()
+  const editing = Boolean(editPostId)
+
   const [text, setText] = useState('')
   const [media, setMedia] = useState<SelectedMedia[]>([])
   const [visibility, setVisibility] =
@@ -60,10 +65,44 @@ export default function NewsComposeScreen() {
   const [commentsEnabled, setCommentsEnabled] = useState(true)
   const [publishing, setPublishing] = useState(false)
   const [progress, setProgress] = useState(0)
+  const [loadingPost, setLoadingPost] = useState(editing)
 
   const canPublish =
     !publishing &&
     (text.trim().length > 0 || media.length > 0)
+
+  useEffect(() => {
+    if (!editPostId || !auth.currentUser) return
+
+    let cancelled = false
+
+    getDoc(doc(db, 'posts', editPostId))
+      .then((snapshot) => {
+        if (cancelled || !snapshot.exists()) return
+
+        const data = snapshot.data()
+
+        if (data.userId !== auth.currentUser?.uid) {
+          Alert.alert(
+            'Action interdite',
+            'Vous ne pouvez pas modifier cette publication.',
+          )
+          router.back()
+          return
+        }
+
+        setText(data.text || '')
+        setVisibility(data.visibility || 'public')
+        setCommentsEnabled(data.commentsEnabled !== false)
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingPost(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [editPostId])
 
   const pickMedia = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -122,6 +161,18 @@ export default function NewsComposeScreen() {
         doc(db, 'users', user.uid),
       )
       const profile = profileSnapshot.data()
+
+      if (editPostId) {
+        await updateDoc(doc(db, 'posts', editPostId), {
+          text: text.trim(),
+          visibility,
+          commentsEnabled,
+          updatedAt: serverTimestamp(),
+        })
+
+        router.replace('/(tabs)/stories')
+        return
+      }
 
       const uploaded: NewsPostMedia[] = []
 
@@ -235,7 +286,9 @@ export default function NewsComposeScreen() {
             <Ionicons name="close" size={28} color="#fff" />
           </Pressable>
 
-          <Text style={styles.title}>Créer une publication</Text>
+          <Text style={styles.title}>
+            {editing ? 'Modifier la publication' : 'Créer une publication'}
+          </Text>
 
           <Pressable
             onPress={publish}
@@ -248,7 +301,9 @@ export default function NewsComposeScreen() {
             {publishing ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
-              <Text style={styles.publishText}>Publier</Text>
+              <Text style={styles.publishText}>
+              {editing ? 'Enregistrer' : 'Publier'}
+            </Text>
             )}
           </Pressable>
         </View>
@@ -349,17 +404,19 @@ export default function NewsComposeScreen() {
               Ajouter à votre publication
             </Text>
 
-            <Pressable onPress={pickMedia} style={styles.optionButton}>
-              <View style={styles.optionIcon}>
-                <Ionicons name="images" size={23} color="#45BD62" />
-              </View>
-              <Text style={styles.optionText}>Photo ou vidéo</Text>
-              <Ionicons
-                name="chevron-forward"
-                size={20}
-                color="#777"
-              />
-            </Pressable>
+            {!editing && (
+              <Pressable onPress={pickMedia} style={styles.optionButton}>
+                <View style={styles.optionIcon}>
+                  <Ionicons name="images" size={23} color="#45BD62" />
+                </View>
+                <Text style={styles.optionText}>Photo ou vidéo</Text>
+                <Ionicons
+                  name="chevron-forward"
+                  size={20}
+                  color="#777"
+                />
+              </Pressable>
+            )}
 
             <Pressable
               onPress={() => setCommentsEnabled((value) => !value)}

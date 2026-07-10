@@ -11,6 +11,9 @@ import {
   increment,
   arrayUnion,
   arrayRemove,
+  deleteDoc,
+  updateDoc,
+  onSnapshot,
   type QueryDocumentSnapshot,
 } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
@@ -75,6 +78,7 @@ function mapPost(snapshot: QueryDocumentSnapshot): NewsPost {
     comments: data.comments ?? 0,
     shares: data.shares ?? 0,
     saves: data.saves ?? 0,
+    savedBy: Array.isArray(data.savedBy) ? data.savedBy : [],
     createdAt: toDate(data.createdAt),
     updatedAt: data.updatedAt ? toDate(data.updatedAt) : undefined,
   }
@@ -87,9 +91,24 @@ export function useNewsFeed() {
   const [refreshing, setRefreshing] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
+  const [followingIds, setFollowingIds] = useState<string[]>([])
 
   const lastDocRef = useRef<QueryDocumentSnapshot | null>(null)
   const requestRunningRef = useRef(false)
+
+  useEffect(() => {
+    if (!uid) {
+      setFollowingIds([])
+      return
+    }
+
+    return onSnapshot(doc(db, 'users', uid), (snapshot: any) => {
+      const following = snapshot.data()?.following
+      setFollowingIds(
+        Array.isArray(following) ? following : [],
+      )
+    })
+  }, [uid])
 
   const fetchPage = useCallback(async (
     reset = false,
@@ -127,8 +146,14 @@ export function useNewsFeed() {
         .map(mapPost)
         .filter((post: NewsPost) => {
           if (blockedIds.has(post.userId)) return false
-          if (post.visibility === 'public') return true
           if (post.userId === uid) return true
+          if (post.visibility === 'public') return true
+          if (
+            post.visibility === 'followers' &&
+            followingIds.includes(post.userId)
+          ) {
+            return true
+          }
           return false
         })
 
@@ -159,7 +184,7 @@ export function useNewsFeed() {
       setRefreshing(false)
       setLoadingMore(false)
     }
-  }, [hasMore, posts.length, uid])
+  }, [hasMore, posts.length, uid, followingIds])
 
   useEffect(() => {
     fetchPage(true)
@@ -237,6 +262,56 @@ export function useNewsFeed() {
     }
   }, [posts, uid])
 
+  const toggleSave = useCallback(async (postId: string) => {
+    if (!uid) return
+
+    const previous = posts.find((post) => post.id === postId)
+    if (!previous) return
+
+    const wasSaved = previous.savedBy.includes(uid)
+
+    setPosts((current) =>
+      current.map((post) =>
+        post.id === postId
+          ? {
+              ...post,
+              saves: Math.max(0, post.saves + (wasSaved ? -1 : 1)),
+              savedBy: wasSaved
+                ? post.savedBy.filter((id) => id !== uid)
+                : [...post.savedBy, uid],
+            }
+          : post,
+      ),
+    )
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        const postRef = doc(db, 'posts', postId)
+        const snapshot = await transaction.get(postRef)
+        if (!snapshot.exists()) return
+
+        const data = snapshot.data()
+        const savedBy: string[] = Array.isArray(data.savedBy)
+          ? data.savedBy
+          : []
+        const saved = savedBy.includes(uid)
+
+        transaction.update(postRef, {
+          savedBy: saved
+            ? arrayRemove(uid)
+            : arrayUnion(uid),
+          saves: increment(saved ? -1 : 1),
+        })
+      })
+    } catch (error) {
+      setPosts((current) =>
+        current.map((post) =>
+          post.id === postId ? previous : post,
+        ),
+      )
+    }
+  }, [posts, uid])
+
   const registerShare = useCallback(async (postId: string) => {
     setPosts((current) =>
       current.map((post) =>
@@ -267,6 +342,48 @@ export function useNewsFeed() {
     }
   }, [])
 
+  const deletePost = useCallback(async (postId: string) => {
+    if (!uid) return false
+
+    const existing = posts.find((post) => post.id === postId)
+
+    if (!existing || existing.userId !== uid) {
+      return false
+    }
+
+    setPosts((current) =>
+      current.filter((post) => post.id !== postId),
+    )
+
+    try {
+      await deleteDoc(doc(db, 'posts', postId))
+
+      await updateDoc(doc(db, 'users', uid), {
+        postsCount: increment(-1),
+      }).catch(() => {})
+
+      return true
+    } catch (error) {
+      setPosts((current) => {
+        if (current.some((post) => post.id === existing.id)) {
+          return current
+        }
+
+        return [existing, ...current].sort(
+          (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+        )
+      })
+
+      return false
+    }
+  }, [posts, uid])
+
+  const removePostsFromUser = useCallback((userId: string) => {
+    setPosts((current) =>
+      current.filter((post) => post.userId !== userId),
+    )
+  }, [])
+
   return {
     posts,
     loading,
@@ -276,6 +393,9 @@ export function useNewsFeed() {
     refresh,
     loadMore,
     toggleLike,
+    toggleSave,
     registerShare,
+    deletePost,
+    removePostsFromUser,
   }
 }

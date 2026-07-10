@@ -10,7 +10,7 @@ export type ReportReason =
   | 'spam' | 'harassment' | 'hate' | 'violence'
   | 'nudity' | 'misinformation' | 'self_harm' | 'other'
 
-export type ReportTarget = 'video' | 'comment' | 'user' | 'story'
+export type ReportTarget = 'video' | 'post' | 'comment' | 'user' | 'story'
 
 export const REPORT_REASONS: { key: ReportReason; label: string }[] = [
   { key: 'spam', label: 'Spam ou arnaque' },

@@ -7,6 +7,7 @@ import {
   Share,
   StyleSheet,
   useWindowDimensions,
+  Alert,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { VideoView, useVideoPlayer } from 'expo-video'
@@ -17,8 +18,12 @@ interface PostCardProps {
   post: NewsPost
   currentUserId: string
   onLike: (postId: string) => void
-  onComment?: (postId: string) => void
+  onComment: (post: NewsPost) => void
   onShare: (postId: string) => void
+  onSave: (postId: string) => void
+  onEdit: (post: NewsPost) => void
+  onDelete: (post: NewsPost) => void
+  onMore: (post: NewsPost) => void
 }
 
 function timeAgo(date: Date): string {
@@ -128,8 +133,14 @@ function PostCardComponent({
   onLike,
   onComment,
   onShare,
+  onSave,
+  onEdit,
+  onDelete,
+  onMore,
 }: PostCardProps) {
   const liked = post.likedBy.includes(currentUserId)
+  const saved = post.savedBy.includes(currentUserId)
+  const isOwner = post.userId === currentUserId
 
   const handleShare = useCallback(async () => {
     try {
@@ -179,7 +190,31 @@ function PostCardComponent({
           </View>
         </View>
 
-        <Pressable hitSlop={12} style={styles.moreButton}>
+        <Pressable
+          hitSlop={12}
+          style={styles.moreButton}
+          onPress={() => {
+            if (isOwner) {
+              Alert.alert('Publication', undefined, [
+                {
+                  text: 'Modifier',
+                  onPress: () => onEdit(post),
+                },
+                {
+                  text: 'Supprimer',
+                  style: 'destructive',
+                  onPress: () => onDelete(post),
+                },
+                {
+                  text: 'Annuler',
+                  style: 'cancel',
+                },
+              ])
+            } else {
+              onMore(post)
+            }
+          }}
+        >
           <Ionicons
             name="ellipsis-horizontal"
             size={22}
@@ -239,13 +274,13 @@ function PostCardComponent({
               liked && { color: colors.primary },
             ]}
           >
-            J\'aime
+            J'aime
           </Text>
         </Pressable>
 
         {post.commentsEnabled && (
           <Pressable
-            onPress={() => onComment?.(post.id)}
+            onPress={() => onComment(post)}
             style={styles.action}
           >
             <Ionicons
@@ -256,6 +291,25 @@ function PostCardComponent({
             <Text style={styles.actionText}>Commenter</Text>
           </Pressable>
         )}
+
+        <Pressable
+          onPress={() => onSave(post.id)}
+          style={styles.action}
+        >
+          <Ionicons
+            name={saved ? 'bookmark' : 'bookmark-outline'}
+            size={21}
+            color={saved ? colors.primary : '#B5B5B5'}
+          />
+          <Text
+            style={[
+              styles.actionText,
+              saved && { color: colors.primary },
+            ]}
+          >
+            Enregistrer
+          </Text>
+        </Pressable>
 
         <Pressable onPress={handleShare} style={styles.action}>
           <Ionicons
@@ -389,7 +443,7 @@ const styles = StyleSheet.create({
   },
   actionText: {
     color: '#B5B5B5',
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '600',
   },
 })

@@ -9,6 +9,7 @@ import {
   Modal,
   StyleSheet,
   ActivityIndicator,
+  Alert,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
@@ -18,9 +19,12 @@ import { auth, db } from '@/lib/firebase'
 import { colors } from '@/lib/theme'
 import { useNewsFeed } from '@/features/news/hooks/useNewsFeed'
 import { PostCard } from '@/features/news/components/PostCard'
+import NewsCommentsModal from '@/features/news/components/NewsCommentsModal'
 import { useStoriesFeed } from '@/features/stories/hooks/useStoriesFeed'
 import StoryViewer from '@/features/stories/components/StoryViewer'
 import { useStories } from '@/hooks/useStories'
+import { ContentActionsSheet } from '@/components/ContentActionsSheet'
+import type { NewsPost } from '@/features/news/types'
 import type { StoryGroup } from '@/features/stories/hooks/useStoriesFeed'
 
 function StoryItem({
@@ -72,13 +76,20 @@ export default function NewsScreen() {
     refresh,
     loadMore,
     toggleLike,
+    toggleSave,
     registerShare,
+    deletePost,
+    removePostsFromUser,
   } = useNewsFeed()
 
   const { markAsViewed } = useStories()
   const [followingIds, setFollowingIds] = useState<string[]>([])
   const [viewerGroupIndex, setViewerGroupIndex] =
     useState<number | null>(null)
+  const [commentPost, setCommentPost] =
+    useState<NewsPost | null>(null)
+  const [actionsPost, setActionsPost] =
+    useState<NewsPost | null>(null)
 
   useEffect(() => {
     if (!uid) return
@@ -265,7 +276,39 @@ export default function NewsScreen() {
             post={item}
             currentUserId={uid}
             onLike={toggleLike}
+            onSave={toggleSave}
             onShare={registerShare}
+            onComment={setCommentPost}
+            onEdit={(post) => {
+              router.push({
+                pathname: '/news-compose',
+                params: { editPostId: post.id },
+              })
+            }}
+            onDelete={(post) => {
+              Alert.alert(
+                'Supprimer la publication ?',
+                'Cette action est définitive.',
+                [
+                  { text: 'Annuler', style: 'cancel' },
+                  {
+                    text: 'Supprimer',
+                    style: 'destructive',
+                    onPress: async () => {
+                      const ok = await deletePost(post.id)
+
+                      if (!ok) {
+                        Alert.alert(
+                          'Erreur',
+                          'Impossible de supprimer la publication.',
+                        )
+                      }
+                    },
+                  },
+                ],
+              )
+            }}
+            onMore={setActionsPost}
           />
         )}
         ListHeaderComponent={header}
@@ -317,6 +360,27 @@ export default function NewsScreen() {
           ) : null
         }
       />
+
+      <NewsCommentsModal
+        post={commentPost}
+        visible={commentPost !== null}
+        onClose={() => setCommentPost(null)}
+      />
+
+      {actionsPost && (
+        <ContentActionsSheet
+          visible
+          targetType="post"
+          targetId={actionsPost.id}
+          contentOwnerId={actionsPost.userId}
+          contentOwnerName={actionsPost.userName}
+          onClose={() => setActionsPost(null)}
+          onBlocked={() => {
+            removePostsFromUser(actionsPost.userId)
+            setActionsPost(null)
+          }}
+        />
+      )}
 
       <Modal
         visible={viewerGroupIndex !== null}

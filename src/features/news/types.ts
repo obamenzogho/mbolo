@@ -30,6 +30,19 @@ export interface NewsPost {
   comments: number
   shares: number
   saves: number
+  savedBy: string[]
   createdAt: Date
   updatedAt?: Date
+}
+
+export interface NewsComment {
+  id: string
+  postId: string
+  userId: string
+  userName: string
+  userPhotoURL?: string
+  text: string
+  likes: number
+  likedBy: string[]
+  createdAt: Date
 }

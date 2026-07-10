@@ -202,10 +202,16 @@ service cloud.firestore {
         && request.resource.data.text is string
         && request.resource.data.format in [
           'text', 'image', 'carousel', 'video'
+        ]
+        && request.resource.data.visibility in [
+          'public', 'followers', 'private'
         ];
 
       allow update: if request.auth != null && (
-        request.auth.uid == resource.data.userId ||
+        (
+          resource.data.userId == request.auth.uid &&
+          request.resource.data.userId == resource.data.userId
+        ) ||
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'likes', 'likedBy', 'comments', 'shares', 'saves', 'savedBy'
         ])
@@ -219,13 +225,15 @@ service cloud.firestore {
 
         allow create: if request.auth != null
           && request.resource.data.userId == request.auth.uid
+          && request.resource.data.postId == postId
           && request.resource.data.text is string
-          && request.resource.data.text.size() > 0;
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 1000;
 
         allow update: if request.auth != null && (
           request.auth.uid == resource.data.userId ||
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'likes', 'likedBy', 'replyCount'
+            'likes', 'likedBy'
           ])
         );
 
