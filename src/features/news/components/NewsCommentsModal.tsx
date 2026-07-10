@@ -52,7 +52,7 @@ export default function NewsCommentsModal({
     addComment,
     deleteComment,
     toggleLikeComment,
-  } = useNewsComments(post?.id ?? null)
+  } = useNewsComments(post?.id ?? null, post?.userId)
 
   const publish = async () => {
     if (!text.trim() || posting) return

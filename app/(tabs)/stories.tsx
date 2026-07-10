@@ -279,6 +279,10 @@ export default function NewsScreen() {
             onSave={toggleSave}
             onShare={registerShare}
             onComment={setCommentPost}
+            onPress={(post) => router.push({
+              pathname: '/post-detail',
+              params: { postId: post.id },
+            })}
             onEdit={(post) => {
               router.push({
                 pathname: '/news-compose',

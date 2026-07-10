@@ -53,8 +53,9 @@ function inferFormat(media: SelectedMedia[]): NewsPostFormat {
 }
 
 export default function NewsComposeScreen() {
-  const { editPostId } = useLocalSearchParams<{
+  const { editPostId, sharedUrl } = useLocalSearchParams<{
     editPostId?: string
+    sharedUrl?: string
   }>()
   const editing = Boolean(editPostId)
 
@@ -70,6 +71,12 @@ export default function NewsComposeScreen() {
   const canPublish =
     !publishing &&
     (text.trim().length > 0 || media.length > 0)
+
+  useEffect(() => {
+    if (sharedUrl && !editPostId) {
+      setText(sharedUrl)
+    }
+  }, [sharedUrl, editPostId])
 
   useEffect(() => {
     if (!editPostId || !auth.currentUser) return

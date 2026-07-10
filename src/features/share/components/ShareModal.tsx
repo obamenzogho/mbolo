@@ -12,6 +12,7 @@ import Reanimated, {
 import { GestureDetector, Gesture } from 'react-native-gesture-handler'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { router } from 'expo-router'
 import { ShareUserCard } from './ShareUserCard'
 import { ShareSearchBar } from './ShareSearchBar'
 import { ShareActions } from './ShareActions'
@@ -145,6 +146,15 @@ export default function ShareModal({
     handleClose()
   }, [shareQRCode, config, handleClose])
 
+  const handleShareToActus = useCallback(() => {
+    handleClose()
+    const url = config.videoURL || `https://mbolo.app/post/${config.videoId}`
+    router.push({
+      pathname: '/news-compose',
+      params: { sharedUrl: url },
+    })
+  }, [config, handleClose])
+
   const panGesture = Gesture.Pan()
     .onUpdate((e: PanGestureHandlerGestureEvent['nativeEvent']) => {
       if (e.translationY > 0) {
@@ -201,6 +211,7 @@ export default function ShareModal({
               <ShareActions
                 actions={[
                   { icon: 'link', label: 'Copier le lien', onPress: handleCopyLink, color: '#00C853' },
+                  { icon: 'newspaper-outline', label: 'Actus', onPress: handleShareToActus, color: '#F7B928' },
                   { icon: 'qr-code', label: 'QR Code', onPress: handleQRpress, color: '#8B5CF6' },
                   { icon: 'logo-whatsapp', label: 'WhatsApp', onPress: handleWapress, color: '#25D366' },
                   { icon: 'send', label: 'Telegram', onPress: handleTgpress, color: '#0088CC' },

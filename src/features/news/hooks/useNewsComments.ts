@@ -18,6 +18,7 @@ import {
 } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
 import { captureException } from '@/lib/sentry'
+import { notifyPostOwner } from '../services/newsNotifications'
 import type { NewsComment } from '../types'
 
 const COMMENTS_LIMIT = 100
@@ -31,7 +32,7 @@ function toDate(value: any): Date {
   return new Date(value)
 }
 
-export function useNewsComments(postId: string | null) {
+export function useNewsComments(postId: string | null, postOwnerId?: string) {
   const uid = auth.currentUser?.uid ?? ''
   const [comments, setComments] = useState<NewsComment[]>([])
   const [loading, setLoading] = useState(false)
@@ -119,6 +120,15 @@ export function useNewsComments(postId: string | null) {
         comments: increment(1),
       })
 
+      if (postOwnerId) {
+        notifyPostOwner({
+          postOwnerId,
+          postId,
+          type: 'post_comment',
+          text: cleanText.slice(0, 120),
+        })
+      }
+
       return true
     } catch (error) {
       captureException(
@@ -129,7 +139,7 @@ export function useNewsComments(postId: string | null) {
       )
       return false
     }
-  }, [postId])
+  }, [postId, postOwnerId])
 
   const deleteComment = useCallback(async (commentId: string) => {
     if (!postId || !uid) return false

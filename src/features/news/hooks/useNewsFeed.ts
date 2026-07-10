@@ -6,22 +6,30 @@ import {
   limit,
   startAfter,
   getDocs,
+  where,
   runTransaction,
   doc,
   increment,
   arrayUnion,
   arrayRemove,
   deleteDoc,
-  updateDoc,
   onSnapshot,
+  updateDoc,
   type QueryDocumentSnapshot,
 } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
 import { captureException } from '@/lib/sentry'
 import { getBlockedUserIds } from '@/lib/blockService'
+import { notifyPostOwner } from '../services/newsNotifications'
 import type { NewsPost, NewsPostMedia, NewsPostFormat } from '../types'
 
 const PAGE_SIZE = 20
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
+  return out
+}
 
 function toDate(value: any): Date {
   if (!value) return new Date()
@@ -93,7 +101,8 @@ export function useNewsFeed() {
   const [hasMore, setHasMore] = useState(true)
   const [followingIds, setFollowingIds] = useState<string[]>([])
 
-  const lastDocRef = useRef<QueryDocumentSnapshot | null>(null)
+  const lastPublicRef = useRef<QueryDocumentSnapshot | null>(null)
+  const lastFollowingRef = useRef<QueryDocumentSnapshot | null>(null)
   const requestRunningRef = useRef(false)
 
   useEffect(() => {
@@ -110,9 +119,7 @@ export function useNewsFeed() {
     })
   }, [uid])
 
-  const fetchPage = useCallback(async (
-    reset = false,
-  ) => {
+  const fetchPage = useCallback(async (reset = false) => {
     if (requestRunningRef.current) return
     if (!reset && !hasMore) return
 
@@ -120,6 +127,8 @@ export function useNewsFeed() {
 
     if (reset) {
       setRefreshing(true)
+      lastPublicRef.current = null
+      lastFollowingRef.current = null
     } else if (posts.length === 0) {
       setLoading(true)
     } else {
@@ -127,55 +136,96 @@ export function useNewsFeed() {
     }
 
     try {
-      const constraints: any[] = [
+      const blockedIds = await getBlockedUserIds()
+
+      // Requête 1 : publications publiques
+      const publicConstraints: any[] = [
+        where('visibility', '==', 'public'),
+        orderBy('createdAt', 'desc'),
+        limit(PAGE_SIZE),
+      ]
+      if (!reset && lastPublicRef.current) {
+        publicConstraints.push(startAfter(lastPublicRef.current))
+      }
+
+      const publicSnap = await getDocs(
+        query(collection(db, 'posts'), ...publicConstraints),
+      )
+
+      if (publicSnap.docs.length > 0) {
+        lastPublicRef.current =
+          publicSnap.docs[publicSnap.docs.length - 1]
+      }
+
+      // Requête 2 : publications "followers" des gens suivis
+      let followersPage: QueryDocumentSnapshot[] = []
+
+      if (followingIds.length > 0) {
+        const chunks = chunk(followingIds, 30)
+
+        for (const ids of chunks) {
+          const followConstraints: any[] = [
+            where('userId', 'in', ids),
+            where('visibility', '==', 'followers'),
+            orderBy('createdAt', 'desc'),
+            limit(PAGE_SIZE),
+          ]
+
+          if (!reset && lastFollowingRef.current) {
+            followConstraints.push(startAfter(lastFollowingRef.current))
+          }
+
+          const snap = await getDocs(
+            query(collection(db, 'posts'), ...followConstraints),
+          )
+
+          followersPage.push(...snap.docs)
+        }
+
+        if (followersPage.length > 0) {
+          lastFollowingRef.current =
+            followersPage[followersPage.length - 1]
+        }
+      }
+
+      // Requête 3 : mes propres publications (toutes visibilités)
+      const myConstraints: any[] = [
+        where('userId', '==', uid),
         orderBy('createdAt', 'desc'),
         limit(PAGE_SIZE),
       ]
 
-      if (!reset && lastDocRef.current) {
-        constraints.push(startAfter(lastDocRef.current))
-      }
-
-      const snapshot = await getDocs(
-        query(collection(db, 'posts'), ...constraints),
+      const mySnap = await getDocs(
+        query(collection(db, 'posts'), ...myConstraints),
       )
 
-      const blockedIds = await getBlockedUserIds()
+      // Fusion + dédoublonnage + tri
+      const allDocs = new Map<string, QueryDocumentSnapshot>()
 
-      const page = snapshot.docs
+      for (const d of publicSnap.docs) allDocs.set(d.id, d)
+      for (const d of followersPage) allDocs.set(d.id, d)
+      for (const d of mySnap.docs) allDocs.set(d.id, d)
+
+      const page = Array.from(allDocs.values())
         .map(mapPost)
-        .filter((post: NewsPost) => {
-          if (blockedIds.has(post.userId)) return false
-          if (post.userId === uid) return true
-          if (post.visibility === 'public') return true
-          if (
-            post.visibility === 'followers' &&
-            followingIds.includes(post.userId)
-          ) {
-            return true
-          }
-          return false
-        })
-
-      lastDocRef.current =
-        snapshot.docs[snapshot.docs.length - 1] ?? null
+        .filter((post) => !blockedIds.has(post.userId))
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+        .slice(0, PAGE_SIZE)
 
       setPosts((current) => {
         if (reset) return page
 
-        const ids = new Set(current.map((post) => post.id))
+        const ids = new Set(current.map((p) => p.id))
         return [
           ...current,
-          ...page.filter((post: NewsPost) => !ids.has(post.id)),
+          ...page.filter((p) => !ids.has(p.id)),
         ]
       })
 
-      setHasMore(snapshot.docs.length === PAGE_SIZE)
+      setHasMore(publicSnap.docs.length === PAGE_SIZE)
     } catch (error) {
       captureException(
-        error instanceof Error
-          ? error
-          : new Error(String(error)),
+        error instanceof Error ? error : new Error(String(error)),
         { context: 'useNewsFeed.fetchPage' },
       )
     } finally {
@@ -191,7 +241,8 @@ export function useNewsFeed() {
   }, [])
 
   const refresh = useCallback(async () => {
-    lastDocRef.current = null
+    lastPublicRef.current = null
+    lastFollowingRef.current = null
     setHasMore(true)
     await fetchPage(true)
   }, [fetchPage])
@@ -246,6 +297,14 @@ export function useNewsFeed() {
           likes: increment(currentlyLiked ? -1 : 1),
         })
       })
+
+      if (!wasLiked) {
+        notifyPostOwner({
+          postOwnerId: previous.userId,
+          postId,
+          type: 'post_like',
+        })
+      }
     } catch (error) {
       setPosts((current) =>
         current.map((post) =>

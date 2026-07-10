@@ -1,4 +1,4 @@
-import { memo, useCallback } from 'react'
+import { memo, useCallback, useState } from 'react'
 import {
   View,
   Text,
@@ -12,6 +12,8 @@ import {
 import { Ionicons } from '@expo/vector-icons'
 import { VideoView, useVideoPlayer } from 'expo-video'
 import { colors } from '@/lib/theme'
+import RichPostText from './RichPostText'
+import ImageGalleryModal from './ImageGalleryModal'
 import type { NewsPost, NewsPostMedia } from '../types'
 
 interface PostCardProps {
@@ -24,6 +26,7 @@ interface PostCardProps {
   onEdit: (post: NewsPost) => void
   onDelete: (post: NewsPost) => void
   onMore: (post: NewsPost) => void
+  onPress?: (post: NewsPost) => void
 }
 
 function timeAgo(date: Date): string {
@@ -59,7 +62,7 @@ function EmbeddedVideo({ media }: { media: NewsPostMedia }) {
   )
 }
 
-function MediaGrid({ media }: { media: NewsPostMedia[] }) {
+function MediaGrid({ media, onImagePress }: { media: NewsPostMedia[]; onImagePress?: (index: number) => void }) {
   const { width } = useWindowDimensions()
   const availableWidth = Math.min(width, 720)
 
@@ -71,15 +74,17 @@ function MediaGrid({ media }: { media: NewsPostMedia[] }) {
 
   if (media.length === 1) {
     return (
-      <Image
-        source={{ uri: media[0].url }}
-        style={{
-          width: availableWidth,
-          height: Math.min(availableWidth * 1.05, 620),
-          backgroundColor: '#111',
-        }}
-        resizeMode="cover"
-      />
+      <Pressable onPress={() => onImagePress?.(0)}>
+        <Image
+          source={{ uri: media[0].url }}
+          style={{
+            width: availableWidth,
+            height: Math.min(availableWidth * 1.05, 620),
+            backgroundColor: '#111',
+          }}
+          resizeMode="cover"
+        />
+      </Pressable>
     )
   }
 
@@ -101,8 +106,9 @@ function MediaGrid({ media }: { media: NewsPostMedia[] }) {
         const remaining = media.length - 4
 
         return (
-          <View
+          <Pressable
             key={`${item.url}-${index}`}
+            onPress={() => onImagePress?.(index)}
             style={{
               width: cellWidth,
               height: cellHeight,
@@ -120,7 +126,7 @@ function MediaGrid({ media }: { media: NewsPostMedia[] }) {
                 <Text style={styles.moreText}>+{remaining}</Text>
               </View>
             )}
-          </View>
+          </Pressable>
         )
       })}
     </View>
@@ -137,10 +143,12 @@ function PostCardComponent({
   onEdit,
   onDelete,
   onMore,
+  onPress,
 }: PostCardProps) {
   const liked = post.likedBy.includes(currentUserId)
   const saved = post.savedBy.includes(currentUserId)
   const isOwner = post.userId === currentUserId
+  const [galleryIndex, setGalleryIndex] = useState<number | null>(null)
 
   const handleShare = useCallback(async () => {
     try {
@@ -155,7 +163,10 @@ function PostCardComponent({
   }, [post.id, post.text, onShare])
 
   return (
-    <View style={styles.card}>
+    <Pressable
+      style={styles.card}
+      onPress={onPress ? () => onPress(post) : undefined}
+    >
       <View style={styles.header}>
         {post.userPhotoURL ? (
           <Image
@@ -224,12 +235,13 @@ function PostCardComponent({
       </View>
 
       {!!post.text && (
-        <Text style={styles.bodyText} selectable>
-          {post.text}
-        </Text>
+        <RichPostText text={post.text} style={styles.bodyText} />
       )}
 
-      <MediaGrid media={post.media} />
+      <MediaGrid
+        media={post.media}
+        onImagePress={(index) => setGalleryIndex(index)}
+      />
 
       {(post.likes > 0 || post.comments > 0 || post.shares > 0) && (
         <View style={styles.stats}>
@@ -320,7 +332,14 @@ function PostCardComponent({
           <Text style={styles.actionText}>Partager</Text>
         </Pressable>
       </View>
-    </View>
+
+      <ImageGalleryModal
+        media={post.media}
+        initialIndex={galleryIndex ?? 0}
+        visible={galleryIndex !== null}
+        onClose={() => setGalleryIndex(null)}
+      />
+    </Pressable>
   )
 }
 

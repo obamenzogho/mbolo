@@ -43,6 +43,10 @@ const handleNotificationNavigation = (router: ReturnType<typeof useRouter>, type
     case 'trending':
       if (data.postId) router.push({ pathname: '/(tabs)/feed', params: { highlightPost: data.postId } })
       break
+    case 'post_like':
+    case 'post_comment':
+      if (data.postId) router.push({ pathname: '/post-detail', params: { postId: data.postId } })
+      break
     case 'story_view':
       router.push('/(tabs)/stories')
       break
@@ -137,6 +141,7 @@ function RootContent() {
       <Stack.Screen name="legal/terms" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
       <Stack.Screen name="legal/privacy" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
       <Stack.Screen name="place/[id]" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="post-detail" options={{ headerShown: false, animation: 'slide_from_right' }} />
     </Stack>
   )
 }
