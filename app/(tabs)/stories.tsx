@@ -93,12 +93,36 @@ export default function StoriesScreen() {
     )
   }
 
-  const renderOtherGroup = ({ item }: { item: typeof otherGroups[number] }) => (
-    <TouchableOpacity onPress={() => openViewerForUser(item.userId)} style={{ alignItems: 'center', marginRight: 16, width: 72 }}>
-      <StoryRing avatarUrl={item.avatarUrl} hasUnseen={item.hasUnseen} />
-      <Text numberOfLines={1} style={{ color: colors.text, fontSize: 12, marginTop: 6, maxWidth: 72 }}>
-        {item.username}
+  const StoryCard = ({
+    avatarUrl, previewUrl, username, hasUnseen, size = 110,
+  }: { avatarUrl?: string; previewUrl?: string; username: string; hasUnseen: boolean; size?: number }) => (
+    <View style={{ width: size, height: size * 1.6, borderRadius: 16, overflow: 'hidden' }}>
+      {previewUrl ? (
+        <Image source={{ uri: previewUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+      ) : (
+        <View style={{ width: '100%', height: '100%', backgroundColor: '#1a1a2e' }} />
+      )}
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.7)']}
+        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%' }}
+      />
+      <View style={{ position: 'absolute', top: 10, left: 10 }}>
+        <StoryRing avatarUrl={avatarUrl} hasUnseen={hasUnseen} size={40} />
+      </View>
+      <Text numberOfLines={1} style={{ position: 'absolute', bottom: 8, left: 8, right: 8, color: '#fff', fontSize: 12, fontWeight: '600', textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 2 }}>
+        {username}
       </Text>
+    </View>
+  )
+
+  const renderOtherGroup = ({ item }: { item: typeof otherGroups[number] }) => (
+    <TouchableOpacity onPress={() => openViewerForUser(item.userId)} style={{ marginRight: 10 }}>
+      <StoryCard
+        avatarUrl={item.avatarUrl}
+        previewUrl={item.stories[0]?.mediaUrl}
+        username={item.username}
+        hasUnseen={item.hasUnseen}
+      />
     </TouchableOpacity>
   )
 
@@ -135,27 +159,41 @@ export default function StoriesScreen() {
         renderItem={renderOtherGroup}
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 12 }}
+        contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 12, gap: 2 }}
         ListHeaderComponent={
           <TouchableOpacity
             onPress={() => (myGroup ? openViewerForUser(uid) : router.push('/story-upload'))}
-            style={{ alignItems: 'center', marginRight: 16, width: 72 }}
+            style={{ marginRight: 10 }}
           >
-            <View>
-              <StoryRing avatarUrl={myGroup?.avatarUrl || user?.photoURL || undefined} hasUnseen={myGroup?.hasUnseen ?? false} />
-              <View style={{
-                position: 'absolute', bottom: 0, right: 2,
-                width: 22, height: 22, borderRadius: 11,
-                backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center',
-                borderWidth: 2, borderColor: colors.black,
-              }}
-              >
-                <Ionicons name="add" size={14} color="#fff" />
+            <View style={{ width: 110, height: 176, borderRadius: 16, overflow: 'hidden' }}>
+              {myGroup?.stories[0]?.mediaUrl ? (
+                <Image source={{ uri: myGroup.stories[0].mediaUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+              ) : (
+                <View style={{ width: '100%', height: '100%', backgroundColor: '#1a1a2e' }} />
+              )}
+              <LinearGradient
+                colors={['transparent', 'rgba(0,0,0,0.7)']}
+                style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%' }}
+              />
+              <View style={{ position: 'absolute', top: 10, left: 10 }}>
+                <StoryRing
+                  avatarUrl={user?.photoURL || undefined}
+                  hasUnseen={false}
+                  size={40}
+                />
+                <View style={{
+                  position: 'absolute', bottom: -2, right: -2,
+                  width: 18, height: 18, borderRadius: 9,
+                  backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center',
+                  borderWidth: 2, borderColor: colors.black,
+                }}>
+                  <Ionicons name="add" size={12} color="#fff" />
+                </View>
               </View>
+              <Text numberOfLines={1} style={{ position: 'absolute', bottom: 8, left: 8, right: 8, color: '#fff', fontSize: 12, fontWeight: '600', textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 2 }}>
+                Votre story
+              </Text>
             </View>
-            <Text numberOfLines={1} style={{ color: colors.text, fontSize: 12, marginTop: 6, maxWidth: 72 }}>
-              Votre story
-            </Text>
           </TouchableOpacity>
         }
         ListEmptyComponent={
