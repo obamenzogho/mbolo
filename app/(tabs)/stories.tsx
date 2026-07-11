@@ -172,7 +172,9 @@ export default function ActusScreen() {
         ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} /> : null}
       />
 
-      <NewsCommentsModal post={commentPost} visible={commentPost !== null} onClose={() => setCommentPost(null)} />
+      {commentPost && (
+        <NewsCommentsModal key={commentPost.id} post={commentPost} visible onClose={() => setCommentPost(null)} />
+      )}
 
       {actionsPost && (
         <ContentActionsSheet
