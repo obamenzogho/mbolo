@@ -115,9 +115,14 @@ export default function ActusScreen() {
     <SafeAreaView style={styles.screen} edges={['top']}>
       <View style={styles.topBar}>
         <Text style={styles.title}>Actus</Text>
-        <Pressable onPress={() => router.push('/(tabs)/explore')} style={styles.iconBtn}>
-          <Ionicons name="search" size={22} color="#fff" />
-        </Pressable>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <Pressable onPress={() => router.push('/(tabs)/explore')} style={styles.textBtn}>
+            <Text style={styles.textBtnLabel}>Explorer</Text>
+          </Pressable>
+          <Pressable onPress={() => router.push('/search')} style={styles.iconBtn}>
+            <Ionicons name="search" size={22} color="#fff" />
+          </Pressable>
+        </View>
       </View>
 
       <FlatList
@@ -209,6 +214,8 @@ const styles = StyleSheet.create({
   },
   title: { color: '#fff', fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
   iconBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#292B2F', alignItems: 'center', justifyContent: 'center' },
+  textBtn: { height: 38, borderRadius: 19, backgroundColor: '#292B2F', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
+  textBtnLabel: { color: '#fff', fontSize: 14, fontWeight: '600' },
 
   composer: {
     paddingHorizontal: 14,

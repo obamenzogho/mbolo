@@ -18,25 +18,17 @@ export default function Explore() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
-        <Text style={{ fontSize: 28, fontWeight: '800', color: colors.white, marginBottom: 16 }}>
-          {t.explore?.title || 'Découvrir'}
-        </Text>
-        <TouchableOpacity
-          onPress={() => router.push('/search')}
-          style={{
-            flexDirection: 'row', alignItems: 'center',
-            backgroundColor: colors.surface,
-            borderRadius: 12, paddingHorizontal: 16,
-            borderWidth: 1, borderColor: colors.border,
-          }}
-        >
-          <Ionicons name="search" size={20} color={colors.textSecondary} />
-          <View style={{ flex: 1, padding: 12 }}>
-            <Text style={{ color: colors.textSecondary, fontSize: 16 }}>
-              Rechercher utilisateurs, hashtags...
-            </Text>
-          </View>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+          <TouchableOpacity onPress={() => router.back()} hitSlop={12} style={{ marginRight: 8 }}>
+            <Ionicons name="arrow-back" size={26} color={colors.white} />
+          </TouchableOpacity>
+          <Text style={{ flex: 1, fontSize: 28, fontWeight: '800', color: colors.white }}>
+            {t.explore?.title || 'Découvrir'}
+          </Text>
+          <TouchableOpacity onPress={() => {}} hitSlop={12}>
+            <Ionicons name="ellipsis-horizontal" size={26} color={colors.white} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={{ paddingHorizontal: 16, marginTop: 24 }}>
