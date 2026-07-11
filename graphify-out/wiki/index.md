@@ -749,3 +749,21 @@ Usage: lookup rapide pseudo → email au login (login.tsx:52)
 
 **Solution :** Simplification de la règle en `allow read: if request.auth != null;`. La modération est déjà filtrée côté client via `.filter(v => v.moderationStatus !== 'hidden')`. La sécurité est maintenue car seuls les utilisateurs authentifiés peuvent lire.
 
+---
+
+## ADR 2026-07-11: Enrichissement module Actus (news)
+
+**Décision :** Extension du module `src/features/news/` avec fond coloré, localisation, humeur et sondage.
+
+**Détails :**
+- **POST_BACKGROUNDS** (10 fonds dégradés + 'none') appliqués via `LinearGradient` sur PostCard et news-compose. Uniquement pour les posts `text` (sans media ni sondage).
+- **Localisation** via `expo-location` (reverseGeocodeAsync) ; stockée comme `{name, lat, lng}` dans Firestore ; rendue sous forme de ligne avec icône pin.
+- **Humeur** : modal avec 8 émotions prédéfinies ; stockée comme `{emoji, label}` ; affichée dans le `userName` du PostCard.
+- **Sondage** : `PollView` composant vote (2-4 options, un seul vote par utilisateur, Firestore `runTransaction`) ; éditeur intégré dans news-compose.
+- **Firestore writes** : tout est atomique dans `addDoc` ; compteur `postsCount` incrémenté via `increment`.
+
+**Impacts :**
+- Aucune nouvelle collection Firestore (tout est dans `posts/{postId}`).
+- Aucun nouvel index nécessaire.
+- Aucune règle de sécurité à modifier (les champs optionnels sont déjà couverts par `request.resource.data` existant).
+
