@@ -532,7 +532,7 @@ export default function NewsComposeScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <Modal visible={moodPickerOpen} transparent animationType="slide" onRequestClose={() => setMoodPickerOpen(false)}>
+      {moodPickerOpen && <Modal transparent animationType="slide" onRequestClose={() => setMoodPickerOpen(false)}>
         <Pressable style={styles.moodBackdrop} onPress={() => setMoodPickerOpen(false)}>
           <Pressable style={styles.moodSheet}>
             <Text style={styles.moodTitle}>Comment te sens-tu ?</Text>
@@ -551,7 +551,7 @@ export default function NewsComposeScreen() {
             )}
           </Pressable>
         </Pressable>
-      </Modal>
+      </Modal>}
     </SafeAreaView>
   )
 }

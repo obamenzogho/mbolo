@@ -188,16 +188,16 @@ export default function ActusScreen() {
         />
       )}
 
-      <Modal visible={viewerGroupIndex !== null} animationType="fade" presentationStyle="fullScreen" onRequestClose={() => setViewerGroupIndex(null)}>
-        {viewerGroupIndex !== null && (
+      {viewerGroupIndex !== null && (
+        <Modal animationType="fade" presentationStyle="fullScreen" onRequestClose={() => setViewerGroupIndex(null)}>
           <StoryViewer
             groups={storyGroups}
             initialGroupIndex={viewerGroupIndex}
             onClose={() => setViewerGroupIndex(null)}
             onViewed={(storyId) => { if (uid) markAsViewed(storyId, uid) }}
           />
-        )}
-      </Modal>
+        </Modal>
+      )}
     </SafeAreaView>
   )
 }

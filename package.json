@@ -29,7 +29,7 @@
     "test:ci": "jest --ci --coverage --passWithNoTests",
     "lint": "eslint . --ext .ts,.tsx --max-warnings 0",
     "typecheck": "tsc --noEmit",
-    "postinstall": "node scripts/patch-expo-image-contentposition.js"
+    "postinstall": "node scripts/patch-expo-image-contentposition.js && patch-package"
   },
   "dependencies": {
     "@babel/traverse": "^7.29.0",

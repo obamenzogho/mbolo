@@ -249,7 +249,7 @@ export default function Explore() {
         </ScrollView>
       )}
 
-      <Modal visible={optionsVisible} transparent animationType="fade" onRequestClose={() => setOptionsVisible(false)}>
+      {optionsVisible && <Modal transparent animationType="fade" onRequestClose={() => setOptionsVisible(false)}>
         <TouchableOpacity style={styles.optionsBackdrop} activeOpacity={1} onPress={() => setOptionsVisible(false)}>
           <View style={styles.optionsSheet}>
             {[
@@ -264,7 +264,7 @@ export default function Explore() {
             ))}
           </View>
         </TouchableOpacity>
-      </Modal>
+      </Modal>}
     </SafeAreaView>
   )
 }
