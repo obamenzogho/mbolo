@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import {
-  View, Text, FlatList, TouchableOpacity, Image, Modal,
+  View, Text, FlatList, TouchableOpacity, Image, Modal, Share, Alert,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -14,7 +14,7 @@ export default function Explore() {
   const [loading] = useState(false)
   const [optionsVisible, setOptionsVisible] = useState(false)
   const t = getTranslation('fr')
-  const { tags: trendingTags } = useTrendingHashtags(8)
+  const { tags: trendingTags, refresh: refreshTrending } = useTrendingHashtags(8)
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.black }}>
@@ -87,12 +87,14 @@ export default function Explore() {
               <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: '#3A3C42' }} />
             </View>
             {[
-              { icon: 'flag-outline', label: 'Signaler', color: colors.white },
-              { icon: 'share-outline', label: 'Partager', color: colors.white },
-              { icon: 'information-circle-outline', label: 'À propos', color: colors.white },
+              { icon: 'refresh-outline', label: 'Actualiser', action: () => { setOptionsVisible(false); refreshTrending() } },
+              { icon: 'options-outline', label: 'Centres d\'intérêt', action: () => { setOptionsVisible(false); Alert.alert('Centres d\'intérêt', 'Bientôt disponible — choisis les sujets que tu veux voir plus ou moins.') } },
+              { icon: 'eye-off-outline', label: 'Ne plus voir ce sujet', action: () => { setOptionsVisible(false); Alert.alert('Masquer un sujet', 'Bientôt disponible — tu pourras masquer des hashtags ou thèmes.') } },
+              { icon: 'flag-outline', label: 'Signaler un problème', action: () => { setOptionsVisible(false); router.push('/settings') } },
+              { icon: 'share-outline', label: 'Partager l\'app', action: () => { setOptionsVisible(false); Share.share({ message: 'Rejoins-moi sur Mbolo ! 🎉' }) } },
             ].map((item, i) => (
-              <TouchableOpacity key={i} onPress={() => setOptionsVisible(false)} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 20 }}>
-                <Ionicons name={item.icon as any} size={22} color={item.color} />
+              <TouchableOpacity key={i} onPress={item.action} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 20 }}>
+                <Ionicons name={item.icon as any} size={22} color={colors.white} />
                 <Text style={{ color: colors.white, fontSize: 15 }}>{item.label}</Text>
               </TouchableOpacity>
             ))}
