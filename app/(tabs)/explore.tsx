@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from 'react'
 import {
   View, Text, TextInput, FlatList, TouchableOpacity, Image,
-  ActivityIndicator, ScrollView, Share, Alert, Modal, StyleSheet,
+  ActivityIndicator, ScrollView, Share, Modal, StyleSheet, RefreshControl,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -10,6 +10,9 @@ import { collection, query, where, getDocs, orderBy, limit } from 'firebase/fire
 import { db } from '@/lib/firebase'
 import { colors } from '@/lib/theme'
 import { useTrendingHashtags } from '@/hooks/useTrendingHashtags'
+import { useFollowSuggestions } from '@/features/suggestions/hooks/useFollowSuggestions'
+import { useInterestGraph } from '@/features/suggestions/hooks/useInterestGraph'
+import { SuggestionsSection } from '@/features/suggestions/components/SuggestionsSection'
 import OrbitLoader from '@/components/OrbitLoader'
 
 type ResultType = 'user' | 'post'
@@ -22,7 +25,6 @@ interface SearchResult {
   photoURL?: string
   text?: string
   thumbnailUrl?: string
-  format?: string
 }
 
 export default function Explore() {
@@ -33,6 +35,15 @@ export default function Explore() {
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const { tags: trendingTags, loading: trendingLoading, refresh: refreshTrending } = useTrendingHashtags(12)
+
+  const {
+    suggestions, trending, loading: suggLoading, refreshing,
+    refresh: refreshSuggestions, dismissSuggestion, error: suggError,
+  } = useFollowSuggestions({ autoRefresh: true })
+
+  const { topCategories, loading: interestsLoading } = useInterestGraph()
+
+  const isSearching = search.trim().length > 0
 
   const performSearch = useCallback(async (term: string) => {
     const q = term.trim()
@@ -64,10 +75,7 @@ export default function Explore() {
         ))
         postsSnap.forEach((d) => {
           const data = d.data()
-          out.push({
-            id: d.id, type: 'post', text: data.text,
-            thumbnailUrl: data.media?.[0]?.url, format: data.format,
-          })
+          out.push({ id: d.id, type: 'post', text: data.text, thumbnailUrl: data.media?.[0]?.url })
         })
       }
 
@@ -91,6 +99,11 @@ export default function Explore() {
     if (searchTimeout.current) clearTimeout(searchTimeout.current)
     searchTimeout.current = setTimeout(() => performSearch(withHash), 100)
   }
+
+  const onRefreshAll = useCallback(() => {
+    refreshTrending()
+    refreshSuggestions()
+  }, [refreshTrending, refreshSuggestions])
 
   const renderResult = ({ item }: { item: SearchResult }) => {
     if (item.type === 'user') {
@@ -161,22 +174,44 @@ export default function Explore() {
         )}
       </View>
 
-      {results.length > 0 ? (
-        <FlatList
-          data={results}
-          keyExtractor={(item) => `${item.type}-${item.id}`}
-          renderItem={renderResult}
-          contentContainerStyle={{ paddingTop: 8 }}
-        />
-      ) : search.length > 0 && !loading ? (
-        <View style={styles.emptySearch}>
-          <Ionicons name="search-outline" size={44} color="#555" />
-          <Text style={styles.emptyText}>Aucun résultat pour "{search}"</Text>
-        </View>
+      {isSearching ? (
+        results.length > 0 ? (
+          <FlatList
+            data={results}
+            keyExtractor={(item) => `${item.type}-${item.id}`}
+            renderItem={renderResult}
+            contentContainerStyle={{ paddingTop: 8 }}
+          />
+        ) : !loading ? (
+          <View style={styles.emptySearch}>
+            <Ionicons name="search-outline" size={44} color="#555" />
+            <Text style={styles.emptyText}>Aucun résultat pour "{search}"</Text>
+          </View>
+        ) : null
       ) : (
-        <ScrollView contentContainerStyle={{ paddingVertical: 16 }}>
-          <Text style={styles.sectionTitle}>Tendances au Gabon 🇬🇦</Text>
+        <ScrollView
+          contentContainerStyle={{ paddingVertical: 16, paddingBottom: 90 }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefreshAll} tintColor={colors.primary} />
+          }
+        >
+          {!interestsLoading && topCategories.length > 0 && (
+            <View style={styles.interestsCard}>
+              <View style={styles.interestsHeader}>
+                <Ionicons name="sparkles" size={16} color={colors.primary} />
+                <Text style={styles.interestsTitle}>Tes centres d'intérêt</Text>
+              </View>
+              <View style={styles.chipRow}>
+                {topCategories.map((cat) => (
+                  <View key={cat} style={styles.interestChip}>
+                    <Text style={styles.interestChipText}>{cat}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
 
+          <Text style={styles.sectionTitle}>Tendances au Gabon 🇬🇦</Text>
           {trendingLoading ? (
             <View style={{ padding: 20 }}><OrbitLoader /></View>
           ) : trendingTags.length > 0 ? (
@@ -189,7 +224,27 @@ export default function Explore() {
               ))}
             </View>
           ) : (
-            <Text style={styles.emptyText}>Pas encore de tendances. Reviens bientôt.</Text>
+            <Text style={styles.emptyText}>Pas encore de tendances.</Text>
+          )}
+
+          <View style={{ marginTop: 20 }}>
+            <SuggestionsSection
+              title="Suggestions pour toi"
+              suggestions={suggestions}
+              loading={suggLoading}
+              onDismiss={dismissSuggestion}
+              error={suggError}
+            />
+          </View>
+
+          {trending.length > 0 && (
+            <View style={{ marginTop: 12 }}>
+              <SuggestionsSection
+                title="Créateurs en vogue"
+                suggestions={trending}
+                compact
+              />
+            </View>
           )}
         </ScrollView>
       )}
@@ -198,7 +253,7 @@ export default function Explore() {
         <TouchableOpacity style={styles.optionsBackdrop} activeOpacity={1} onPress={() => setOptionsVisible(false)}>
           <View style={styles.optionsSheet}>
             {[
-              { icon: 'refresh-outline', label: 'Actualiser', action: () => { setOptionsVisible(false); refreshTrending() } },
+              { icon: 'refresh-outline', label: 'Actualiser', action: () => { setOptionsVisible(false); onRefreshAll() } },
               { icon: 'flag-outline', label: 'Signaler un problème', action: () => { setOptionsVisible(false); router.push('/settings') } },
               { icon: 'share-outline', label: "Partager l'app", action: () => { setOptionsVisible(false); Share.share({ message: 'Rejoins-moi sur Mbolo ! 🎉' }) } },
             ].map((item, i) => (
@@ -231,6 +286,12 @@ const styles = StyleSheet.create({
   tagChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#1A1B1E', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#2A2C31' },
   tagText: { color: colors.primary, fontSize: 14, fontWeight: '600' },
   tagCount: { color: '#777', fontSize: 12 },
+  interestsCard: { marginHorizontal: 16, marginBottom: 20, backgroundColor: '#111214', borderRadius: 12, padding: 14 },
+  interestsHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+  interestsTitle: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  interestChip: { backgroundColor: '#25272A', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 },
+  interestChipText: { color: '#DDD', fontSize: 12, fontWeight: '500' },
   emptySearch: { alignItems: 'center', paddingTop: 60, gap: 10 },
   emptyText: { color: '#888', fontSize: 14, textAlign: 'center', paddingHorizontal: 32 },
   optionsBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
