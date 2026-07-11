@@ -1,106 +1,240 @@
-import { useState } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import {
-  View, Text, FlatList, TouchableOpacity, Image, Modal, Share, Alert,
+  View, Text, TextInput, FlatList, TouchableOpacity, Image,
+  ActivityIndicator, ScrollView, Share, Alert, Modal, StyleSheet,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import { colors } from '../../src/lib/theme'
-import { getTranslation } from '../../src/i18n/translations'
-import { useTrendingHashtags } from '../../src/hooks/useTrendingHashtags'
-import OrbitLoader from '../../src/components/OrbitLoader'
+import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore'
+import { db } from '@/lib/firebase'
+import { colors } from '@/lib/theme'
+import { useTrendingHashtags } from '@/hooks/useTrendingHashtags'
+import OrbitLoader from '@/components/OrbitLoader'
+
+type ResultType = 'user' | 'post'
+
+interface SearchResult {
+  id: string
+  type: ResultType
+  nom?: string
+  pseudo?: string
+  photoURL?: string
+  text?: string
+  thumbnailUrl?: string
+  format?: string
+}
 
 export default function Explore() {
-  const [loading] = useState(false)
+  const [search, setSearch] = useState('')
+  const [results, setResults] = useState<SearchResult[]>([])
+  const [loading, setLoading] = useState(false)
   const [optionsVisible, setOptionsVisible] = useState(false)
-  const t = getTranslation('fr')
-  const { tags: trendingTags, refresh: refreshTrending } = useTrendingHashtags(8)
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const { tags: trendingTags, loading: trendingLoading, refresh: refreshTrending } = useTrendingHashtags(12)
+
+  const performSearch = useCallback(async (term: string) => {
+    const q = term.trim()
+    if (!q) { setResults([]); setLoading(false); return }
+    setLoading(true)
+
+    try {
+      const out: SearchResult[] = []
+
+      const usersSnap = await getDocs(query(
+        collection(db, 'users'),
+        where('pseudo', '>=', q),
+        where('pseudo', '<=', q + '\uf8ff'),
+        limit(10),
+      ))
+      usersSnap.forEach((d) => {
+        const data = d.data()
+        out.push({ id: d.id, type: 'user', nom: data.nom, pseudo: data.pseudo, photoURL: data.photoURL })
+      })
+
+      if (q.startsWith('#')) {
+        const tag = q.slice(1).toLowerCase()
+        const postsSnap = await getDocs(query(
+          collection(db, 'posts'),
+          where('hashtags', 'array-contains', tag),
+          where('visibility', '==', 'public'),
+          orderBy('createdAt', 'desc'),
+          limit(20),
+        ))
+        postsSnap.forEach((d) => {
+          const data = d.data()
+          out.push({
+            id: d.id, type: 'post', text: data.text,
+            thumbnailUrl: data.media?.[0]?.url, format: data.format,
+          })
+        })
+      }
+
+      setResults(out)
+    } catch (e) {
+      console.error('Search error:', e)
+    }
+    setLoading(false)
+  }, [])
+
+  const handleSearchChange = useCallback((text: string) => {
+    setSearch(text)
+    if (searchTimeout.current) clearTimeout(searchTimeout.current)
+    if (!text.trim()) { setResults([]); return }
+    searchTimeout.current = setTimeout(() => performSearch(text), 400)
+  }, [performSearch])
+
+  const handleTagPress = (tag: string) => {
+    const withHash = tag.startsWith('#') ? tag : `#${tag}`
+    setSearch(withHash)
+    if (searchTimeout.current) clearTimeout(searchTimeout.current)
+    searchTimeout.current = setTimeout(() => performSearch(withHash), 100)
+  }
+
+  const renderResult = ({ item }: { item: SearchResult }) => {
+    if (item.type === 'user') {
+      return (
+        <TouchableOpacity
+          onPress={() => router.push({ pathname: '/(tabs)/user/[userId]', params: { userId: item.id } })}
+          style={styles.resultRow}
+        >
+          {item.photoURL ? (
+            <Image source={{ uri: item.photoURL }} style={styles.resultAvatar} />
+          ) : (
+            <View style={[styles.resultAvatar, styles.avatarFallback]}>
+              <Ionicons name="person" size={20} color="#888" />
+            </View>
+          )}
+          <View style={{ flex: 1 }}>
+            <Text style={styles.resultTitle}>@{item.pseudo || 'utilisateur'}</Text>
+            {item.nom ? <Text style={styles.resultSub}>{item.nom}</Text> : null}
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#555" />
+        </TouchableOpacity>
+      )
+    }
+
+    return (
+      <TouchableOpacity
+        onPress={() => router.push({ pathname: '/post-detail', params: { postId: item.id } })}
+        style={styles.resultRow}
+      >
+        <View style={styles.postThumb}>
+          {item.thumbnailUrl ? (
+            <Image source={{ uri: item.thumbnailUrl }} style={styles.postThumb} />
+          ) : (
+            <Ionicons name="document-text-outline" size={22} color="#888" />
+          )}
+        </View>
+        <Text numberOfLines={2} style={[styles.resultSub, { flex: 1 }]}>
+          {item.text || 'Publication'}
+        </Text>
+      </TouchableOpacity>
+    )
+  }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.black }}>
-      <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8, backgroundColor: '#111214' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <TouchableOpacity onPress={() => router.back()} hitSlop={12} style={{ marginRight: 8 }}>
-            <Ionicons name="arrow-back" size={26} color={colors.white} />
-          </TouchableOpacity>
-          <Text style={{ flex: 1, fontSize: 28, fontWeight: '800', color: colors.white }}>
-            {t.explore?.title || 'Découvrir'}
-          </Text>
-          <TouchableOpacity onPress={() => setOptionsVisible(true)} style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#292B2F', alignItems: 'center', justifyContent: 'center' }}>
-            <Ionicons name="ellipsis-horizontal" size={22} color={colors.white} />
-          </TouchableOpacity>
-        </View>
+    <SafeAreaView style={styles.screen} edges={['top']}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Découvrir</Text>
+        <TouchableOpacity onPress={() => setOptionsVisible(true)} hitSlop={10}>
+          <Ionicons name="ellipsis-horizontal" size={22} color="#fff" />
+        </TouchableOpacity>
       </View>
 
-      <View style={{ paddingHorizontal: 16, marginTop: 24 }}>
-        <Text style={{ color: colors.white, fontSize: 18, fontWeight: '700', marginBottom: 12 }}>
-          {t.explore?.trending || 'Tendances au Gabon'} 🇬🇦
-        </Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-          {trendingTags.map((t) => (
-            <TouchableOpacity
-              key={t.tag}
-              onPress={() => router.push({ pathname: '/hashtag/[tag]', params: { tag: t.tag } })}
-              style={{
-                backgroundColor: colors.surfaceLight,
-                paddingHorizontal: 16, paddingVertical: 8,
-                borderRadius: 20, borderWidth: 1, borderColor: colors.border,
-              }}
-            >
-              <Text style={{ color: colors.primary, fontWeight: '600' }}>#{t.tag}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      <View style={{ paddingHorizontal: 16, marginTop: 24 }}>
-        <Text style={{ color: colors.white, fontSize: 18, fontWeight: '700', marginBottom: 12 }}>
-          Artistes gabonais
-        </Text>
-        {loading ? (
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <OrbitLoader size={80} />
-          </View>
-        ) : (
-          <FlatList
-            horizontal
-            data={[1, 2, 3, 4, 5]}
-            keyExtractor={(i) => i.toString()}
-            renderItem={() => (
-              <TouchableOpacity style={{ width: 120, marginRight: 12, alignItems: 'center' }}>
-                <View style={{ width: 100, height: 100, borderRadius: 50, backgroundColor: colors.surfaceLight, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: colors.primary }}>
-                  <Ionicons name="person" size={40} color={colors.textSecondary} />
-                </View>
-                <Text style={{ color: colors.white, marginTop: 8, fontSize: 13, textAlign: 'center' }} numberOfLines={1}>Artiste</Text>
-              </TouchableOpacity>
-            )}
-            showsHorizontalScrollIndicator={false}
-          />
+      <View style={styles.searchBar}>
+        <Ionicons name="search" size={18} color="#888" />
+        <TextInput
+          value={search}
+          onChangeText={handleSearchChange}
+          placeholder="Rechercher un profil, #hashtag…"
+          placeholderTextColor="#777"
+          style={styles.searchInput}
+          autoCapitalize="none"
+        />
+        {loading && <ActivityIndicator size="small" color={colors.primary} />}
+        {search.length > 0 && !loading && (
+          <TouchableOpacity onPress={() => { setSearch(''); setResults([]) }} hitSlop={8}>
+            <Ionicons name="close-circle" size={18} color="#888" />
+          </TouchableOpacity>
         )}
       </View>
 
-      <Modal transparent visible={optionsVisible} animationType="slide" onRequestClose={() => setOptionsVisible(false)}>
-        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <TouchableOpacity activeOpacity={1} onPress={() => setOptionsVisible(false)} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} />
-          <View style={{ backgroundColor: '#1C1E22', borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingBottom: 34 }}>
-            <View style={{ paddingVertical: 12, alignItems: 'center' }}>
-              <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: '#3A3C42' }} />
+      {results.length > 0 ? (
+        <FlatList
+          data={results}
+          keyExtractor={(item) => `${item.type}-${item.id}`}
+          renderItem={renderResult}
+          contentContainerStyle={{ paddingTop: 8 }}
+        />
+      ) : search.length > 0 && !loading ? (
+        <View style={styles.emptySearch}>
+          <Ionicons name="search-outline" size={44} color="#555" />
+          <Text style={styles.emptyText}>Aucun résultat pour "{search}"</Text>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={{ paddingVertical: 16 }}>
+          <Text style={styles.sectionTitle}>Tendances au Gabon 🇬🇦</Text>
+
+          {trendingLoading ? (
+            <View style={{ padding: 20 }}><OrbitLoader /></View>
+          ) : trendingTags.length > 0 ? (
+            <View style={styles.tagCloud}>
+              {trendingTags.map((t) => (
+                <TouchableOpacity key={t.tag} onPress={() => handleTagPress(t.tag)} style={styles.tagChip}>
+                  <Text style={styles.tagText}>#{t.tag}</Text>
+                  <Text style={styles.tagCount}>{t.videoCount}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
+          ) : (
+            <Text style={styles.emptyText}>Pas encore de tendances. Reviens bientôt.</Text>
+          )}
+        </ScrollView>
+      )}
+
+      <Modal visible={optionsVisible} transparent animationType="fade" onRequestClose={() => setOptionsVisible(false)}>
+        <TouchableOpacity style={styles.optionsBackdrop} activeOpacity={1} onPress={() => setOptionsVisible(false)}>
+          <View style={styles.optionsSheet}>
             {[
               { icon: 'refresh-outline', label: 'Actualiser', action: () => { setOptionsVisible(false); refreshTrending() } },
-              { icon: 'options-outline', label: 'Centres d\'intérêt', action: () => { setOptionsVisible(false); Alert.alert('Centres d\'intérêt', 'Bientôt disponible — choisis les sujets que tu veux voir plus ou moins.') } },
-              { icon: 'eye-off-outline', label: 'Ne plus voir ce sujet', action: () => { setOptionsVisible(false); Alert.alert('Masquer un sujet', 'Bientôt disponible — tu pourras masquer des hashtags ou thèmes.') } },
               { icon: 'flag-outline', label: 'Signaler un problème', action: () => { setOptionsVisible(false); router.push('/settings') } },
-              { icon: 'share-outline', label: 'Partager l\'app', action: () => { setOptionsVisible(false); Share.share({ message: 'Rejoins-moi sur Mbolo ! 🎉' }) } },
+              { icon: 'share-outline', label: "Partager l'app", action: () => { setOptionsVisible(false); Share.share({ message: 'Rejoins-moi sur Mbolo ! 🎉' }) } },
             ].map((item, i) => (
-              <TouchableOpacity key={i} onPress={item.action} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 20 }}>
-                <Ionicons name={item.icon as any} size={22} color={colors.white} />
-                <Text style={{ color: colors.white, fontSize: 15 }}>{item.label}</Text>
+              <TouchableOpacity key={i} onPress={item.action} style={styles.optionRow}>
+                <Ionicons name={item.icon as any} size={22} color="#fff" />
+                <Text style={styles.optionLabel}>{item.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
-        </View>
+        </TouchableOpacity>
       </Modal>
     </SafeAreaView>
   )
 }
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: '#08090A' },
+  header: { height: 54, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  title: { color: '#fff', fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
+  searchBar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginBottom: 8, paddingHorizontal: 14, height: 44, borderRadius: 22, backgroundColor: '#1A1B1E' },
+  searchInput: { flex: 1, color: '#fff', fontSize: 15 },
+  resultRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 16, borderBottomWidth: 0.5, borderBottomColor: '#1E1F22' },
+  resultAvatar: { width: 46, height: 46, borderRadius: 23 },
+  avatarFallback: { backgroundColor: '#25272A', alignItems: 'center', justifyContent: 'center' },
+  resultTitle: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  resultSub: { color: '#AAA', fontSize: 13, marginTop: 2 },
+  postThumb: { width: 46, height: 46, borderRadius: 8, backgroundColor: '#1A1B1E', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  sectionTitle: { color: '#fff', fontSize: 17, fontWeight: '700', paddingHorizontal: 16, marginBottom: 12 },
+  tagCloud: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16 },
+  tagChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#1A1B1E', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#2A2C31' },
+  tagText: { color: colors.primary, fontSize: 14, fontWeight: '600' },
+  tagCount: { color: '#777', fontSize: 12 },
+  emptySearch: { alignItems: 'center', paddingTop: 60, gap: 10 },
+  emptyText: { color: '#888', fontSize: 14, textAlign: 'center', paddingHorizontal: 32 },
+  optionsBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  optionsSheet: { backgroundColor: '#17181B', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingVertical: 8, paddingBottom: 34 },
+  optionRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 20 },
+  optionLabel: { color: '#fff', fontSize: 15 },
+})

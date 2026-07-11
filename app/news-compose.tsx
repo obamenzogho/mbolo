@@ -244,6 +244,10 @@ export default function NewsComposeScreen() {
         return
       }
 
+      const hashtags = Array.from(
+        new Set((text.match(/#[\w\u00C0-\u024F]+/g) || []).map((h) => h.slice(1).toLowerCase()))
+      )
+
       const uploaded: NewsPostMedia[] = []
 
       for (let index = 0; index < media.length; index++) {
@@ -278,6 +282,7 @@ export default function NewsComposeScreen() {
         visibility,
         commentsEnabled,
         background: media.length === 0 && !poll ? background : 'none',
+        hashtags,
         location: location ?? null,
         mood: mood ?? null,
         poll: poll ? {
