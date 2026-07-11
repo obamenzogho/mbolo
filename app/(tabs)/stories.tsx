@@ -23,26 +23,9 @@ import NewsCommentsModal from '@/features/news/components/NewsCommentsModal'
 import { ContentActionsSheet } from '@/components/ContentActionsSheet'
 import { useStoriesFeed } from '@/features/stories/hooks/useStoriesFeed'
 import StoryViewer from '@/features/stories/components/StoryViewer'
+import { StoryCard, CreateStoryCard } from '@/features/stories/components/StoryCard'
 import { useStories } from '@/hooks/useStories'
-import type { StoryGroup } from '@/features/stories/hooks/useStoriesFeed'
 import type { NewsPost } from '@/features/news/types'
-
-function StoryCircle({ group, onPress }: { group: StoryGroup; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress} style={styles.storyItem}>
-      <View style={[styles.storyRing, { borderColor: group.hasUnseen ? colors.primary : '#4C4E52' }]}>
-        {group.avatarUrl ? (
-          <Image source={{ uri: group.avatarUrl }} style={styles.storyAvatar} />
-        ) : (
-          <View style={[styles.storyAvatar, styles.avatarFallback]}>
-            <Ionicons name="person" size={24} color="#777" />
-          </View>
-        )}
-      </View>
-      <Text numberOfLines={1} style={styles.storyName}>{group.username}</Text>
-    </Pressable>
-  )
-}
 
 export default function ActusScreen() {
   const uid = auth.currentUser?.uid ?? ''
@@ -101,33 +84,21 @@ export default function ActusScreen() {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.storiesRow}
       >
-        <Pressable
-          onPress={() => myStoryGroup ? openStory(uid) : router.push('/story-upload')}
-          style={styles.storyItem}
-        >
-          <View>
-            <View style={[styles.storyRing, { borderColor: myStoryGroup?.hasUnseen ? colors.primary : '#4C4E52' }]}>
-              {auth.currentUser?.photoURL ? (
-                <Image source={{ uri: auth.currentUser.photoURL }} style={styles.storyAvatar} />
-              ) : (
-                <View style={[styles.storyAvatar, styles.avatarFallback]}>
-                  <Ionicons name="person" size={24} color="#777" />
-                </View>
-              )}
-            </View>
-            <View style={styles.storyAdd}>
-              <Ionicons name="add" size={14} color="#fff" />
-            </View>
-          </View>
-          <Text numberOfLines={1} style={styles.storyName}>Votre story</Text>
-        </Pressable>
+        <CreateStoryCard
+          avatarUrl={myStoryGroup?.avatarUrl || auth.currentUser?.photoURL || undefined}
+          onPress={() => (myStoryGroup ? openStory(uid) : router.push('/story-upload'))}
+        />
+
+        {myStoryGroup && (
+          <StoryCard group={myStoryGroup} onPress={() => openStory(uid)} />
+        )}
 
         {otherStoryGroups.map((group) => (
-          <StoryCircle key={group.userId} group={group} onPress={() => openStory(group.userId)} />
+          <StoryCard key={group.userId} group={group} onPress={() => openStory(group.userId)} />
         ))}
 
         {storiesLoading && (
-          <View style={{ width: 60, height: 68, alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ width: 108, height: 168, alignItems: 'center', justifyContent: 'center' }}>
             <ActivityIndicator color={colors.primary} size="small" />
           </View>
         )}
@@ -251,12 +222,7 @@ const styles = StyleSheet.create({
 
   separator: { height: 6, backgroundColor: '#08090A' },
 
-  storiesRow: { paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#111214' },
-  storyItem: { width: 70, marginRight: 10, alignItems: 'center' },
-  storyRing: { width: 64, height: 64, borderRadius: 32, borderWidth: 3, padding: 2, alignItems: 'center', justifyContent: 'center' },
-  storyAvatar: { width: 52, height: 52, borderRadius: 26 },
-  storyAdd: { position: 'absolute', right: -2, bottom: -2, width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#111214', backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  storyName: { maxWidth: 68, marginTop: 5, color: '#D8D8D8', fontSize: 11, textAlign: 'center' },
+  storiesRow: { paddingHorizontal: 14, paddingVertical: 12, backgroundColor: '#111214' },
 
   empty: { minHeight: 300, paddingHorizontal: 32, alignItems: 'center', justifyContent: 'center' },
   emptyTitle: { color: '#fff', fontSize: 18, fontWeight: '700', marginTop: 12 },

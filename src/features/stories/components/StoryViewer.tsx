@@ -16,6 +16,7 @@ import type { StoryGroup } from '../hooks/useStoriesFeed'
 import type { Story } from '../../../hooks/useStories'
 
 const IMAGE_DURATION = 5000
+const QUICK_REACTIONS = ['❤️', '🔥', '😂', '😮', '😢', '👏']
 
 interface StoryViewerProps {
   groups: StoryGroup[]
@@ -308,6 +309,35 @@ export default function StoryViewer({ groups, initialGroupIndex, initialStoryId,
         </View>
       </View>
 
+      {/* Réactions emoji rapides */}
+      {!isMine && (
+        <View style={styles.reactionsRow}>
+          {QUICK_REACTIONS.map((emoji) => (
+            <Pressable
+              key={emoji}
+              onPress={async () => {
+                if (!user || !story) return
+                try {
+                  const conv = await getOrCreateConversation(user.uid, story.userId)
+                  await sendMessage(conv.id, user.uid, emoji, {
+                    type: 'story_reply' as const,
+                    storyRef: {
+                      storyId: story.id,
+                      mediaUrl: story.mediaUrl,
+                      mediaType: story.mediaType,
+                      ownerId: story.userId,
+                    },
+                  })
+                } catch {}
+              }}
+              style={styles.reactionBtn}
+            >
+              <Text style={styles.reactionEmoji}>{emoji}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+
       {/* Barre "Vu par" (mes stories) ou champ reply (autres) */}
       {isMine ? (
         <Pressable style={styles.seenBar} onPress={openViewers}>
@@ -426,4 +456,15 @@ const styles = StyleSheet.create({
   commentOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' },
   commentSheet: { backgroundColor: '#1a1a2e', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 8 },
   commentInput: { flex: 1, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 24, paddingHorizontal: 16, paddingVertical: 12, color: '#fff', fontSize: 15 },
+  reactionsRow: {
+    position: 'absolute',
+    bottom: 84,
+    left: 12,
+    right: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    zIndex: 20,
+  },
+  reactionBtn: { padding: 6 },
+  reactionEmoji: { fontSize: 30 },
 })
