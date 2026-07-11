@@ -37,12 +37,15 @@ export default function ActusScreen() {
   } = useNewsFeed()
 
   const [followingIds, setFollowingIds] = useState<string[]>([])
+  const [userPhotoURL, setUserPhotoURL] = useState<string | null>(null)
   const [viewerGroupIndex, setViewerGroupIndex] = useState<number | null>(null)
 
   useEffect(() => {
     if (!uid) return
     return onSnapshot(doc(db, 'users', uid), (snap: any) => {
-      setFollowingIds(Array.isArray(snap.data()?.following) ? snap.data()!.following : [])
+      const data = snap.data()
+      setFollowingIds(Array.isArray(data?.following) ? data!.following : [])
+      setUserPhotoURL(data?.photoURL || null)
     })
   }, [uid])
 
@@ -62,8 +65,8 @@ export default function ActusScreen() {
   const header = (
     <>
       <View style={styles.composer}>
-        {auth.currentUser?.photoURL ? (
-          <Image source={{ uri: auth.currentUser.photoURL }} style={styles.composerAvatar} />
+        {userPhotoURL ? (
+          <Image source={{ uri: userPhotoURL }} style={styles.composerAvatar} />
         ) : (
           <View style={[styles.composerAvatar, styles.avatarFallback]}>
             <Ionicons name="person" size={18} color="#777" />
@@ -85,7 +88,7 @@ export default function ActusScreen() {
         contentContainerStyle={styles.storiesRow}
       >
         <CreateStoryCard
-          avatarUrl={myStoryGroup?.avatarUrl || auth.currentUser?.photoURL || undefined}
+          avatarUrl={myStoryGroup?.avatarUrl || userPhotoURL || auth.currentUser?.photoURL || undefined}
           onPress={() => (myStoryGroup ? openStory(uid) : router.push('/story-upload'))}
         />
 
