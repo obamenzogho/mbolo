@@ -89,6 +89,10 @@ function mapPost(snapshot: QueryDocumentSnapshot): NewsPost {
     savedBy: Array.isArray(data.savedBy) ? data.savedBy : [],
     createdAt: toDate(data.createdAt),
     updatedAt: data.updatedAt ? toDate(data.updatedAt) : undefined,
+    background: data.background || undefined,
+    location: data.location || undefined,
+    mood: data.mood || undefined,
+    poll: data.poll || undefined,
   }
 }
 

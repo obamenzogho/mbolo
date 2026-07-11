@@ -62,6 +62,10 @@ export default function PostDetailScreen() {
         saves: data.saves ?? 0,
         savedBy: Array.isArray(data.savedBy) ? data.savedBy : [],
         createdAt: toDate(data.createdAt),
+        background: data.background || undefined,
+        location: data.location || undefined,
+        mood: data.mood || undefined,
+        poll: data.poll || undefined,
       })
 
       setLoading(false)

@@ -11,9 +11,12 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { VideoView, useVideoPlayer } from 'expo-video'
+import { LinearGradient } from 'expo-linear-gradient'
 import { colors } from '@/lib/theme'
 import RichPostText from './RichPostText'
 import ImageGalleryModal from './ImageGalleryModal'
+import PollView from './PollView'
+import { POST_BACKGROUNDS } from '../types'
 import type { NewsPost, NewsPostMedia } from '../types'
 
 interface PostCardProps {
@@ -182,6 +185,7 @@ function PostCardComponent({
         <View style={{ flex: 1 }}>
           <Text style={styles.userName} numberOfLines={1}>
             {post.userName}
+            {post.mood ? <Text style={{ fontWeight: '400', color: '#B8B8B8' }}>{`  se sent ${post.mood.emoji} ${post.mood.label}`}</Text> : null}
           </Text>
 
           <View style={styles.metaRow}>
@@ -234,14 +238,30 @@ function PostCardComponent({
         </Pressable>
       </View>
 
-      {!!post.text && (
+      {!!post.text && post.background && post.background !== 'none' && post.media.length === 0 ? (
+        <LinearGradient
+          colors={(POST_BACKGROUNDS.find((b) => b.id === post.background) ?? POST_BACKGROUNDS[0]).colors}
+          style={styles.bgTextWrap}
+        >
+          <Text style={styles.bgText}>{post.text}</Text>
+        </LinearGradient>
+      ) : !!post.text ? (
         <RichPostText text={post.text} style={styles.bodyText} />
+      ) : null}
+
+      {post.location && (
+        <View style={styles.locationRow}>
+          <Ionicons name="location" size={14} color={colors.primary} />
+          <Text style={styles.locationText}>{post.location.name}</Text>
+        </View>
       )}
 
       <MediaGrid
         media={post.media}
         onImagePress={(index) => setGalleryIndex(index)}
       />
+
+      {post.poll && <PollView poll={post.poll} postId={post.id} currentUserId={currentUserId} />}
 
       {(post.likes > 0 || post.comments > 0 || post.shares > 0) && (
         <View style={styles.stats}>
@@ -465,4 +485,8 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
+  bgTextWrap: { minHeight: 200, marginHorizontal: 0, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  bgText: { color: '#fff', fontSize: 24, fontWeight: '700', textAlign: 'center', lineHeight: 32 },
+  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingBottom: 10 },
+  locationText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
 })
