@@ -14,6 +14,8 @@ const ICON: Record<string, { name: keyof typeof Ionicons.glyphMap; color: string
   repost:         { name: 'repeat',           color: '#00C853' },
   mention:        { name: 'at',               color: '#FFB300' },
   message:        { name: 'chatbubble-ellipses', color: '#4FC3F7' },
+  post_like:      { name: 'heart',            color: '#FF2D55' },
+  post_comment:   { name: 'chatbubble',       color: '#4FC3F7' },
 }
 
 function timeAgo(date: Date): string {
@@ -38,7 +40,7 @@ export const NotificationRow = memo(function NotificationRow({
   item, actorName, actorAvatar, videoThumb, onPress, onPressActor,
 }: Props) {
   const badge = ICON[item.type] ?? { name: 'notifications', color: colors.secondary }
-  const excerpt = (item as any).commentText || (item as any).excerpt
+  const excerpt = (item as any).commentText || (item as any).text || (item as any).excerpt
 
   const message = (() => {
     switch (item.type) {
@@ -51,6 +53,8 @@ export const NotificationRow = memo(function NotificationRow({
       case 'repost':         return 'a republié ta vidéo'
       case 'mention':        return excerpt ? `t'a mentionné : ${excerpt}` : "t'a mentionné"
       case 'message':        return "t'a envoyé un message"
+      case 'post_like':      return 'a aimé ta publication'
+      case 'post_comment':   return `a commenté ta publication${excerpt ? ` : ${excerpt}` : ''}`
       default:               return 'a interagi avec toi'
     }
   })()

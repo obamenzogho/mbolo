@@ -58,7 +58,7 @@ export default function ActusScreen() {
 
   useEffect(() => {
     if (!uid) return
-    return onSnapshot(doc(db, 'users', uid), (snap) => {
+    return onSnapshot(doc(db, 'users', uid), (snap: any) => {
       setFollowingIds(Array.isArray(snap.data()?.following) ? snap.data()!.following : [])
     })
   }, [uid])
@@ -157,6 +157,7 @@ export default function ActusScreen() {
             onSave={toggleSave}
             onShare={registerShare}
             onComment={setCommentPost}
+            onPress={(post) => router.push({ pathname: '/post-detail', params: { postId: post.id } })}
             onEdit={(post) => router.push({ pathname: '/news-compose', params: { editPostId: post.id } })}
             onDelete={(post) => {
               Alert.alert('Supprimer ?', 'Cette action est définitive.', [

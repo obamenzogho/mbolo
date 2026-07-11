@@ -36,6 +36,10 @@ const handleNotifPress = (item: NotificationType) => {
     case 'message':
       router.push('/(tabs)/messages')
       break
+    case 'post_like':
+    case 'post_comment':
+      if (item.postId) router.push({ pathname: '/post-detail', params: { postId: item.postId } })
+      break
   }
 }
 
