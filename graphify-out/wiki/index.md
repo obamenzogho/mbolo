@@ -767,3 +767,18 @@ Usage: lookup rapide pseudo → email au login (login.tsx:52)
 - Aucun nouvel index nécessaire.
 - Aucune règle de sécurité à modifier (les champs optionnels sont déjà couverts par `request.resource.data` existant).
 
+---
+
+## ADR 2026-07-11: Patch RN Modal — `setState` dans `componentWillUnmount` (iOS)
+
+**Problème :** `node_modules/react-native/Libraries/Modal/Modal.js` ligne 260 appelle `this.setState({isRendered: false})` dans `componentWillUnmount` sur iOS. Avec la nouvelle architecture React Native, ce `setState` pendant le démontage crée une boucle infinie `Maximum update depth exceeded`, faisant crasher l'app au moindre démontage de Modal.
+
+**Solution :**
+1. **Patch `patch-package`** : suppression du `setState` incriminé dans `componentWillUnmount`. L'état `isRendered` n'est de toute façon plus utile après le démontage.
+2. **Conditional rendering** : tous les `Modal` de l'app utilisent désormais `{condition && <Modal>}` au lieu de `visible={bool}`, évitant les cycles de rendu concurrents entre le `visible` prop et l'état interne.
+
+**Fichiers :**
+- `patches/react-native+0.81.5.patch`
+- `package.json` — `postinstall` enrichi avec `patch-package`
+- `app/(tabs)/stories.tsx`, `app/(tabs)/explore.tsx`, `app/news-compose.tsx` — conversion en `{condition && <Modal>}`
+
