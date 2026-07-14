@@ -1,0 +1,68 @@
+# CI GitLab — Mbolo
+# Migré depuis .github/workflows/ci.yml et eas-build.yml
+#
+# ⚠️ Le job EAS est MANUEL uniquement : ne pas auto-publier le client
+# tant que les Cloud Functions ne sont pas déployées (voir DEPLOY_STATUS.md).
+# Prérequis : variable CI/CD `EXPO_TOKEN` (masquée) dans les settings du projet.
+
+stages:
+  - quality
+  - build
+
+default:
+  image: node:20
+  interruptible: true
+
+workflow:
+  rules:
+    # Pipeline MR (évite les doublons branche + MR)
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    # Pipeline sur push main
+    - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"
+
+quality:app:
+  stage: quality
+  cache:
+    key:
+      files:
+        - package-lock.json
+    paths:
+      - .npm/
+  script:
+    - npm ci --cache .npm --prefer-offline
+    - npm run lint
+    - npm run typecheck
+    - npm run test:ci
+
+quality:functions:
+  stage: quality
+  cache:
+    key:
+      files:
+        - functions/package-lock.json
+    paths:
+      - functions/.npm/
+  script:
+    - cd functions
+    - npm ci --cache .npm --prefer-offline
+    - npm run build
+
+# Build EAS Android — déclenchement MANUEL uniquement.
+# Choisir le profil via la variable EAS_PROFILE (preview | production).
+eas:build:android:
+  stage: build
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: manual
+      allow_failure: true
+  variables:
+    EAS_PROFILE: "preview"
+  cache:
+    key:
+      files:
+        - package-lock.json
+    paths:
+      - .npm/
+  script:
+    - npm ci --cache .npm --prefer-offline
+    - npx eas-cli build --non-interactive --no-wait --platform android --profile "$EAS_PROFILE"
