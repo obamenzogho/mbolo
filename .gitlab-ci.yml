@@ -15,6 +15,10 @@
 # 3. `quality:typecheck` en allow_failure : erreurs tsc préexistantes
 #    documentées dans DEPLOY_STATUS.md (shareService.ts, repostService.ts,
 #    types jest). Repasser en bloquant une fois corrigées.
+# 4. Lint désactivé : le script `npm run lint` référence eslint qui n'est
+#    PAS dans les devDependencies (échec `eslint: not found`). Ajouter
+#    eslint + config en local, commiter le lockfile, puis rétablir
+#    `npm run lint` dans quality:app.
 
 stages:
   - quality
@@ -41,7 +45,7 @@ quality:app:
       - .npm/
   script:
     - npm ci --legacy-peer-deps --cache .npm --prefer-offline
-    - npm run lint
+    # TODO : rétablir `npm run lint` — voir contournement n°4 en tête de fichier.
     - npm run test:ci
 
 # Non bloquant temporairement — voir contournement n°3 en tête de fichier.
