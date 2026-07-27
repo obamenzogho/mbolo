@@ -6,9 +6,11 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
+import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { auth } from '@/lib/firebase'
 import { captureException } from '@/lib/sentry'
+import { STORY_BACKGROUNDS, TEXT_STORY_DURATION } from '../constants'
 import { sendMessage, getOrCreateConversation } from '@/features/chat/services/chatService'
 import { useStories } from '@/hooks/useStories'
 import { VideoView, useVideoPlayer } from 'expo-video'
@@ -52,6 +54,7 @@ export default function StoryViewer({ groups, initialGroupIndex, initialStoryId,
   const group = groups[groupIdx]
   const story: Story | undefined = group?.stories[storyIdx]
   const isVideo = story?.mediaType === 'video'
+  const isText = story?.mediaType === 'text'
   const isMine = user && story?.userId === user.uid
 
   const progress = useRef(new Animated.Value(0)).current
@@ -275,12 +278,45 @@ export default function StoryViewer({ groups, initialGroupIndex, initialStoryId,
 
       {/* Média */}
       <View style={StyleSheet.absoluteFill}>
-        {isVideo ? (
+        {isText ? (
+          <LinearGradient
+            colors={(story.backgroundGradient?.length === 2
+              ? story.backgroundGradient
+              : STORY_BACKGROUNDS.find(b => b.id === story.backgroundColor)?.colors
+              || STORY_BACKGROUNDS[0].colors) as [string, string]}
+            style={StyleSheet.absoluteFill}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 }}>
+              <Text style={{ color: '#fff', fontSize: 28, fontWeight: '700', textAlign: 'center', lineHeight: 36 }}>
+                {story.text}
+              </Text>
+            </View>
+          </LinearGradient>
+        ) : isVideo ? (
           <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="contain" nativeControls={false} />
         ) : (
           <Image source={{ uri: story.mediaUrl }} style={StyleSheet.absoluteFill} resizeMode="contain" />
         )}
       </View>
+
+      {/* Text Overlay (image/video only) */}
+      {!isText && story.textOverlay ? (
+        <View
+          style={{
+            position: 'absolute',
+            left: story.textPosition?.x ?? 0,
+            top: story.textPosition?.y ?? '40%',
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            paddingHorizontal: 12,
+            paddingVertical: 6,
+            borderRadius: 8,
+          }}
+        >
+          <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>{story.textOverlay}</Text>
+        </View>
+      ) : null}
 
       {/* Caption */}
       {story.caption ? (

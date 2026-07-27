@@ -54,6 +54,16 @@ const TabItem = React.memo(function TabItem({
   const iconColor = isActive ? colors.primary : colors.textSecondary
   const labelColor = isActive ? colors.primary : colors.textSecondary
 
+  // Motif premium façon Facebook/Instagram : icône PLEINE sur l'onglet actif,
+  // CONTOUR sur les onglets inactifs. Les noms de TAB_ICONS sont les variantes
+  // pleines ; on ajoute « -outline » quand l'onglet est inactif, sauf si le nom
+  // porte déjà le suffixe (robustesse) ou n'a pas de variante contour connue.
+  const displayIcon: keyof typeof Ionicons.glyphMap = isActive
+    ? icon
+    : (icon.endsWith('-outline')
+        ? icon
+        : (`${icon}-outline` as keyof typeof Ionicons.glyphMap))
+
   return (
     <Pressable
       onPress={handlePress}
@@ -81,16 +91,17 @@ const TabItem = React.memo(function TabItem({
               }}
             />
           ) : (
-            <Ionicons name={icon} size={ICON_SIZE} color={iconColor} />
+            <Ionicons name={displayIcon} size={ICON_SIZE} color={iconColor} />
           )}
           {badge != null && badge > 0 && (
             <View style={{
-              position: 'absolute', top: -6, right: -10,
-              backgroundColor: '#ef4444', borderRadius: 9,
-              minWidth: 18, height: 18, paddingHorizontal: 4,
+              position: 'absolute', top: -8, right: -13,
+              backgroundColor: colors.accent, borderRadius: 12,
+              minWidth: 24, height: 24, paddingHorizontal: 5,
+              borderWidth: 2, borderColor: '#0D1117',
               justifyContent: 'center', alignItems: 'center',
             }}>
-              <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>
+              <Text style={{ color: '#000', fontSize: 12, fontWeight: '800' }}>
                 {badge > 99 ? '99+' : badge}
               </Text>
             </View>

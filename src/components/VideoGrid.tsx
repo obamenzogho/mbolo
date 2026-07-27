@@ -15,6 +15,9 @@ const EMPTY_MESSAGES: Record<ProfileTab, { icon: string; title: string; subtitle
   grid: { icon: 'videocam-outline', title: 'Aucune publication', subtitle: 'Les vidéos apparaîtront ici' },
   saved: { icon: 'bookmark-outline', title: 'Aucun contenu sauvegardé', subtitle: 'Les vidéos que tu sauvegardes apparaîtront ici' },
   liked: { icon: 'heart-outline', title: 'Aucun contenu aimé', subtitle: 'Les vidéos que tu aimes apparaîtront ici' },
+  reposted: { icon: 'repeat-outline', title: 'Aucune republication', subtitle: 'Les vidéos republiées apparaîtront ici' },
+  tagged: { icon: 'pricetag-outline', title: 'Aucune identification', subtitle: 'Les vidéos où tu es identifié(e) apparaîtront ici' },
+  reels: { icon: 'film-outline', title: 'Aucun réel', subtitle: 'Les réels apparaîtront ici' },
 }
 
 interface VideoGridProps {

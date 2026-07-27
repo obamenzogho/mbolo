@@ -1,5 +1,6 @@
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
 import { db, auth } from '@/lib/firebase'
+import { captureException } from '@/lib/sentry'
 
 type NewsNotificationType = 'post_like' | 'post_comment'
 
@@ -22,5 +23,10 @@ export async function notifyPostOwner(params: {
       read: false,
       createdAt: serverTimestamp(),
     })
-  } catch {}
+  } catch (error) {
+    captureException(
+      error instanceof Error ? error : new Error(String(error)),
+      { context: 'newsNotifications.notifyPostOwner', postId: params.postId },
+    )
+  }
 }

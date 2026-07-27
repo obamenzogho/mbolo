@@ -20,6 +20,7 @@ interface UseFollowSuggestionsReturn {
   error: Error | null
   refresh: () => Promise<void>
   dismissSuggestion: (id: string) => void
+  dismissTrending: (id: string) => void
   clearCache: () => Promise<void>
 }
 
@@ -90,6 +91,10 @@ export function useFollowSuggestions(
     setSuggestions((prev) => prev.filter((s) => s.id !== id))
   }, [])
 
+  const dismissTrending = useCallback((id: string) => {
+    setTrending((prev) => prev.filter((s) => s.id !== id))
+  }, [])
+
   const clearCache = useCallback(async () => {
     const uid = auth.currentUser?.uid
     if (uid) {
@@ -108,6 +113,7 @@ export function useFollowSuggestions(
     error,
     refresh,
     dismissSuggestion,
+    dismissTrending,
     clearCache,
   }
 }

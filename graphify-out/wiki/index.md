@@ -435,6 +435,19 @@ Usage: lookup rapide pseudo → email au login (login.tsx:52)
 - Push tokens, écouteurs, badges, templates de notifications
 - Templates: newFollower, newLike, newComment, newReply, videoTrending, mention, milestone, storyViewed
 
+### Typesense Search (src/services/searchService.ts)
+- **3 collections** : `users`, `hashtags`, `posts` — la collection `posts` est **unifiée** (text, image, carousel, article, video, video_share) avec champ `mediaType` obligatoire en pratique.
+- **Source unique de vérité du schéma** : `src/lib/typesense-schemas.ts` (importé par la cloud function `functions/src/search.ts` ; dupliqué inline dans `scripts/typesense-sync.mjs` avec commentaire de synchronisation).
+- **3 fonctions de recherche** :
+  - `searchUsers(term)` — `pseudo,nom,bio,city`, pondération `3,2,1,1`
+  - `searchHashtags(term)` — `tag`, pondération 1
+  - `searchPosts(term)` — tous types ; `searchVideos(term)` filtre `mediaType:=video || video_share` ; `searchPostsByType(term, types)` flexible
+- **`searchMulti`** lance les 3 en parallèle avec `Promise.all` + retry `withTypesenseRetry` (429/503/504). Cache LRU 30s (`src/lib/searchCache.ts`).
+- **Filtre de sécurité** : `SEARCH_FILTER_BY = 'visibility:=public && moderationStatus:!=blocked'` appliqué à toutes les requêtes `posts`.
+- **Cloud Functions** : `syncUserToSearch`, `syncHashtagToSearch`, `syncPostToSearch` (triggers onDocumentWritten) ; `initSearchSchema` (admin, crée les 3 collections) ; `backfillSearch` (admin, import users + hashtags + posts publics).
+- **UI** : `app/(tabs)/explore.tsx` orchestre ; `SearchTabs` (5 onglets : Tout / Comptes / Posts / Vidéos / Tags) ; `SearchAutocomplete` (sections groupées) ; `PostResultCard` (badge icône colorée par type) ; `VideoResultCard` (badge play UNIQUEMENT si `mediaType='video'` ou `'video_share'`).
+- **Limites connues** : cache `memoryLocalCache` uniquement (perdu au restart) ; pas de NetInfo ; pas de fallback offline sur les résultats de recherche.
+
 ---
 
 ## Règles de Conventions
@@ -781,4 +794,32 @@ Usage: lookup rapide pseudo → email au login (login.tsx:52)
 - `patches/react-native+0.81.5.patch`
 - `package.json` — `postinstall` enrichi avec `patch-package`
 - `app/(tabs)/stories.tsx`, `app/(tabs)/explore.tsx`, `app/news-compose.tsx` — conversion en `{condition && <Modal>}`
+
+---
+
+## ADR 2026-07-27: Aligner Typesense — collection `posts` unifiée avec `mediaType`
+
+**Problème :** Avant cette décision, le code client (`src/services/searchService.ts`) interrogeait une collection Typesense `posts` en filtrant par `mediaType` (text, image, carousel, video, video_share…), mais **la cloud function `functions/src/search.ts` ne synchronisait QUE users + hashtags** — donc aucun post n'était indexé en production. Le script de fallback `scripts/typesense-sync.mjs` définissait de son côté une collection `videos` (sans `mediaType`) et excluait les posts sans `media[]`, créant trois sources de vérité divergentes.
+
+**Décision :**
+1. **Source unique de vérité** : `src/lib/typesense-schemas.ts` exporte `POSTS_SCHEMA` (avec champ `mediaType` + `mediaUrl` + `thumbnailUrl` + `commentCount` + `userPhoto`). La cloud function l'importe directement ; le script `.mjs` duplique avec un commentaire explicite "DOIT ÊTRE IDENTIQUE À src/lib/typesense-schemas.ts".
+2. **Mapping complet** : `mapPost` (cloud) et `mapPostHit` (client) couvrent tous les champs, y compris `mediaType` calculé en fallback depuis `media[].type` si absent.
+3. **`searchVideos()` reste correct** : filtre `mediaType:=video || mediaType:=video_share` (`searchService.ts:152`). Pas besoin de modifier.
+4. **Onglets distincts déjà présents** : `SearchTabs` a 5 onglets (Tout / Comptes / Posts / Vidéos / Tags) ; `SearchAutocomplete` sépare posts et vidéos en deux sections distinctes.
+5. **Durcissement `VideoResultCard`** : le badge `play` n'apparaît QUE si `mediaType` est `video` ou `video_share` (défense en profondeur, `VideoResultCard.tsx:23`).
+
+**Fichiers modifiés :**
+- `src/services/searchService.ts` — `mapPostHit` exporté pour réutilisation
+- `app/(tabs)/explore.tsx` — suppression de la duplication (utilise `mapPostHit`)
+- `src/features/search/components/VideoResultCard.tsx` — garde `isVideo`
+- `functions/src/search.ts` — ajout `syncPostToSearch` + backfill posts + import `POSTS_SCHEMA` partagé
+- `functions/tsconfig.json` — include `"../src/lib/typesense-schemas.ts"`
+- `scripts/typesense-sync.mjs` — alignement `VIDEOS_SCHEMA` → `POSTS_SCHEMA`, `mapVideo` → `mapPost`, suppression du filtre `hasMedia`
+
+**Conséquences :**
+- Les posts `text`, `image`, `carousel`, `video`, `video_share`, `article` sont désormais tous indexés.
+- L'onglet "Posts" de la recherche affichera enfin des résultats distincts de l'onglet "Vidéos".
+- Le filtrage par type se fait au niveau Typesense (`searchPostsByType`) et côté client (`filterPostsByType`) pour le merge unifié.
+- Aucun nouvel index Firestore requis (les requêtes restent sur `posts` côté client).
+- **Action manuelle requise après déploiement** : `initSearchSchema` doit être appelé une fois pour créer la collection `posts` dans Typesense Cloud ; puis `backfillSearch` pour importer les posts existants.
 

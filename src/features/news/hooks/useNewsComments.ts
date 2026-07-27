@@ -19,18 +19,10 @@ import {
 import { auth, db } from '@/lib/firebase'
 import { captureException } from '@/lib/sentry'
 import { notifyPostOwner } from '../services/newsNotifications'
+import { toDate } from '../utils'
 import type { NewsComment } from '../types'
 
 const COMMENTS_LIMIT = 100
-
-function toDate(value: any): Date {
-  if (!value) return new Date()
-  if (typeof value.toDate === 'function') return value.toDate()
-  if (typeof value.seconds === 'number') {
-    return new Date(value.seconds * 1000)
-  }
-  return new Date(value)
-}
 
 export function useNewsComments(postId: string | null, postOwnerId?: string) {
   const uid = auth.currentUser?.uid ?? ''

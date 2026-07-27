@@ -31,7 +31,7 @@ export async function recordWatch(videoId: string, ratio: number, replayed = fal
       doc(db, 'users', uid, 'watched', videoId),
       { ratio: cache[videoId], updatedAt: Date.now() },
       { merge: true }
-    ).catch((e) => captureException(e instanceof Error ? e : new Error(String(e)), { context: 'recordWatch' }))
+    ).catch((e: any) => captureException(e instanceof Error ? e : new Error(String(e)), { context: 'recordWatch' }))
   }
 }
 

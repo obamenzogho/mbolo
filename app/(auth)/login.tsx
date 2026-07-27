@@ -48,7 +48,7 @@ export default function Login() {
 
   const inputBase = {
     backgroundColor: colors.surface,
-    color: colors.text,
+    color: colors.textPrimary,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -190,7 +190,7 @@ export default function Login() {
                   autoComplete="email"
                   onFocus={() => setFocusedField('identifier')}
                   onBlur={() => setFocusedField(null)}
-                  style={{ flex: 1, color: colors.text, fontSize: 16 }}
+                  style={{ flex: 1, color: colors.textPrimary, fontSize: 16 }}
                 />
               </View>
             </View>
@@ -218,7 +218,7 @@ export default function Login() {
                   autoComplete="current-password"
                   onFocus={() => setFocusedField('password')}
                   onBlur={() => setFocusedField(null)}
-                  style={{ flex: 1, color: colors.text, fontSize: 16 }}
+                  style={{ flex: 1, color: colors.textPrimary, fontSize: 16 }}
                 />
                 <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ padding: 4 }}>
                   {showPassword ? (
@@ -285,8 +285,8 @@ export default function Login() {
                   opacity: socialLoading ? 0.6 : 1,
                 }}
               >
-                <Ionicons name="logo-google" size={20} color={colors.text} style={{ marginRight: 10 }} />
-                <Text style={{ color: colors.text, fontSize: 16, fontWeight: '600' }}>
+                <Ionicons name="logo-google" size={20} color={colors.textPrimary} style={{ marginRight: 10 }} />
+                <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600' }}>
                   {socialLoading === 'google' ? 'Connexion...' : 'Continuer avec Google'}
                 </Text>
               </TouchableOpacity>

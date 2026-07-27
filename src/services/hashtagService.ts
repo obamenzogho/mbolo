@@ -20,9 +20,38 @@ export async function getTrendingHashtags(max = 10): Promise<TrendingHashtag[]> 
       limit(max),
     )
     const snap = await getDocs(q)
-    return snap.docs.map((d) => d.data() as TrendingHashtag)
+    return snap.docs.map((d: any) => d.data() as TrendingHashtag)
   } catch (e) {
     captureException(e instanceof Error ? e : new Error(String(e)), { context: 'getTrendingHashtags' })
+    return []
+  }
+}
+
+export async function getTrendingHashtagsByCity(city: string, max = 10): Promise<TrendingHashtag[]> {
+  try {
+    const q = query(
+      collection(db, 'videos'),
+      where('place', '==', city),
+      orderBy('createdAt', 'desc'),
+      limit(100),
+    )
+    const snap = await getDocs(q)
+
+    const counts: Record<string, number> = {}
+    snap.forEach((d) => {
+      const tags: string[] = d.data().hashtags ?? []
+      for (const t of tags) {
+        const tag = t.toLowerCase().trim()
+        counts[tag] = (counts[tag] ?? 0) + 1
+      }
+    })
+
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, max)
+      .map(([tag, videoCount]) => ({ tag, videoCount, trendingScore: videoCount }))
+  } catch (e) {
+    captureException(e instanceof Error ? e : new Error(String(e)), { context: 'getTrendingHashtagsByCity' })
     return []
   }
 }
@@ -37,7 +66,7 @@ export async function getVideosByHashtag(tag: string, max = 30) {
       limit(max),
     )
     const snap = await getDocs(q)
-    return snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+    return snap.docs.map((d: any) => ({ id: d.id, ...d.data() }))
   } catch (e) {
     captureException(e instanceof Error ? e : new Error(String(e)), { context: 'getVideosByHashtag' })
     return []

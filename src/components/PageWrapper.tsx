@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { usePageAnimation } from '../hooks/usePageAnimation';
+import { colors } from '../lib/theme';
 
 interface PageWrapperProps {
   children: React.ReactNode;
@@ -9,8 +10,17 @@ interface PageWrapperProps {
   style?: object;
 }
 
-const PageWrapper: React.FC<PageWrapperProps> = ({ 
-  children, 
+/**
+ * Conteneur d'animation d'entrée de page.
+ *
+ * Le fond `colors.background` couvre toute la surface : pendant les
+ * transitions (slide/scale) le contenu peut être translaté ou réduit, et sans
+ * ce fond opaque on verrait apparaître le fond par défaut (blanc) du navigateur
+ * sous forme de bordures claires. `overflow: 'hidden'` empêche en plus le
+ * contenu enfant de déborder pendant l'animation.
+ */
+const PageWrapper: React.FC<PageWrapperProps> = ({
+  children,
   type = 'fadeSlide',
   style,
 }) => {
@@ -26,6 +36,7 @@ const PageWrapper: React.FC<PageWrapperProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.background,
   },
 });
 

@@ -1,9 +1,10 @@
 /* VideoOptionsSheet — menu "plus d'options" style Instagram. */
 
-import { useCallback, useState, useMemo, useRef } from 'react'
+import { useCallback, useState, useRef } from 'react'
 import { View, Text, Alert, StyleSheet } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { TouchableOpacity } from 'react-native-gesture-handler'
-import BottomSheet, { BottomSheetBackdrop } from '@gorhom/bottom-sheet'
+import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet'
 import { Ionicons } from '@expo/vector-icons'
 import * as Clipboard from 'expo-clipboard'
 import { doc, deleteDoc } from 'firebase/firestore'
@@ -24,7 +25,7 @@ interface VideoOptionsSheetProps {
 
 export default function VideoOptionsSheet({ videoId, isOwner, contentOwnerId, contentOwnerName, onClose, sheetRef }: VideoOptionsSheetProps) {
   const [reportOpen, setReportOpen] = useState(false)
-  const snapPoints = useMemo(() => ['40%', '70%'], [])
+  const insets = useSafeAreaInsets()
   const hasOpenedRef = useRef(false)
 
   const handleClose = useCallback(() => {
@@ -112,7 +113,7 @@ export default function VideoOptionsSheet({ videoId, isOwner, contentOwnerId, co
       <BottomSheet
         ref={sheetRef}
         index={-1}
-        snapPoints={snapPoints}
+        enableDynamicSizing
         enablePanDownToClose
         backdropComponent={renderBackdrop}
         backgroundStyle={styles.background}
@@ -120,6 +121,7 @@ export default function VideoOptionsSheet({ videoId, isOwner, contentOwnerId, co
         handleStyle={styles.handleBar}
         onChange={handleSheetChange}
       >
+        <BottomSheetView style={[styles.sheetContent, { paddingBottom: 24 + insets.bottom }]}>
         <TouchableOpacity style={styles.optionRow} onPress={handleCopyLink}>
           <Ionicons name="link-outline" size={22} color={colors.textOnMedia} />
           <Text style={styles.optionText}>Copier le lien</Text>
@@ -159,6 +161,7 @@ export default function VideoOptionsSheet({ videoId, isOwner, contentOwnerId, co
         <TouchableOpacity style={styles.optionRow} onPress={handleClose}>
           <Text style={[styles.optionText, { textAlign: 'center', flex: 0 }]}>Annuler</Text>
         </TouchableOpacity>
+        </BottomSheetView>
       </BottomSheet>
 
       <ReportModal
@@ -174,12 +177,10 @@ export default function VideoOptionsSheet({ videoId, isOwner, contentOwnerId, co
 
 const styles = StyleSheet.create({
   background: { backgroundColor: colors.surface },
+  sheetContent: { paddingTop: 4 },
   handleIndicator: { backgroundColor: colors.textSecondary, width: 36 },
   handleBar: { backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 8 },
-  headerTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
-  backBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.hairline, justifyContent: 'center', alignItems: 'center' },
   optionRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 20 },
-  optionText: { color: colors.text, fontSize: 15, flex: 1 },
+  optionText: { color: colors.textPrimary, fontSize: 15, flex: 1 },
   separator: { height: StyleSheet.hairlineWidth, backgroundColor: colors.hairline, marginLeft: 20 },
 })

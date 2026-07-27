@@ -49,8 +49,8 @@ export default function EditProfile() {
     const node = fieldRefs.current[field]
     if (!node) return
     requestAnimationFrame(() => {
-      node.measureInWindow((_fx, fy) => {
-        scrollRef.current?.measureInWindow((_sx, sy) => {
+      node.measureInWindow((_fx: any, fy: any) => {
+        ;(scrollRef.current as any)?.measureInWindow((_sx: any, sy: any) => {
           const contentY = fy - sy + scrollOff.current
           scrollRef.current?.scrollTo({ y: Math.max(0, contentY - 120), animated: true })
         })
@@ -306,7 +306,7 @@ export default function EditProfile() {
                   }}
                 >
                   <Ionicons name={option.icon as any} size={18} color={genre === option.key ? colors.white : '#888'} />
-                  <Text style={{ color: genre === option.key ? colors.white : colors.text, fontSize: 13, fontWeight: '600' }}>{option.label}</Text>
+                  <Text style={{ color: genre === option.key ? colors.white : colors.textPrimary, fontSize: 13, fontWeight: '600' }}>{option.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>

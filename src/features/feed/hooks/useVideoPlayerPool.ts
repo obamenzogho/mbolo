@@ -16,6 +16,7 @@ import type { VideoPlayer } from 'expo-video'
 import { useFeedStore } from '../store/feedStore'
 import { captureException } from '../../../lib/sentry'
 import { resolveVideoUrl } from '../services/resolveVideoUrl'
+import { getResumePosition } from '../services/positionTracker'
 import { setPlayerForVideo, removePlayerForVideo } from '../components/VideoPlayerSlot'
 import type { Video } from '../../../types'
 
@@ -30,6 +31,8 @@ interface Slot {
   state: PlayerState
   role: SlotRole | null
   loadedQuality: 'LOW' | 'FULL' | null
+  // true une fois la position de reprise appliquée pour la vidéo courante.
+  resumed: boolean
 }
 
 function createPoolPlayer(): VideoPlayer {
@@ -75,6 +78,7 @@ export function useVideoPlayerPool(
           state: 'IDLE' as PlayerState,
           role: null as SlotRole | null,
           loadedQuality: null as 'LOW' | 'FULL' | null,
+          resumed: false,
         }
       })
     } catch (e) {
@@ -115,6 +119,7 @@ export function useVideoPlayerPool(
     slot.videoId = null
     slot.state = 'RECYCLING'
     slot.loadedQuality = null
+    slot.resumed = false
     try { slot.player.currentTime = 0 } catch {}
     try { slot.player.replaceAsync(null) } catch {}
     try { slot.player.pause() } catch {}
@@ -169,6 +174,7 @@ export function useVideoPlayerPool(
     slot.role = role
     slot.state = 'LOADING'
     slot.loadedQuality = quality
+    slot.resumed = false
     mapRef.current.set(videoId, findSlotIndex(slot))
     setPlayerForVideo(cid, videoId, slot.player)
 
@@ -218,6 +224,14 @@ export function useVideoPlayerPool(
     if (!isActiveRef.current) return
     if (slot.role === 'CURRENT' && !isScrollingRef.current) {
       pauseNonCurrentSlots(slot.videoId)
+      // Reprise : on repositionne la vidéo là où l'utilisateur l'avait laissée
+      // (persistée entre scroll et redémarrages). Une seule fois par (re)promotion
+      // en CURRENT, pour ne pas resauter en arrière si l'utilisateur scrube ensuite.
+      if (slot.videoId && !slot.resumed) {
+        slot.resumed = true
+        const at = getResumePosition(slot.videoId)
+        if (at > 0) { try { slot.player.currentTime = at } catch {} }
+      }
       slot.state = 'PLAYING'
       try { slot.player.volume = 1 } catch {}
       try { slot.player.play() } catch {}
@@ -316,18 +330,21 @@ export function useVideoPlayerPool(
     }
   }, [])
 
-  /** Libère les sources de TOUS les slots (décodeurs + buffers), sans détruire
-   *  les players eux-mêmes. Appelé quand le feed reste inactif : c'est ce qui
-   *  fait vraiment retomber la conso CPU/GPU (et la chauffe) d'un onglet non
-   *  visible. Le pool se recharge via syncPool à la réactivation. */
+  /** Sur feed inactif : on ne libère PLUS les sources, on se contente de couper
+   *  lecture + son sur tout le pool. Les 5 slots (PREV_PREV → NEXT_NEXT) restent
+   *  « chauds » : leur source reste chargée pour un RETOUR INSTANTANÉ (aucun
+   *  écran noir ni rechargement au re-focus / re-swipe), façon TikTok.
+   *
+   *  Coût : ~5 buffers vidéo retenus en mémoire tant que l'onglet est inactif.
+   *  Les players étant EN PAUSE, il n'y a pas de décodage continu → impact
+   *  CPU/GPU/chauffe négligeable ; seule la mémoire est concernée. */
   const releaseAllSources = useCallback(() => {
-    const cid = instanceIdRef.current
-    for (let i = 0; i < slotsRef.current.length; i++) {
-      const slot = slotsRef.current[i]
-      if (!slot.videoId && slot.state === 'IDLE') continue
-      recycleSlot(i)
+    for (const slot of slotsRef.current) {
+      if (!slot.videoId) continue
+      if (slot.state === 'PLAYING') slot.state = 'PAUSED'
+      try { slot.player.pause() } catch {}
+      try { slot.player.volume = 0 } catch {}
     }
-    mapRef.current.clear()
   }, [])
 
   /** Bascule l'état actif du feed. Sur désactivation, coupe tout le pool et

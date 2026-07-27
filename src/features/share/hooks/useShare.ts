@@ -40,7 +40,7 @@ export function useShare() {
 
   const copyLink = useCallback(async (config: ShareVideoConfig) => {
     if (!currentUserId) return
-    const link = `mbolo://post/${config.videoId}`
+    const link = `https://mbolo.app/post/${config.videoId}`
     try {
       await Clipboard.setStringAsync(link)
       await createShare({ senderId: currentUserId, postId: config.videoId, shareType: 'COPY_LINK' })
@@ -52,10 +52,19 @@ export function useShare() {
     }
   }, [currentUserId])
 
-  const shareExternal = useCallback(async (url: string, config: ShareVideoConfig) => {
+  // Ouvre une URL cible ; si le lien n'est pas gérable (app absente, schéma
+  // inconnu), on retombe sur la feuille de partage système pour que le bouton
+  // fasse TOUJOURS quelque chose au lieu d'échouer en silence.
+  const shareExternal = useCallback(async (url: string, config: ShareVideoConfig, fallbackText?: string) => {
     if (!currentUserId) return
     try {
-      await Linking.openURL(url)
+      const canOpen = await Linking.canOpenURL(url).catch(() => false)
+      if (canOpen) {
+        await Linking.openURL(url)
+      } else {
+        const { Share } = require('react-native')
+        await Share.share({ message: fallbackText ?? config.videoURL, url: config.videoURL })
+      }
       await createShare({ senderId: currentUserId, postId: config.videoId, shareType: 'EXTERNAL_SHARE' })
       trackShareEvent({ videoId: config.videoId, shareType: 'EXTERNAL_SHARE', senderId: currentUserId })
     } catch (e) {
@@ -80,38 +89,45 @@ export function useShare() {
     }
   }, [currentUserId])
 
+  const buildText = (config: ShareVideoConfig) => {
+    const link = config.videoURL || `https://mbolo.app/post/${config.videoId}`
+    return config.description ? `🎬 ${config.description}\n${link}` : `🎬 Regarde ça !\n${link}`
+  }
+
   const shareWhatsApp = useCallback((config: ShareVideoConfig) => {
-    const text = config.description
-      ? `🎬 ${config.description}\n${config.videoURL}`
-      : `🎬 Regarde ça !\n${config.videoURL}`
-    shareExternal(`whatsapp://send?text=${encodeURIComponent(text)}`, config)
+    const text = buildText(config)
+    // wa.me : lien universel qui ouvre l'app si installée, sinon WhatsApp Web.
+    shareExternal(`https://wa.me/?text=${encodeURIComponent(text)}`, config, text)
   }, [shareExternal])
 
   const shareTelegram = useCallback((config: ShareVideoConfig) => {
-    const text = config.description
-      ? `🎬 ${config.description}\n${config.videoURL}`
-      : `🎬 Regarde ça !\n${config.videoURL}`
-    shareExternal(`tg://msg?text=${encodeURIComponent(text)}`, config)
+    const link = config.videoURL || `https://mbolo.app/post/${config.videoId}`
+    const text = config.description ? `🎬 ${config.description}` : '🎬 Regarde ça !'
+    shareExternal(
+      `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`,
+      config,
+      buildText(config),
+    )
   }, [shareExternal])
 
   const shareInstagramStory = useCallback((config: ShareVideoConfig) => {
-    shareExternal(`instagram-stories://share?source_application=mbolo`, config)
+    // Pas de partage web fiable côté Instagram → feuille système directement.
+    shareExternal(`instagram-stories://share?source_application=mbolo`, config, buildText(config))
   }, [shareExternal])
 
   const shareX = useCallback((config: ShareVideoConfig) => {
-    const text = config.description
-      ? `🎬 ${config.description}\n${config.videoURL}`
-      : `🎬 Regarde ça !\n${config.videoURL}`
-    shareExternal(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, config)
+    const text = buildText(config)
+    shareExternal(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, config, text)
   }, [shareExternal])
 
   const shareSnapchat = useCallback((config: ShareVideoConfig) => {
-    shareExternal(`snapchat://`, config)
+    // Snapchat n'expose pas d'intent de partage de lien → feuille système.
+    shareExternal(`snapchat://`, config, buildText(config))
   }, [shareExternal])
 
   const shareQRCode = useCallback(async (config: ShareVideoConfig) => {
     if (!currentUserId) return
-    const link = `mbolo://post/${config.videoId}`
+    const link = `https://mbolo.app/post/${config.videoId}`
     const qrURL = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(link)}`
     try {
       await Clipboard.setStringAsync(link)

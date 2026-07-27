@@ -79,7 +79,7 @@ NetInfo.addEventListener((state) => {
   const online = !!state.isConnected && state.isInternetReachable !== false
   if (online === netOnline) return
   netOnline = online
-  ;(online ? enableNetwork(db) : disableNetwork(db)).catch((e) =>
+  ;(online ? enableNetwork(db) : disableNetwork(db)).catch((e: any) =>
     console.warn('[Firestore] network toggle failed:', e?.message ?? e),
   )
 })

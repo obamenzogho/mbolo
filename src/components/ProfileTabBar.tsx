@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { View, Text, TouchableOpacity } from 'react-native'
+import type { SharedValue } from 'react-native-reanimated'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '@/lib/theme'
 import type { ProfileTab } from '@/types'
@@ -17,6 +18,7 @@ interface ProfileTabBarProps {
   tabs: ProfileTab[]
   activeTab: ProfileTab
   onTabChange: (tab: ProfileTab) => void
+  swipeOffsetPx?: SharedValue<number>
 }
 
 export function ProfileTabBar({ tabs, activeTab, onTabChange }: ProfileTabBarProps) {

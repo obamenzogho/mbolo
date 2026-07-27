@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
   },
   card: {
     flex: 1,
-    backgroundColor: colors.surfaceLight,
+    backgroundColor: colors.surfaceElevated,
     borderRadius: 12,
     paddingVertical: 10,
     alignItems: 'center',

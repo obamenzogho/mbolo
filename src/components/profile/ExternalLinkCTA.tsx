@@ -39,7 +39,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     alignSelf: 'flex-start',
-    backgroundColor: colors.surfaceLight,
+    backgroundColor: colors.surfaceElevated,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: colors.secondary,

@@ -13,7 +13,7 @@ export async function markAllNotificationsRead(): Promise<void> {
     ))
     if (snap.empty) return
     const batch = writeBatch(db)
-    snap.docs.forEach((d) => batch.update(d.ref, { read: true }))
+    snap.docs.forEach((d: any) => batch.update(d.ref, { read: true }))
     await batch.commit()
   } catch (e) {
     captureException(e instanceof Error ? e : new Error(String(e)), { context: 'markAllNotificationsRead' })

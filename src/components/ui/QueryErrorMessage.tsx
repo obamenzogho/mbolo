@@ -45,7 +45,7 @@ export default function QueryErrorMessage({
         </View>
         <Text
           style={{
-            color: colors.text,
+            color: colors.textPrimary,
             fontSize: 18,
             fontWeight: '700',
             textAlign: 'center',
@@ -87,7 +87,7 @@ export default function QueryErrorMessage({
           <TouchableOpacity
             onPress={openIndexConsole}
             style={{
-              backgroundColor: colors.surfaceLight,
+              backgroundColor: colors.surfaceElevated,
               paddingHorizontal: 24,
               paddingVertical: 12,
               borderRadius: 12,
@@ -129,7 +129,7 @@ export default function QueryErrorMessage({
       <Ionicons name="warning" size={20} color={colors.error} />
       <Text
         style={{
-          color: colors.text,
+          color: colors.textPrimary,
           fontSize: 13,
           flex: 1,
           lineHeight: 18,

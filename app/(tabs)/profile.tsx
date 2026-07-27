@@ -350,7 +350,7 @@ export default function Profile() {
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <Text style={{ color: colors.white, fontSize: 14, fontWeight: '700' }}>{profile?.nom || ''}</Text>
-                    <TouchableOpacity onPress={() => router.push('/(tabs)/edit-profile')} style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: colors.surfaceLight, borderWidth: 1, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' }}>
+                    <TouchableOpacity onPress={() => router.push('/(tabs)/edit-profile')} style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' }}>
                       <Ionicons name="pencil" size={14} color={colors.textSecondary} />
                     </TouchableOpacity>
                   </View>
@@ -383,11 +383,11 @@ export default function Profile() {
                   ) : null}
                 </View>
                 <View style={{ flexDirection: 'column', gap: 8, justifyContent: 'center', marginLeft: 12 }}>
-                  <TouchableOpacity onPress={() => router.push('/insights')} style={{ width: 34, height: 34, borderRadius: 8, backgroundColor: colors.surfaceLight, borderWidth: 1, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' }}>
+                  <TouchableOpacity onPress={() => router.push('/insights')} style={{ width: 34, height: 34, borderRadius: 8, backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' }}>
                     <Ionicons name="bar-chart-outline" size={18} color={colors.white} />
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={shareProfile} style={{ width: 34, height: 34, borderRadius: 8, backgroundColor: colors.surfaceLight, borderWidth: 1, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' }}>
-                    <Ionicons name="share-outline" size={18} color={colors.white} />
+                  <TouchableOpacity onPress={shareProfile} style={{ width: 34, height: 34, borderRadius: 8, backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' }}>
+                    <Ionicons name="arrow-redo-outline" size={18} color={colors.white} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -416,7 +416,7 @@ export default function Profile() {
                         onPress={() => { setGridFilter(opt); setFilterOpen(false) }}
                         style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10, minWidth: 140 }}
                       >
-                        <Ionicons name={opt === 'reels' ? 'film-outline' : opt === 'photos' ? 'image-outline' : 'grid-outline'} size={16} color={gridFilter === opt ? colors.primary : colors.textMuted} />
+                        <Ionicons name={gridFilter === opt ? (opt === 'reels' ? 'film' : opt === 'photos' ? 'image' : 'grid') : (opt === 'reels' ? 'film-outline' : opt === 'photos' ? 'image-outline' : 'grid-outline')} size={16} color={gridFilter === opt ? colors.primary : colors.textMuted} />
                         <Text style={{ color: gridFilter === opt ? colors.primary : colors.white, fontSize: 14, fontWeight: gridFilter === opt ? '700' : '400' }}>
                           {opt === 'reels' ? 'Réel' : opt === 'photos' ? 'Photo' : 'Publications'}
                         </Text>
@@ -430,38 +430,66 @@ export default function Profile() {
           />
     </SafeAreaView>
 
-    {/* MENU */}
-    <Modal transparent visible={menuVisible} animationType="fade" onRequestClose={closeMenu}>
+    {/* MENU — bottom sheet style TikTok */}
+    <Modal transparent visible={menuVisible} animationType="none" onRequestClose={closeMenu}>
       <View style={{ flex: 1, justifyContent: 'flex-end' }}>
         <TouchableOpacity activeOpacity={1} onPress={closeMenu} style={{ flex: 1, backgroundColor: colors.overlay }} />
-        <Animated.View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 16, borderTopRightRadius: 16, transform: [{ translateY: menuAnim.interpolate({ inputRange: [0, 1], outputRange: [300, 0] }) }] }}>
-          <View style={{ paddingVertical: 24, alignItems: 'center', position: 'relative', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
-            <TouchableOpacity onPress={closeMenu} style={{ position: 'absolute', right: 16, top: 6, width: 34, height: 34, borderRadius: 17, backgroundColor: colors.surfaceLight, justifyContent: 'center', alignItems: 'center' }}>
-              <Ionicons name="close" size={26} color={colors.white} />
-            </TouchableOpacity>
+        <Animated.View
+          style={{
+            backgroundColor: colors.surface,
+            borderTopLeftRadius: 20,
+            borderTopRightRadius: 20,
+            overflow: 'hidden',
+            paddingBottom: 34,
+            transform: [{ translateY: menuAnim.interpolate({ inputRange: [0, 1], outputRange: [600, 0] }) }],
+          }}
+        >
+          {/* Poignée + en-tête */}
+          <View style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 6 }}>
+            <View style={{ width: 40, height: 5, borderRadius: 2.5, backgroundColor: colors.surfaceElevated }} />
           </View>
-          <ScrollView style={{ maxHeight: Dimensions.get('window').height * 0.65 }} showsVerticalScrollIndicator={false}>
+          <View style={{ alignItems: 'center', paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
+            <Text style={{ color: colors.textSecondary, fontSize: 13, fontWeight: '600' }}>Menu</Text>
+          </View>
+
+          <ScrollView
+            style={{ maxHeight: Dimensions.get('window').height * 0.6 }}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingTop: 4, paddingBottom: 8 }}
+          >
             {[
-              { icon: 'settings-outline', label: 'Paramètres', action: () => { closeMenu(); router.push('/settings') } },
-              { icon: 'shield-checkmark-outline', label: 'Confidentialité', action: () => { closeMenu(); router.push('/settings') } },
-              { icon: 'time-outline', label: 'Activité', action: () => { closeMenu(); router.push('/settings') } },
+              { icon: 'settings-outline', label: 'Paramètres et confidentialité', action: () => { closeMenu(); router.push('/settings') } },
+              { icon: 'time-outline', label: 'Activité', action: () => { closeMenu(); router.push('/settings/screen-time') } },
               { icon: 'bookmark-outline', label: 'Vidéos sauvegardées', action: () => { closeMenu(); setActiveTab('saved') } },
               { icon: 'heart-outline', label: 'Vidéos aimées', action: () => { closeMenu(); setActiveTab('liked') } },
               { icon: 'repeat-outline', label: 'Republications', action: () => { closeMenu(); setActiveTab('reposted') } },
               { icon: 'pricetags-outline', label: 'Identifications', action: () => { closeMenu(); setActiveTab('tagged') } },
-              { icon: 'notifications-outline', label: 'Notifications', action: () => closeMenu() },
-              { icon: 'help-circle-outline', label: 'Aide', action: () => closeMenu() },
-              { icon: 'information-circle-outline', label: 'À propos de Mbolo', action: () => closeMenu() },
+              { icon: 'notifications-outline', label: 'Notifications', action: () => { closeMenu(); router.push('/settings/notifications') } },
+              { icon: 'help-circle-outline', label: 'Aide', action: () => { closeMenu(); router.push('/settings/help') } },
+              { icon: 'information-circle-outline', label: 'À propos de Mbolo', action: () => { closeMenu(); router.push('/settings/about') } },
             ].map((item, i) => (
-              <TouchableOpacity key={i} onPress={item.action} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 20 }}>
-                <Ionicons name={item.icon as any} size={24} color={colors.white} />
-                <Text style={{ color: colors.white, fontSize: 16 }}>{item.label}</Text>
+              <TouchableOpacity
+                key={i}
+                onPress={item.action}
+                activeOpacity={0.55}
+                style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 22 }}
+              >
+                <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: colors.surfaceElevated, alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name={item.icon as any} size={20} color={colors.white} />
+                </View>
+                <Text style={{ color: colors.white, fontSize: 16, marginLeft: 16 }}>{item.label}</Text>
               </TouchableOpacity>
             ))}
-            <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 8 }} />
-            <TouchableOpacity onPress={() => { closeMenu(); handleLogout() }} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 20, paddingBottom: 24 }}>
-              <Ionicons name="log-out-outline" size={24} color={colors.error} />
-              <Text style={{ color: colors.error, fontSize: 16, fontWeight: '600' }}>Se déconnecter</Text>
+            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginVertical: 8, marginHorizontal: 22 }} />
+            <TouchableOpacity
+              onPress={() => { closeMenu(); handleLogout() }}
+              activeOpacity={0.55}
+              style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 22 }}
+            >
+              <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(248,81,73,0.12)', alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="log-out-outline" size={20} color={colors.error} />
+              </View>
+              <Text style={{ color: colors.error, fontSize: 16, fontWeight: '600', marginLeft: 16 }}>Se déconnecter</Text>
             </TouchableOpacity>
           </ScrollView>
         </Animated.View>
@@ -476,7 +504,7 @@ export default function Profile() {
           <View style={{ paddingVertical: 12, alignItems: 'center' }}><View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border }} /></View>
           <Text style={{ color: colors.white, fontSize: 16, fontWeight: '700', textAlign: 'center', marginBottom: 16 }}>Partager le profil</Text>
           <View style={{ marginHorizontal: 16, marginBottom: 16 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceLight, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: colors.border }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceElevated, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: colors.border }}>
               <Ionicons name="link-outline" size={18} color={colors.textSecondary} style={{ marginRight: 8 }} />
               <Text style={{ flex: 1, color: colors.textOnMedia, fontSize: 14 }} numberOfLines={1}>https://mbolo.app/@{profile?.pseudo || ''}</Text>
               <TouchableOpacity onPress={async () => { try { await require('expo-clipboard').setStringAsync(`https://mbolo.app/@${profile?.pseudo || ''}`); Alert.alert('Lien copié', 'Le lien a été copié dans le presse-papiers') } catch {} }} style={{ marginLeft: 8, padding: 4 }}>
@@ -484,11 +512,11 @@ export default function Profile() {
               </TouchableOpacity>
             </View>
           </View>
-          <TouchableOpacity onPress={() => { setShareVisible(false); shareAnim.setValue(0); setTimeout(() => setShowQR(true), 100) }} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 14, marginHorizontal: 16, marginBottom: 16, backgroundColor: colors.surfaceLight, borderRadius: 12 }}>
+          <TouchableOpacity onPress={() => { setShareVisible(false); shareAnim.setValue(0); setTimeout(() => setShowQR(true), 100) }} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 14, marginHorizontal: 16, marginBottom: 16, backgroundColor: colors.surfaceElevated, borderRadius: 12 }}>
             <Ionicons name="qr-code-outline" size={20} color={colors.white} />
             <Text style={{ color: colors.white, fontSize: 15, fontWeight: '600' }}>Code QR</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={async () => { try { await Share.share({ message: `Découvre @${profile?.pseudo || ''} sur Mbolo ! 🇬🇦\nhttps://mbolo.app/@${profile?.pseudo || ''}` }) } catch {} }} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 14, marginHorizontal: 16, backgroundColor: colors.surfaceLight, borderRadius: 12 }}>
+          <TouchableOpacity onPress={async () => { try { await Share.share({ message: `Découvre @${profile?.pseudo || ''} sur Mbolo ! 🇬🇦\nhttps://mbolo.app/@${profile?.pseudo || ''}` }) } catch {} }} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 14, marginHorizontal: 16, backgroundColor: colors.surfaceElevated, borderRadius: 12 }}>
             <Ionicons name="ellipsis-horizontal" size={20} color={colors.white} />
             <Text style={{ color: colors.white, fontSize: 15, fontWeight: '600' }}>Plus d'options</Text>
           </TouchableOpacity>

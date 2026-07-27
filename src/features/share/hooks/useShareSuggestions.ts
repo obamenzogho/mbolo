@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { doc, getDoc, collection, query, where, orderBy, limit as firestoreLimit, getDocs } from 'firebase/firestore'
+import { doc, getDoc, collection, query, where, orderBy, limit as firestoreLimit, getDocs, type QueryDocumentSnapshot } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
 import { captureException } from '@/lib/sentry'
 import type { ShareSuggestion } from '../types'
@@ -30,7 +30,7 @@ export function useShareSuggestions(postId?: string) {
             firestoreLimit(20),
           ),
         )
-        shareSnap.docs.forEach((d) => {
+        shareSnap.docs.forEach((d: QueryDocumentSnapshot) => {
           const data = d.data()
           if (data.receiverId && data.receiverId !== currentUserId) {
             recentShareSenderIds.add(data.receiverId)

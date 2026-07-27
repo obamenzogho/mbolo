@@ -12,7 +12,6 @@ import { RepostedByBanner } from '@/features/repost/components/RepostedByBanner'
 
 import { VideoOverlay } from './VideoOverlay'
 import { AuthorInfo } from './AuthorInfo'
-import { CaptionBlock } from './CaptionBlock'
 import { CommentPreview } from './CommentPreview'
 import { ActionBar } from './ActionBar'
 import { ProgressBar } from './ProgressBar'
@@ -48,9 +47,15 @@ function FeedItemComponent({
   const isActive = isActiveProp ?? false
   const insets = useSafeAreaInsets()
   const player = usePlayerForVideo(instanceId, item.id)
-  const { hideTabBar, showTabBar } = useTabBarVisibility()
+  const { hideTabBar, showTabBar, isTabBarHidden } = useTabBarVisibility()
 
   const { liked, saved, likeCount, saveCount, toggleLike, toggleSave } = useFeedItemActions(item)
+
+  // Pause VOLONTAIRE (tap utilisateur) vs involontaire (stall réseau, swipe,
+  // changement d'onglet). Seule la pause volontaire épaissit la barre + affiche
+  // le minuteur. Réinitialisée dès que la vidéo n'est plus active.
+  const [userPaused, setUserPaused] = useState(false)
+  useEffect(() => { if (!isActive) setUserPaused(false) }, [isActive])
 
   const [likeIconScale] = useState(() => new Animated.Value(1))
   const animateLikeIcon = useCallback(() => {
@@ -105,19 +110,12 @@ function FeedItemComponent({
   const immersiveShift = useRef(new Animated.Value(0)).current
   const immersiveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
-  const enterImmersive = useCallback(() => {
-    hideTabBar()
-    Animated.timing(immersiveShift, {
-      toValue: IMMERSIVE_SHIFT, duration: 300, useNativeDriver: true,
-    }).start()
-  }, [hideTabBar, immersiveShift])
-
-  const exitImmersive = useCallback(() => {
-    showTabBar()
-    Animated.timing(immersiveShift, {
-      toValue: 0, duration: 200, useNativeDriver: true,
-    }).start()
-  }, [showTabBar, immersiveShift])
+  // enter/exit ne font que basculer la navbar. Le décalage du bloc (immersiveShift)
+  // est piloté par un effet unique qui SUIT la visibilité réelle de la navbar
+  // (voir plus bas) : ainsi, si une source externe rallume la navbar pendant
+  // l'immersif, le bloc remonte automatiquement → jamais de superposition.
+  const enterImmersive = useCallback(() => { hideTabBar() }, [hideTabBar])
+  const exitImmersive = useCallback(() => { showTabBar() }, [showTabBar])
 
   const scheduleImmersive = useCallback(() => {
     clearTimeout(immersiveTimer.current)
@@ -125,36 +123,44 @@ function FeedItemComponent({
   }, [enterImmersive])
 
   // Démarre / relance le cycle quand la vidéo est active ET que les commentaires
-  // sont fermés. Suspend le cycle (timer annulé, décalage remis à zéro) tant que
-  // les commentaires sont ouverts, et restaure tout quand la vidéo n'est plus
-  // active (scroll, perte de focus…).
-  // Hors mode immersif (viewer sans navbar) : jamais de masquage, bloc ancré.
+  // sont fermés. Suspend le cycle (timer annulé) tant que les commentaires sont
+  // ouverts, et restaure la navbar quand la vidéo n'est plus active (scroll,
+  // perte de focus…). Ce cycle ne touche QUE la navbar ; le décalage du bloc
+  // est géré par l'effet suivant (qui suit isTabBarHidden).
   useEffect(() => {
     if (!immersive) {
       clearTimeout(immersiveTimer.current)
-      // Pas de navbar dans ce contexte → on descend le bloc (de façon STATIQUE)
-      // pour qu'il occupe l'espace du bas, sans cycle ni animation.
-      immersiveShift.setValue(IMMERSIVE_SHIFT)
       return
     }
     if (isActive && !commentsOpen) {
-      // On (re)part toujours d'un état visible avant de lancer le compte à
-      // rebours — au cas où la navbar aurait été laissée masquée.
+      // On (re)part toujours d'un état visible avant de lancer le compte à rebours.
       showTabBar()
-      immersiveShift.setValue(0)
       scheduleImmersive()
     } else {
       clearTimeout(immersiveTimer.current)
-      if (commentsOpen) {
-        // Le CommentSheet gère déjà la navbar ; on remet juste le bloc en place.
-        immersiveShift.setValue(0)
-      } else {
-        showTabBar()
-        immersiveShift.setValue(0)
-      }
+      if (!commentsOpen) showTabBar()
     }
     return () => clearTimeout(immersiveTimer.current)
-  }, [immersive, isActive, commentsOpen, scheduleImmersive, showTabBar, immersiveShift])
+  }, [immersive, isActive, commentsOpen, scheduleImmersive, showTabBar])
+
+  // Décalage du bloc info : SUIT la visibilité réelle de la navbar.
+  // - Hors immersif (viewer sans navbar) : bloc descendu en permanence.
+  // - Inactif ou commentaires ouverts : bloc ancré en haut (0).
+  // - Actif : descend UNIQUEMENT quand la navbar est réellement masquée.
+  // Cette dépendance sur isTabBarHidden garantit que si la navbar réapparaît
+  // (source externe), le bloc remonte aussitôt → plus jamais de superposition.
+  useEffect(() => {
+    if (!immersive) {
+      immersiveShift.setValue(IMMERSIVE_SHIFT)
+      return
+    }
+    const shouldShift = isActive && !commentsOpen && isTabBarHidden
+    Animated.timing(immersiveShift, {
+      toValue: shouldShift ? IMMERSIVE_SHIFT : 0,
+      duration: shouldShift ? 300 : 200,
+      useNativeDriver: true,
+    }).start()
+  }, [immersive, isActive, commentsOpen, isTabBarHidden, immersiveShift])
 
   // Un toucher réaffiche tout et relance le compte à rebours de 5 s.
   const handleInteraction = useCallback(() => {
@@ -181,6 +187,7 @@ function FeedItemComponent({
         onDoubleTapLike={() => toggleLike({ force: true })}
         onLongPress={onLongPress}
         onInteraction={handleInteraction}
+        onUserTogglePlay={setUserPaused}
       />
 
       <LinearGradient
@@ -205,8 +212,12 @@ function FeedItemComponent({
       )}
 
       <Animated.View style={[styles.infoColumn, { bottom: BOTTOM_PADDING + insets.bottom, transform: [{ translateY: immersiveShift }] }]}>
-        <AuthorInfo item={item} username={username} userPhotoURL={userPhotoURL} hashtags={item.hashtags} />
-        <CaptionBlock description={item.description} />
+        <AuthorInfo
+          item={item}
+          username={username}
+          userPhotoURL={userPhotoURL}
+          hashtags={item.hashtags}
+        />
         {item.place && (
           <TouchableOpacity
             onPress={() => router.push({ pathname: '/place/[id]', params: { id: item.place! } })}
@@ -223,6 +234,13 @@ function FeedItemComponent({
           </Animated.View>
         )}
       </Animated.View>
+
+      {/* ProgressBar rendue AVANT la colonne d'action : son conteneur pleine
+          largeur (60px) recouvre géométriquement le bouton « more ». En la
+          peignant en dessous, la colonne d'action reçoit les taps en priorité
+          (sinon le PanResponder de la barre, qui décline le geste au start,
+          « avale » le tap sans le rediriger vers le bouton). */}
+      <ProgressBar player={player} videoId={item.id} isActive={isActive} userPaused={userPaused} bottomOffset={BOTTOM_PROGRESS} translateY={immersiveShift} />
 
       <View style={[styles.actionColumn, { bottom: BOTTOM_PADDING + insets.bottom }]}>
         <ActionBar
@@ -241,8 +259,6 @@ function FeedItemComponent({
           video={item}
         />
       </View>
-
-      <ProgressBar player={player} bottomOffset={BOTTOM_PROGRESS} translateY={immersiveShift} />
     </View>
   )
 }

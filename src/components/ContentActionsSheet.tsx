@@ -65,8 +65,8 @@ export function ContentActionsSheet({
               onPress={() => { onClose(); setTimeout(() => setReportOpen(true), 250) }}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, paddingHorizontal: 20 }}
             >
-              <Ionicons name="flag-outline" size={22} color={colors.text} />
-              <Text style={{ color: colors.text, fontSize: 16 }}>Signaler</Text>
+              <Ionicons name="flag-outline" size={22} color={colors.textPrimary} />
+              <Text style={{ color: colors.textPrimary, fontSize: 16 }}>Signaler</Text>
             </TouchableOpacity>
 
             {contentOwnerId && (

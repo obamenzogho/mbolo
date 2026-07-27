@@ -40,7 +40,7 @@ export const ProfilePreview = memo(function ProfilePreview({ nom, pseudo, bio, p
 })
 
 const styles = StyleSheet.create({
-  card: { backgroundColor: colors.surfaceLight, borderRadius: 14, borderWidth: 1, borderColor: colors.border, padding: 16, marginBottom: 16 },
+  card: { backgroundColor: colors.surfaceElevated, borderRadius: 14, borderWidth: 1, borderColor: colors.border, padding: 16, marginBottom: 16 },
   hint: { color: colors.textMuted, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   avatar: { width: 56, height: 56, borderRadius: 28 },

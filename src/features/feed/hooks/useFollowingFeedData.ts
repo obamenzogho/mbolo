@@ -174,7 +174,7 @@ export function useFollowingFeedData({ store, isActive = true }: { store: StoreA
           )
         )
         const vMap = new Map<string, any>()
-        vSnaps.forEach((s) => s.docs.forEach((d) => vMap.set(d.id, d)))
+        vSnaps.forEach((s: any) => s.docs.forEach((d: any) => vMap.set(d.id, d)))
         for (const e of repostEntries) {
           const d = vMap.get(e.videoId)
           if (!d) continue

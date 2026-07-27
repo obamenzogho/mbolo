@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { View, Text, Pressable, StyleSheet } from 'react-native'
 import { doc, runTransaction } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { captureException } from '@/lib/sentry'
 import { colors } from '@/lib/theme'
 import type { NewsPoll } from '../types'
 
@@ -35,7 +36,12 @@ export default function PollView({ poll, postId, currentUserId }: { poll: NewsPo
         })
         tx.update(ref, { 'poll.options': currentOptions })
       })
-    } catch {}
+    } catch (error) {
+      captureException(
+        error instanceof Error ? error : new Error(String(error)),
+        { context: 'PollView.vote', postId, optionId },
+      )
+    }
   }
 
   return (

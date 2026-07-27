@@ -46,8 +46,8 @@ function CommentInputComponent({
         endAt(prefix + '\uf8ff'),
         limit(6),
       )
-      const snap = await getDocs(q)
-      setSuggestions(snap.docs.map((d) => ({ uid: d.id, pseudo: d.data().pseudo, photoURL: d.data().photoURL })))
+      const snap: any = await getDocs(q)
+      setSuggestions(snap.docs.map((d: any) => ({ uid: d.id, pseudo: d.data().pseudo, photoURL: d.data().photoURL })))
     } catch { setSuggestions([]) }
   }, [])
 
@@ -121,8 +121,8 @@ function CommentInputComponent({
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 8 }}>
                   {s.photoURL
                     ? <Image source={{ uri: s.photoURL }} style={{ width: 28, height: 28, borderRadius: 14 }} />
-                    : <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors.surfaceLight }} />}
-                  <Text style={{ color: colors.text }}>@{s.pseudo}</Text>
+                    : <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors.surfaceElevated }} />}
+                  <Text style={{ color: colors.textPrimary }}>@{s.pseudo}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -202,13 +202,13 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   avatarPlaceholder: {
-    backgroundColor: colors.surfaceLight,
+    backgroundColor: colors.surfaceElevated,
     alignItems: 'center',
     justifyContent: 'center',
   },
   inputContainer: {
     flex: 1,
-    backgroundColor: colors.surfaceLight,
+    backgroundColor: colors.surfaceElevated,
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 8,

@@ -7,7 +7,6 @@ import {
   Image,
   ScrollView,
   Alert,
-  ActivityIndicator,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
@@ -32,7 +31,9 @@ import { auth, db } from '@/lib/firebase'
 import { uploadToCloudinary } from '@/lib/cloudinary'
 import { captureException } from '@/lib/sentry'
 import { colors } from '@/lib/theme'
+import OrbitLoader from '@/components/OrbitLoader'
 import { POST_BACKGROUNDS } from '@/features/news/types'
+import { newsFeedStore } from '@/features/news/store/newsFeedStore'
 import type {
   NewsPostFormat,
   NewsPostMedia,
@@ -90,6 +91,12 @@ export default function NewsComposeScreen() {
   const [mood, setMood] = useState<NewsMood | null>(null)
   const [poll, setPoll] = useState<NewsPoll | null>(null)
   const [moodPickerOpen, setMoodPickerOpen] = useState(false)
+  const [articleMode, setArticleMode] = useState(false)
+  const [articleTitle, setArticleTitle] = useState('')
+  const [articleBody, setArticleBody] = useState('')
+  const [articleCoverImage, setArticleCoverImage] = useState<string | null>(null)
+  const [videoShareMode, setVideoShareMode] = useState(false)
+  const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null)
 
   const canUseBackground = media.length === 0 && !poll
   const activeBg = POST_BACKGROUNDS.find((b) => b.id === background) ?? POST_BACKGROUNDS[0]
@@ -126,6 +133,20 @@ export default function NewsComposeScreen() {
         setText(data.text || '')
         setVisibility(data.visibility || 'public')
         setCommentsEnabled(data.commentsEnabled !== false)
+
+        if (Array.isArray(data.media) && data.media.length > 0) {
+          setMedia(data.media.map((m: any) => ({
+            uri: m.url,
+            type: m.type === 'video' ? 'video' : 'image',
+            width: m.width,
+            height: m.height,
+            duration: m.duration ?? null,
+          })))
+        }
+        if (data.background && data.background !== 'none') setBackground(data.background)
+        if (data.location) setLocation(data.location)
+        if (data.mood) setMood(data.mood)
+        if (data.poll) setPoll(data.poll)
       })
       .finally(() => {
         if (!cancelled) setLoadingPost(false)
@@ -237,7 +258,27 @@ export default function NewsComposeScreen() {
           text: text.trim(),
           visibility,
           commentsEnabled,
+          background: media.length === 0 && !poll ? background : 'none',
+          location: location ?? null,
+          mood: mood ?? null,
+          poll: poll ? {
+            question: poll.question.trim(),
+            options: poll.options.filter((o) => o.text.trim()).map((o) => ({ ...o, text: o.text.trim() })),
+          } : null,
           updatedAt: serverTimestamp(),
+        })
+
+        newsFeedStore.getState().updatePost(editPostId, {
+          text: text.trim(),
+          visibility,
+          commentsEnabled,
+          background: media.length === 0 && !poll ? background : 'none',
+          location: location ?? undefined,
+          mood: mood ?? undefined,
+          poll: poll ? {
+            question: poll.question.trim(),
+            options: poll.options.filter((o) => o.text.trim()).map((o) => ({ ...o, text: o.text.trim() })),
+          } : undefined,
         })
 
         router.replace('/(tabs)/stories')
@@ -277,17 +318,30 @@ export default function NewsComposeScreen() {
         userName: profile?.nom || profile?.pseudo || user.displayName || user.email?.split('@')[0] || 'Utilisateur',
         userPhotoURL: profile?.photoURL || user.photoURL || null,
         text: text.trim(),
-        format: inferFormat(media),
+        format: articleMode ? 'article' : videoShareMode ? 'video_share' : inferFormat(media),
         media: uploaded,
         visibility,
         commentsEnabled,
-        background: media.length === 0 && !poll ? background : 'none',
+        background: media.length === 0 && !poll && !articleMode ? background : 'none',
         hashtags,
         location: location ?? null,
         mood: mood ?? null,
         poll: poll ? {
           question: poll.question.trim(),
           options: poll.options.filter((o) => o.text.trim()).map((o) => ({ ...o, text: o.text.trim() })),
+        } : null,
+        article: articleMode ? {
+          title: articleTitle.trim(),
+          excerpt: articleBody.trim().slice(0, 200),
+          body: articleBody.trim(),
+          coverImage: articleCoverImage ?? undefined,
+        } : null,
+        videoShare: videoShareMode && selectedVideoId ? {
+          sharedVideoId: selectedVideoId,
+          sharedVideoURL: '',
+          sharedThumbnailURL: undefined,
+          sharedUserName: undefined,
+          originalDescription: text.trim() || undefined,
         } : null,
         likes: 0,
         likedBy: [],
@@ -336,7 +390,7 @@ export default function NewsComposeScreen() {
             style={[styles.publishButton, !canPublish && styles.publishButtonDisabled]}
           >
             {publishing ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <OrbitLoader size={20} />
             ) : (
               <Text style={styles.publishText}>{editing ? 'Enregistrer' : 'Publier'}</Text>
             )}
@@ -397,6 +451,51 @@ export default function NewsComposeScreen() {
               autoFocus
               style={styles.input}
             />
+          )}
+
+          {/* Article Mode */}
+          {articleMode && (
+            <View style={{ paddingHorizontal: 14, paddingTop: 8, gap: 8 }}>
+              <TextInput
+                value={articleTitle}
+                onChangeText={setArticleTitle}
+                placeholder="Titre de l'article"
+                placeholderTextColor="#555"
+                maxLength={200}
+                style={{ color: '#fff', fontSize: 18, fontWeight: '700', borderBottomWidth: 0.5, borderBottomColor: '#333', paddingBottom: 8 }}
+              />
+              <TextInput
+                value={articleBody}
+                onChangeText={setArticleBody}
+                placeholder="Corps de l'article..."
+                placeholderTextColor="#555"
+                multiline
+                maxLength={5000}
+                style={{ color: '#DDD', fontSize: 15, minHeight: 150, lineHeight: 22 }}
+              />
+              <Pressable
+                onPress={() => { setArticleMode(false); setArticleTitle(''); setArticleBody(''); setArticleCoverImage(null) }}
+                style={{ alignSelf: 'flex-end', paddingVertical: 6 }}
+              >
+                <Text style={{ color: '#888', fontSize: 13 }}>Annuler l'article</Text>
+              </Pressable>
+            </View>
+          )}
+
+          {/* Video Share Mode */}
+          {videoShareMode && (
+            <View style={{ paddingHorizontal: 14, paddingTop: 8 }}>
+              <View style={{ backgroundColor: '#1A1A1A', borderRadius: 10, padding: 14, borderWidth: 1, borderColor: '#333' }}>
+                <Text style={{ color: '#888', fontSize: 13, marginBottom: 8 }}>Sélectionne une de tes vidéos à partager :</Text>
+                <Text style={{ color: '#555', fontSize: 12 }}>La sélection des vidéos arrive prochainement. Pour l'instant, tu peux écrire un texte pour ta publication.</Text>
+              </View>
+              <Pressable
+                onPress={() => { setVideoShareMode(false); setSelectedVideoId(null) }}
+                style={{ alignSelf: 'flex-end', paddingVertical: 6 }}
+              >
+                <Text style={{ color: '#888', fontSize: 13 }}>Annuler le partage</Text>
+              </Pressable>
+            </View>
           )}
 
           {canUseBackground && (
@@ -506,6 +605,26 @@ export default function NewsComposeScreen() {
                       <Ionicons name="bar-chart-outline" size={23} color="#2D9CDB" />
                     </View>
                     <Text style={styles.optionText}>Sondage</Text>
+                    <Ionicons name="chevron-forward" size={20} color="#777" />
+                  </Pressable>
+                )}
+
+                {!articleMode && (
+                  <Pressable onPress={() => setArticleMode(true)} style={styles.optionButton}>
+                    <View style={styles.optionIcon}>
+                      <Ionicons name="document-text" size={23} color="#2D9CDB" />
+                    </View>
+                    <Text style={styles.optionText}>Article long</Text>
+                    <Ionicons name="chevron-forward" size={20} color="#777" />
+                  </Pressable>
+                )}
+
+                {!videoShareMode && !articleMode && (
+                  <Pressable onPress={() => setVideoShareMode(true)} style={styles.optionButton}>
+                    <View style={styles.optionIcon}>
+                      <Ionicons name="logo-youtube" size={23} color="#EB5757" />
+                    </View>
+                    <Text style={styles.optionText}>Partager une vidéo</Text>
                     <Ionicons name="chevron-forward" size={20} color="#777" />
                   </Pressable>
                 )}

@@ -1,8 +1,9 @@
 import { createContext, ReactNode, useCallback } from 'react'
+import { type GestureResponderEvent } from 'react-native'
 import { router } from 'expo-router'
 
 interface NavigationHistoryContextType {
-  goBack: (fallback?: string) => void
+  goBack: (eventOrFallback?: GestureResponderEvent | string) => void
 }
 
 export const NavigationHistoryContext = createContext<NavigationHistoryContextType>({
@@ -10,7 +11,8 @@ export const NavigationHistoryContext = createContext<NavigationHistoryContextTy
 })
 
 export function NavigationHistoryProvider({ children }: { children: ReactNode }) {
-  const goBack = useCallback((fallback: string = '/(tabs)/feed') => {
+  const goBack = useCallback((eventOrFallback: GestureResponderEvent | string = '/(tabs)/feed') => {
+    const fallback = typeof eventOrFallback === 'string' ? eventOrFallback : '/(tabs)/feed'
     if (router.canGoBack()) {
       router.back()
     } else {

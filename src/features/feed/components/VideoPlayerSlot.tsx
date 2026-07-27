@@ -81,14 +81,26 @@ function VideoPlayerSlotComponent({ videoId, thumbnailURL, instanceId }: VideoPl
   // Fallback cross-platform (Web + natif) : onFirstFrameRender ne se déclenche
   // pas sur Web et peut manquer sur natif si la frame est rendue avant l'attache
   // du listener. On révèle dès que le player est prêt à lire.
+  //
+  // Inversement, si la source est PERDUE (status 'idle' → replaceAsync(null) lors
+  // d'un recyclage/rechargement de slot), on RE-MASQUE la vidéo derrière la
+  // vignette : sinon on verrait le noir de la VideoView sans image avant que la
+  // source se recharge. (On ignore 'loading' pour ne pas flasher pendant un
+  // simple stall de buffering, où la dernière frame reste visible.)
   useEffect(() => {
     if (!player) return
     const handler = ({ status }: { status: string }) => {
-      if (status === 'readyToPlay') revealVideo()
+      if (status === 'readyToPlay') {
+        revealVideo()
+      } else if (status === 'idle') {
+        firstFrameRef.current = false
+        setReady(false)
+        thumbOpacity.value = 1
+      }
     }
-    player.addListener('statusChange', handler)
-    return () => player.removeListener('statusChange', handler)
-  }, [player, revealVideo])
+    ;(player as any).addListener('statusChange', handler)
+    return () => (player as any).removeListener('statusChange', handler)
+  }, [player, revealVideo, thumbOpacity])
 
   // Si le player est déjà prêt au montage (préchargé par le pool), on révèle direct.
   useEffect(() => {
@@ -113,7 +125,7 @@ function VideoPlayerSlotComponent({ videoId, thumbnailURL, instanceId }: VideoPl
   const displayUri = firstFrameUri || thumbnailURL
 
   return (
-    <View style={StyleSheet.absoluteFill}>
+    <View style={[StyleSheet.absoluteFill, { backgroundColor: '#0d0d0d' }]}>
       {player ? (
         <VideoView
           key={videoId}
@@ -128,6 +140,13 @@ function VideoPlayerSlotComponent({ videoId, thumbnailURL, instanceId }: VideoPl
 
       {!ready && (
         <Animated.View style={[StyleSheet.absoluteFill, thumbAnimatedStyle]} pointerEvents="none">
+          {/* Fond dégradé TOUJOURS peint en premier : tant que la thumbnail
+              (réseau) n'est pas chargée, on voit ce dégradé et non le noir de la
+              VideoView → plus d'« écran noir » au lancement d'une vidéo. */}
+          <LinearGradient
+            colors={['#1a1a1a', '#0d0d0d']}
+            style={StyleSheet.absoluteFill}
+          />
           {displayUri ? (
             <Image
               source={{ uri: displayUri }}
@@ -135,14 +154,9 @@ function VideoPlayerSlotComponent({ videoId, thumbnailURL, instanceId }: VideoPl
               resizeMode="cover"
             />
           ) : (
-            <LinearGradient
-              colors={['#1a1a1a', '#0d0d0d']}
-              style={StyleSheet.absoluteFill}
-            >
-              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <Ionicons name="videocam-outline" size={48} color="#333" />
-              </View>
-            </LinearGradient>
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              <Ionicons name="videocam-outline" size={48} color="#333" />
+            </View>
           )}
         </Animated.View>
       )}

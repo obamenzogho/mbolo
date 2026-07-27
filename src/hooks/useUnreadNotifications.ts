@@ -13,7 +13,7 @@ export function useUnreadNotifications() {
       where('userId', '==', uid),
       where('read', '==', false),
     )
-    const unsub = onSnapshot(q, (snap) => setCount(snap.size), () => setCount(0))
+    const unsub = onSnapshot(q, (snap: any) => setCount(snap.size), () => setCount(0))
     return unsub
   }, [])
 

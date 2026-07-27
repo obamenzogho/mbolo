@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   title: {
-    color: colors.text,
+    color: colors.textPrimary,
     fontSize: 20,
     fontWeight: '700',
   },
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   hTitle: {
-    color: colors.text,
+    color: colors.textPrimary,
     fontSize: 18,
     fontWeight: '700',
   },
@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
     right: -6,
   },
   hName: {
-    color: colors.text,
+    color: colors.textPrimary,
     fontSize: 18,
     fontWeight: '700',
     marginTop: 12,

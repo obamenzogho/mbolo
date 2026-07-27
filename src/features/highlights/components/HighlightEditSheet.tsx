@@ -116,7 +116,7 @@ export default function HighlightEditSheet({ visible, onClose, onSaved, highligh
     })
   }
 
-  const uploadToCloudinary = async (uri: string): Promise<string | null> => {
+  const uploadToCloudinaryLocal = async (uri: string): Promise<string | null> => {
     try {
       const isVideo = uri.includes('.mp4') || uri.includes('.mov') || uri.includes('.mkv') || uri.includes('.avi')
       const resourceType = isVideo ? 'video' : 'image'
@@ -135,7 +135,7 @@ export default function HighlightEditSheet({ visible, onClose, onSaved, highligh
       const newUris = media.filter(u => !u.startsWith('http'))
       const uploadedUrls: string[] = [...existingUrls]
       for (const uri of newUris) {
-        const url = await uploadToCloudinary(uri)
+        const url = await uploadToCloudinaryLocal(uri)
         if (url) uploadedUrls.push(url)
         else {
           Alert.alert('Erreur', 'Impossible d\'uploader un fichier')

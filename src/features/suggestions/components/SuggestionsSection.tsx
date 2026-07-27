@@ -14,6 +14,7 @@ interface SuggestionsSectionProps {
   onDismiss?: (userId: string) => void
   onViewAll?: () => void
   compact?: boolean
+  carousel?: boolean
   error?: Error | null
 }
 
@@ -24,6 +25,7 @@ function SuggestionsSectionInner({
   onDismiss,
   onViewAll,
   compact = false,
+  carousel = false,
   error,
 }: SuggestionsSectionProps) {
   if (!loading && suggestions.length === 0 && !error) return null
@@ -61,6 +63,24 @@ function SuggestionsSectionInner({
             </View>
           ))}
         </View>
+      ) : carousel ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.carouselScroll}
+          decelerationRate="fast"
+          snapToInterval={172}
+          snapToAlignment="start"
+        >
+          {suggestions.map((s) => (
+            <SuggestedUserCard
+              key={s.id}
+              suggestion={s}
+              onDismiss={handleDismiss}
+              carousel
+            />
+          ))}
+        </ScrollView>
       ) : compact ? (
         <ScrollView
           horizontal
@@ -114,7 +134,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   title: {
-    color: colors.text,
+    color: colors.textPrimary,
     fontSize: 17,
     fontWeight: '700',
   },
@@ -130,6 +150,11 @@ const styles = StyleSheet.create({
   compactScroll: {
     paddingLeft: 16,
     paddingRight: 16,
+    paddingBottom: 8,
+  },
+  carouselScroll: {
+    paddingLeft: 16,
+    paddingRight: 4,
     paddingBottom: 8,
   },
   listContainer: {
@@ -161,11 +186,11 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.surfaceLight,
+    backgroundColor: colors.surfaceElevated,
   },
   skeletonLine: {
     height: 10,
-    backgroundColor: colors.surfaceLight,
+    backgroundColor: colors.surfaceElevated,
     borderRadius: 4,
   },
   errorContainer: {

@@ -167,7 +167,7 @@ export async function generateSuggestions(
       const candidate = candidates[i]
       const data = candidate.data()
 
-      let mutualFollowers: string[] = mutualCache.get(candidate.id)
+      let mutualFollowers: string[] | undefined = mutualCache.get(candidate.id)
       if (!mutualFollowers) {
         if (i < MAX_MUTUAL_FETCH_PER_BATCH) {
           mutualFollowers = await getMutualFollows(uid, candidate.id, following)

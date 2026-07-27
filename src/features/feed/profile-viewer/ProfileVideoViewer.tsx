@@ -37,9 +37,13 @@ export function ProfileVideoViewer({
   const { currentIndex, setCurrentIndex, skipToNext } = useProfileFeedData({ videos, initialIndex })
   const [commentVideoId, setCommentVideoId] = useState<string | null>(null)
   const [pendingActivation, setPendingActivation] = useState(false)
+  // isScrolling en STATE (pas en ref) : la fin du scroll doit re-déclencher
+  // l'effet syncPool pour lancer la lecture de la vidéo devenue visible. Avec un
+  // ref, onMomentumScrollEnd ne provoquait aucun re-render → syncPool n'était
+  // jamais rappelé avec isScrolling=false → la vidéo ne démarrait pas au scroll.
+  const [isScrolling, setIsScrolling] = useState(false)
   const flatListRef = useRef<FlatList>(null)
   const commentSheetRef = useRef<BottomSheet>(null)
-  const isScrollingRef = useRef(false)
   const { height: SCREEN_HEIGHT } = useWindowDimensions()
   const isShareModalVisible = useShareStore((s) => s.isModalVisible)
 
@@ -56,15 +60,15 @@ export function ProfileVideoViewer({
   } = useVisibleIndex({
     index: currentIndex,
     onIndexChange: (i) => setCurrentIndex(i),
-    onScrollBeginDrag: () => { isScrollingRef.current = true },
-    onMomentumScrollEnd: () => { isScrollingRef.current = false },
+    onScrollBeginDrag: () => setIsScrolling(true),
+    onMomentumScrollEnd: () => setIsScrolling(false),
   })
 
   useEffect(() => {
     if (videos.length > 0) {
-      pool.syncPool(videos, currentIndex, isScrollingRef.current)
+      pool.syncPool(videos, currentIndex, isScrolling)
     }
-  }, [currentIndex, videos, pool])
+  }, [currentIndex, videos, pool, isScrolling])
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state: string) => {

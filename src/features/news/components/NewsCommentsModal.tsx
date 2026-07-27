@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
   Image,
@@ -17,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { auth } from '@/lib/firebase'
 import { colors } from '@/lib/theme'
+import OrbitLoader from '@/components/OrbitLoader'
 import { useNewsComments } from '../hooks/useNewsComments'
 import type { NewsPost } from '../types'
 
@@ -114,10 +114,7 @@ export default function NewsCommentsModal({
             }
             ListEmptyComponent={
               loading ? (
-                <ActivityIndicator
-                  size="large"
-                  color={colors.primary}
-                />
+                <OrbitLoader size={40} />
               ) : (
                 <View style={styles.empty}>
                   <Ionicons
@@ -242,7 +239,7 @@ export default function NewsCommentsModal({
               ]}
             >
               {posting ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <OrbitLoader size={16} />
               ) : (
                 <Ionicons name="send" size={20} color="#fff" />
               )}

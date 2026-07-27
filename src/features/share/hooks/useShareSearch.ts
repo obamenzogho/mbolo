@@ -6,7 +6,7 @@ export function useShareSearch(excludeUserId?: string) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<ShareSearchResult[]>([])
   const [loading, setLoading] = useState(false)
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   const search = useCallback((q: string) => {
     setQuery(q)

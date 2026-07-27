@@ -29,7 +29,7 @@ export default function PseudoResolver() {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', gap: 12 }}>
         <Ionicons name="person-remove-outline" size={48} color={colors.textSecondary} />
-        <Text style={{ color: colors.text, fontSize: 18, fontWeight: '700' }}>Profil introuvable</Text>
+        <Text style={{ color: colors.textPrimary, fontSize: 18, fontWeight: '700' }}>Profil introuvable</Text>
         <Text style={{ color: colors.textSecondary, fontSize: 14 }}>@{pseudo} n'existe pas</Text>
       </View>
     )

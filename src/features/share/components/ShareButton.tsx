@@ -31,7 +31,7 @@ function ShareButtonComponent({ onPress, size = 28, showLabel = true, count, col
       style={{ alignItems: 'center', justifyContent: 'center' }}
     >
       <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-        <Ionicons name="paper-plane-outline" size={size} color={color} />
+        <Ionicons name="arrow-redo-outline" size={size} color={color} />
       </Animated.View>
       {showLabel && (
         <Text style={{

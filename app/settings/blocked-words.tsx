@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    backgroundColor: colors.surfaceLight,
+    backgroundColor: colors.surfaceElevated,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,

@@ -151,10 +151,11 @@ export function ConversationItem({
   )
 }
 
-function toDate(value: Timestamp | Date | null | undefined): Date | null {
+function toDate(value: any): Date | null {
   if (!value) return null
-  if (value instanceof Timestamp) return value.toDate()
-  return value
+  if (typeof value?.toDate === 'function') return value.toDate()
+  if (value instanceof Date) return value
+  return null
 }
 
 function formatRelativeTime(date: Date): string {

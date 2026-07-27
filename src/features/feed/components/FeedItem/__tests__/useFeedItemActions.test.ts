@@ -3,12 +3,13 @@ import React, { useEffect } from 'react'
 import { useFeedItemActions } from '../useFeedItemActions'
 import type { Video } from '../../../../../types'
 
+// Mock de serverTimestamp qui retourne un marqueur identifiable
 jest.mock('firebase/firestore', () => ({
-  doc: jest.fn(() => 'video-ref'),
+  doc: jest.fn((_db: any, ...segments: string[]) => segments.join('/')),
   setDoc: jest.fn(() => Promise.resolve()),
   deleteDoc: jest.fn(() => Promise.resolve()),
-  updateDoc: jest.fn(() => Promise.resolve()),
   getDoc: jest.fn(() => Promise.resolve({ exists: () => false })),
+  serverTimestamp: jest.fn(() => ({ __serverTimestamp: true })),
   increment: jest.fn((n: number) => ({ __increment: n })),
   arrayUnion: jest.fn((v: string) => ({ __arrayUnion: v })),
   arrayRemove: jest.fn((v: string) => ({ __arrayRemove: v })),
@@ -27,11 +28,10 @@ jest.mock('../../../../../lib/sentry', () => ({
   captureException: jest.fn(),
 }))
 
-import { updateDoc, setDoc, deleteDoc } from 'firebase/firestore'
+import { setDoc, deleteDoc } from 'firebase/firestore'
 import { createNotification } from '../../../../../lib/notifications'
 import { captureException } from '../../../../../lib/sentry'
 
-const mockUpdateDoc = updateDoc as jest.Mock
 const mockSetDoc = setDoc as jest.Mock
 const mockDeleteDoc = deleteDoc as jest.Mock
 const mockCreateNotification = createNotification as jest.Mock
@@ -87,12 +87,9 @@ describe('useFeedItemActions', () => {
     expect(ref.current!.liked).toBe(true)
     expect(ref.current!.likeCount).toBe(11)
     expect(mockSetDoc).toHaveBeenCalledWith(
-      'video-ref',
-      { createdAt: expect.any(Number) },
+      'videos/vid1/likes/me',
+      { userId: 'me', createdAt: { __serverTimestamp: true } },
     )
-    expect(mockUpdateDoc).toHaveBeenCalledWith('video-ref', {
-      likes: { __increment: 1 },
-    })
     expect(mockCreateNotification).toHaveBeenCalledWith({
       userId: 'author',
       type: 'like',
@@ -111,10 +108,7 @@ describe('useFeedItemActions', () => {
 
     expect(ref.current!.liked).toBe(false)
     expect(ref.current!.likeCount).toBe(9)
-    expect(mockDeleteDoc).toHaveBeenCalledWith('video-ref')
-    expect(mockUpdateDoc).toHaveBeenCalledWith('video-ref', {
-      likes: { __increment: -1 },
-    })
+    expect(mockDeleteDoc).toHaveBeenCalledWith('videos/vid1/likes/me')
     expect(mockCreateNotification).not.toHaveBeenCalled()
   })
 
@@ -127,7 +121,7 @@ describe('useFeedItemActions', () => {
 
     expect(ref.current!.likeCount).toBe(10)
     expect(mockSetDoc).not.toHaveBeenCalled()
-    expect(mockUpdateDoc).not.toHaveBeenCalled()
+    expect(mockDeleteDoc).not.toHaveBeenCalled()
   })
 
   it('rollback du like si Firestore échoue', async () => {
@@ -156,12 +150,9 @@ describe('useFeedItemActions', () => {
     expect(ref.current!.saved).toBe(true)
     expect(ref.current!.saveCount).toBe(5)
     expect(mockSetDoc).toHaveBeenCalledWith(
-      'video-ref',
-      { createdAt: expect.any(Number) },
+      'videos/vid1/saves/me',
+      { userId: 'me', createdAt: { __serverTimestamp: true } },
     )
-    expect(mockUpdateDoc).toHaveBeenCalledWith('video-ref', {
-      saves: { __increment: 1 },
-    })
   })
 
   it('rollback du save si Firestore échoue', async () => {
@@ -188,6 +179,6 @@ describe('useFeedItemActions', () => {
     })
 
     expect(ref.current!.likeCount).toBe(0)
-    expect(mockDeleteDoc).toHaveBeenCalledWith('video-ref')
+    expect(mockDeleteDoc).toHaveBeenCalledWith('videos/vid1/likes/me')
   })
 })

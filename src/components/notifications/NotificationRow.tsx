@@ -98,7 +98,7 @@ export const NotificationRow = memo(function NotificationRow({
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 4 },
-  unread: { backgroundColor: colors.surfaceLight, borderRadius: 12, paddingHorizontal: 10 },
+  unread: { backgroundColor: colors.surfaceElevated, borderRadius: 12, paddingHorizontal: 10 },
   avatarWrap: { position: 'relative' },
   avatar: { width: 46, height: 46, borderRadius: 23 },
   avatarPlaceholder: { backgroundColor: '#2a2a2a', alignItems: 'center', justifyContent: 'center' },

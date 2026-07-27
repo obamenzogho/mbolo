@@ -8,7 +8,6 @@ import {
   ScrollView,
   Modal,
   Alert,
-  ActivityIndicator,
   StyleSheet,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -17,10 +16,14 @@ import { Ionicons } from '@expo/vector-icons'
 import { doc, onSnapshot } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
 import { colors } from '@/lib/theme'
-import { useNewsFeed } from '@/features/news/hooks/useNewsFeed'
+import { newsFeedStore, useNewsFeedStore } from '@/features/news/store/newsFeedStore'
+import { useNewsFeedData } from '@/features/news/hooks/useNewsFeedData'
 import { PostCard } from '@/features/news/components/PostCard'
 import NewsCommentsModal from '@/features/news/components/NewsCommentsModal'
+import { deletePost } from '@/features/news/services/postMutations'
+import { newsFeedSource } from '@/features/news/services/newsFeedSource'
 import { ContentActionsSheet } from '@/components/ContentActionsSheet'
+import OrbitLoader from '@/components/OrbitLoader'
 import { useStoriesFeed } from '@/features/stories/hooks/useStoriesFeed'
 import StoryViewer from '@/features/stories/components/StoryViewer'
 import { StoryCard, CreateStoryCard } from '@/features/stories/components/StoryCard'
@@ -32,10 +35,12 @@ export default function ActusScreen() {
   const uid = auth.currentUser?.uid ?? ''
   const { markAsViewed } = useStories()
 
-  const {
-    posts, loading, refreshing, loadingMore, hasMore,
-    refresh, loadMore, toggleLike, toggleSave, registerShare, deletePost, removePostsFromUser,
-  } = useNewsFeed()
+  const feedData = useNewsFeedData({ store: newsFeedStore })
+  const posts = useNewsFeedStore((s) => s.posts)
+  const loading = useNewsFeedStore((s) => s.loading)
+  const refreshing = useNewsFeedStore((s) => s.refreshing)
+  const loadingMore = useNewsFeedStore((s) => s.loadingMore)
+  const hasMore = useNewsFeedStore((s) => s.hasMore)
 
   const [followingIds, setFollowingIds] = useState<string[]>([])
   const [userPhotoURL, setUserPhotoURL] = useState<string | null>(null)
@@ -132,16 +137,20 @@ export default function ActusScreen() {
           <PostCard
             post={item}
             currentUserId={uid}
-            onLike={toggleLike}
-            onSave={toggleSave}
-            onShare={registerShare}
             onComment={setCommentPost}
             onPress={(post) => router.push({ pathname: '/post-detail', params: { postId: post.id } })}
             onEdit={(post) => router.push({ pathname: '/news-compose', params: { editPostId: post.id } })}
             onDelete={(post) => {
               Alert.alert('Supprimer ?', 'Cette action est définitive.', [
                 { text: 'Annuler', style: 'cancel' },
-                { text: 'Supprimer', style: 'destructive', onPress: () => deletePost(post.id) },
+                {
+                  text: 'Supprimer',
+                  style: 'destructive',
+                  onPress: async () => {
+                    newsFeedStore.getState().removePost(post.id)
+                    await deletePost(post.id, uid)
+                  },
+                },
               ])
             }}
             onMore={setActionsPost}
@@ -149,8 +158,8 @@ export default function ActusScreen() {
         )}
         ListHeaderComponent={header}
         refreshing={refreshing}
-        onRefresh={refresh}
-        onEndReached={hasMore ? loadMore : undefined}
+        onRefresh={feedData.refresh}
+        onEndReached={hasMore ? feedData.loadMore : undefined}
         onEndReachedThreshold={0.5}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
@@ -171,7 +180,7 @@ export default function ActusScreen() {
             </View>
           )
         }
-        ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} /> : null}
+        ListFooterComponent={loadingMore ? <View style={{ alignItems: 'center', marginVertical: 20 }}><OrbitLoader size={28} /></View> : null}
       />
 
       {commentPost && (
@@ -186,7 +195,14 @@ export default function ActusScreen() {
           contentOwnerId={actionsPost.userId}
           contentOwnerName={actionsPost.userName}
           onClose={() => setActionsPost(null)}
-          onBlocked={() => { removePostsFromUser(actionsPost.userId); setActionsPost(null) }}
+          onBlocked={() => {
+            const blockedUserId = actionsPost.userId
+            setActionsPost(null)
+            newsFeedStore.getState().setPosts(
+              newsFeedStore.getState().posts.filter((p) => p.userId !== blockedUserId),
+            )
+            newsFeedSource.reset()
+          }}
         />
       )}
 

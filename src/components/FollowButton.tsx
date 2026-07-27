@@ -1,5 +1,6 @@
 import { useRef, useCallback } from 'react'
 import { View, TouchableOpacity, Text, StyleSheet, Animated } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { useFollow } from '../hooks/useFollow'
 import OrbitLoader from './OrbitLoader'
@@ -38,7 +39,8 @@ export default function FollowButton({ targetUserId, size = 'md', style, initial
     )
   }
 
-  const isActive = isFollowing || isRequested
+  const iconName = isFollowing ? 'checkmark' : isRequested ? 'person-add' : 'add'
+  const iconSize = size === 'sm' ? 13 : 15
 
   return (
     <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
@@ -52,7 +54,12 @@ export default function FollowButton({ targetUserId, size = 'md', style, initial
         ]}
         onPress={handlePress}
       >
-        <Text style={[styles.label, isActive && styles.activeLabel]}>
+        <Ionicons
+          name={iconName}
+          size={iconSize}
+          color={isFollowing ? colors.textSecondary : '#000'}
+        />
+        <Text style={[styles.label, isFollowing && styles.followingLabel]}>
           {isFollowing ? t.follow.following : isRequested ? t.follow.requested : t.follow.follow}
         </Text>
       </TouchableOpacity>
@@ -61,12 +68,17 @@ export default function FollowButton({ targetUserId, size = 'md', style, initial
 }
 
 const styles = StyleSheet.create({
-  button: { borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
+  button: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    borderRadius: 14,
+  },
   sm: { height: 27, paddingHorizontal: 10 },
   md: { height: 32, paddingHorizontal: 14 },
-  notFollowing: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.primary },
-  requested: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.border },
-  following: { backgroundColor: colors.surfaceLight, borderWidth: 1, borderColor: colors.border },
-  label: { color: colors.white, fontWeight: '700', fontSize: 12 },
-  activeLabel: { color: colors.textSecondary },
+  notFollowing: { backgroundColor: colors.accent, borderWidth: 1, borderColor: colors.border },
+  requested: { backgroundColor: colors.accent, borderWidth: 1, borderColor: colors.border },
+  following: { backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.border },
+  label: { color: '#000', fontWeight: '700', fontSize: 12 },
+  followingLabel: { color: colors.textSecondary },
 })

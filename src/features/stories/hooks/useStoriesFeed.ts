@@ -1,8 +1,35 @@
 import { useState, useEffect, useMemo } from 'react'
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore'
+import { collection, query, where, onSnapshot, orderBy, getDoc, doc } from 'firebase/firestore'
 import { db, auth } from '../../../lib/firebase'
 import { captureException } from '../../../lib/sentry'
 import type { Story } from '../../../hooks/useStories'
+
+// Cache pour les settings de privacy des auteurs ( évite les lectures répétées ).
+const privacyCache = new Map<string, { storyAudience: string; storyExcludedUsers: string[] }>()
+
+async function getPrivacy(uid: string): Promise<{ storyAudience: string; storyExcludedUsers: string[] }> {
+  const cached = privacyCache.get(uid)
+  if (cached) return cached
+  try {
+    // La sous-collection settings est owner-only dans les rules. On ne peut PAS
+    // la lire depuis un autre appareil. Donc on se base sur le doc user public :
+    // le champ `privateAccount` indique si le compte est privé (= abonnés uniquement).
+    // Pour le filtrage granulaire (exclusion), il faudrait un Cloud Function qui
+    // dénormalise les settings sur le doc user ou sur les stories. Pour l'instant,
+    // on utilise `privateAccount` comme proxy pour `storyAudience`.
+    const snap = await getDoc(doc(db, 'users', uid))
+    if (snap.exists()) {
+      const data = snap.data() as any
+      const result = {
+        storyAudience: data.privateAccount ? 'followers' : 'everyone',
+        storyExcludedUsers: data.storyExcludedUsers || [],
+      }
+      privacyCache.set(uid, result)
+      return result
+    }
+  } catch { /* ignore */ }
+  return { storyAudience: 'everyone', storyExcludedUsers: [] }
+}
 
 export interface StoryGroup {
   userId: string
@@ -31,6 +58,7 @@ export function useStoriesFeed(followingIds: string[]) {
   const uid = auth.currentUser?.uid ?? ''
   const [rawStories, setRawStories] = useState<Record<string, Story[]>>({})
   const [loading, setLoading] = useState(true)
+  const [privacyMap, setPrivacyMap] = useState<Map<string, { storyAudience: string; storyExcludedUsers: string[] }>>(new Map())
 
   const targetIds = useMemo(() => {
     const set = new Set<string>([uid, ...followingIds].filter(Boolean))
@@ -62,7 +90,7 @@ export function useStoriesFeed(followingIds: string[]) {
               : data.expiresAt?.seconds
                 ? data.expiresAt.seconds * 1000
                 : new Date(data.expiresAt).getTime()
-            if (expMs > Date.now()) {
+            if (expMs > Date.now() && data.moderationStatus !== 'hidden') {
               list.push({ id: d.id, ...data } as Story)
             }
           })
@@ -86,11 +114,35 @@ export function useStoriesFeed(followingIds: string[]) {
     return () => unsubs.forEach((u) => u())
   }, [targetIds])
 
+  // Fetch privacy settings for all story authors
+  useEffect(() => {
+    const userIds = Object.keys(rawStories).filter(id => id !== uid)
+    if (userIds.length === 0) return
+
+    let cancelled = false
+    Promise.allSettled(userIds.map(id => getPrivacy(id))).then(results => {
+      if (cancelled) return
+      const map = new Map(privacyMap)
+      results.forEach((r, i) => {
+        if (r.status === 'fulfilled') map.set(userIds[i], r.value)
+      })
+      setPrivacyMap(map)
+    })
+    return () => { cancelled = true }
+  }, [Object.keys(rawStories).join(','), uid])
+
   const groups = useMemo<StoryGroup[]>(() => {
     const out: StoryGroup[] = []
 
     for (const [userId, stories] of Object.entries(rawStories)) {
       if (!stories.length) continue
+
+      // Privacy filtering: check if this author's stories should be visible
+      if (userId !== uid) {
+        const settings = privacyMap.get(userId)
+        if (settings?.storyAudience === 'nobody') continue
+        if (settings?.storyExcludedUsers?.includes(uid)) continue
+      }
 
       const ordered = [...stories].sort(
         (a, b) => dateMs(a.createdAt) - dateMs(b.createdAt),
@@ -117,7 +169,7 @@ export function useStoriesFeed(followingIds: string[]) {
       if (a.hasUnseen !== b.hasUnseen) return a.hasUnseen ? -1 : 1
       return b.latestAt - a.latestAt
     })
-  }, [rawStories, uid])
+  }, [rawStories, uid, privacyMap])
 
   return { groups, loading }
 }

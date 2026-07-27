@@ -77,7 +77,7 @@ function CreateModalComponent({ onClose }: CreateModalProps) {
       >
         <Text
           style={{
-            color: colors.text,
+            color: colors.textPrimary,
             fontSize: 21,
             fontWeight: '700',
             marginBottom: 18,

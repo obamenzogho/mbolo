@@ -1,9 +1,11 @@
 import { useStartupStore } from '../store/startupStore'
 import { restoreSession } from './sessionService'
-import { hydrateCache } from './cacheHydrationService'
-import { preloadFeed, preloadNotifications, warmFirestoreConnections } from './preloadService'
+import { hydrateCache, cacheFeed } from './cacheHydrationService'
+import { preloadNotifications, warmFirestoreConnections } from './preloadService'
 import { preloadFirstVideos } from './videoPreloadService'
 import { markStartupPhase, reportStartupComplete, reportStartupError } from './startupAnalytics'
+import { primeForYouFeed } from '@/features/feed/services/forYouFeedSource'
+import { forYouFeedStore } from '@/features/feed/store/feedStore'
 import type { Video } from '@/types'
 
 interface StartupResult {
@@ -46,16 +48,33 @@ export async function runStartup(): Promise<StartupResult> {
     store().setPhase('preloading')
     markStartupPhase('preloading')
 
-    const [freshFeed] = await Promise.all([
-      preloadFeed(),
+    // Amorce la 1re page du feed « Pour toi » via la MÊME source (donc le même
+    // classement) que useFeedData, et seed directement le feedStore : le feed
+    // s'affiche déjà rempli (pas de loader) et la 1re vidéo est exactement celle
+    // classée en tête (alignement startup ↔ feed garanti).
+    const [feedPage] = await Promise.all([
+      primeForYouFeed(),
       preloadNotifications(),
       warmFirestoreConnections(),
     ])
-    result.freshFeed = freshFeed
 
-    const feedToPreload = freshFeed.length > 0 ? freshFeed : cachedFeed
-    if (feedToPreload.length > 0) {
-      preloadFirstVideos(feedToPreload)
+    const rankedFeed = feedPage?.videos ?? []
+    result.freshFeed = rankedFeed
+
+    if (rankedFeed.length > 0) {
+      forYouFeedStore.getState().setVideos(rankedFeed)
+      forYouFeedStore.getState().setHasMore(feedPage!.hasMore)
+      cacheFeed(rankedFeed)
+      // Précharge la miniature de la 1re vidéo classée (source du 1er rendu).
+      preloadFirstVideos(rankedFeed).then((thumb) => {
+        if (thumb) store().setFirstThumbnailURL(thumb)
+      })
+    } else if (cachedFeed.length > 0) {
+      // Pas de réseau : on retombe sur le cache disque pour un affichage immédiat.
+      forYouFeedStore.getState().setVideos(cachedFeed)
+      preloadFirstVideos(cachedFeed).then((thumb) => {
+        if (thumb) store().setFirstThumbnailURL(thumb)
+      })
     }
 
     store().setPhase('ready')

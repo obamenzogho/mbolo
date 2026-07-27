@@ -89,7 +89,7 @@ export async function getSharesForVideo(
         limit(max),
       ),
     )
-    return snap.docs.map((d) => {
+    return snap.docs.map((d: any) => {
       const data = d.data()
       return {
         id: d.id,
@@ -124,11 +124,11 @@ export async function searchUsers(
       ),
     )
     return snap.docs
-      .map((d) => {
+      .map((d: any) => {
         const data = d.data()
         return { id: d.id, pseudo: data.pseudo, nom: data.nom, photoURL: data.photoURL }
       })
-      .filter((u) => u.id !== excludeUserId)
+      .filter((u: any) => u.id !== excludeUserId)
   } catch (e) {
     captureException(e instanceof Error ? e : new Error(String(e)), { context: 'searchUsers' })
     return []

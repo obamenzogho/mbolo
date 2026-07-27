@@ -8,7 +8,7 @@ import { BackButton } from '../src/components/ui/BackButton'
 
 const StatCard = ({ label, value }: { label: string; value: number }) => (
   <View style={{ flex: 1, backgroundColor: colors.surface, borderRadius: 12, padding: 16, alignItems: 'center' }}>
-    <Text style={{ color: colors.text, fontSize: 22, fontWeight: '700' }}>
+    <Text style={{ color: colors.textPrimary, fontSize: 22, fontWeight: '700' }}>
       {value >= 1000 ? (value / 1000).toFixed(1) + 'K' : value}
     </Text>
     <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 4 }}>{label}</Text>
@@ -31,7 +31,7 @@ export default function Insights() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 }}>
         <BackButton />
-        <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700' }}>Statistiques</Text>
+        <Text style={{ color: colors.textPrimary, fontSize: 20, fontWeight: '700' }}>Statistiques</Text>
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
@@ -44,15 +44,15 @@ export default function Insights() {
           <StatCard label="Partages" value={insights.totalShares} />
         </View>
 
-        <Text style={{ color: colors.text, fontSize: 16, fontWeight: '700', marginTop: 16 }}>
+        <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700', marginTop: 16 }}>
           Tes vidéos les plus vues
         </Text>
         {insights.topVideos.map((v, i) => (
           <View key={v.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface, borderRadius: 12, padding: 10 }}>
             <Text style={{ color: colors.textSecondary, fontWeight: '700', width: 20 }}>{i + 1}</Text>
-            <Image source={{ uri: v.thumbnailURL }} style={{ width: 44, height: 60, borderRadius: 6, backgroundColor: colors.surfaceLight }} />
+            <Image source={{ uri: v.thumbnailURL }} style={{ width: 44, height: 60, borderRadius: 6, backgroundColor: colors.surfaceElevated }} />
             <View>
-              <Text style={{ color: colors.text }}>{v.views.toLocaleString()} vues</Text>
+              <Text style={{ color: colors.textPrimary }}>{v.views.toLocaleString()} vues</Text>
               <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{v.likes.toLocaleString()} j'aime</Text>
             </View>
           </View>

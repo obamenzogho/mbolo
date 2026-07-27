@@ -31,7 +31,7 @@ export function useCreatorInsights(uid: string) {
 
     const unsub = onSnapshot(
       doc(db, 'users', uid),
-      async (snap) => {
+      async (snap: any) => {
         if (!snap.exists()) { setLoading(false); return }
         const d = snap.data()
 
@@ -43,7 +43,7 @@ export function useCreatorInsights(uid: string) {
             orderBy('views', 'desc'),
             limit(5),
           ))
-          topVideos = vidsSnap.docs.map((v) => {
+          topVideos = vidsSnap.docs.map((v: any) => {
             const vd = v.data()
             return {
               id: v.id,
@@ -67,7 +67,7 @@ export function useCreatorInsights(uid: string) {
         })
         setLoading(false)
       },
-      (error) => {
+      (error: any) => {
         captureException(error, { context: 'useCreatorInsights onSnapshot' })
         setLoading(false)
       },

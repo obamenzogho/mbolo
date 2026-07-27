@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   View, Text, TouchableOpacity, Image, TextInput,
-  Alert, Dimensions, Modal,
+  Alert, Dimensions, Modal, ScrollView,
   KeyboardAvoidingView, Platform,
 } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { Video as AVVideo } from 'expo-av'
@@ -14,6 +15,7 @@ import OrbitLoader from '../../src/components/OrbitLoader'
 import { BackButton } from '../../src/components/ui/BackButton'
 import { colors } from '../../src/lib/theme'
 import { useStories } from '../../src/hooks/useStories'
+import { STORY_BACKGROUNDS } from '../../src/features/stories/constants'
 import HighlightPickerModal from '../../src/components/HighlightPickerModal'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
@@ -33,8 +35,11 @@ export default function StoryUploadScreen() {
   const [textPosition, setTextPosition] = useState({ x: SCREEN_WIDTH / 2 - 100, y: SCREEN_HEIGHT / 2 - 20 })
   const [highlightPickerVisible, setHighlightPickerVisible] = useState(false)
   const [storyId, setStoryId] = useState<string | null>(null)
+  const [storyMode, setStoryMode] = useState<'media' | 'text'>('media')
+  const [textStoryContent, setTextStoryContent] = useState('')
+  const [selectedBg, setSelectedBg] = useState(STORY_BACKGROUNDS[0])
 
-  const { uploadStory } = useStories()
+  const { uploadStory, uploadTextStory } = useStories()
 
   useEffect(() => {
     if (mediaUri) setStep('edit')
@@ -95,6 +100,22 @@ export default function StoryUploadScreen() {
     }
   }
 
+  const publishTextStory = async () => {
+    if (!user || !textStoryContent.trim()) return
+    setStep('uploading')
+    try {
+      const id = await uploadTextStory(textStoryContent.trim(), selectedBg.id, selectedBg.colors)
+      setStoryId(id)
+      Alert.alert('Succès', 'Votre story a été publiée', [
+        { text: 'OK', onPress: () => router.back() },
+      ])
+    } catch (e) {
+      console.error(e)
+      Alert.alert('Erreur', 'Impossible de publier la story')
+      setStep('select')
+    }
+  }
+
   // STEP 1: SELECT
   if (step === 'select') {
     return (
@@ -105,28 +126,108 @@ export default function StoryUploadScreen() {
           Nouvelle story
         </Text>
 
-        <View style={{ flexDirection: 'row', gap: 24 }}>
+        <View style={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 20 }}>
           <TouchableOpacity
             onPress={openCamera}
-            style={{ width: 140, height: 140, borderRadius: 20, backgroundColor: '#1a1a1a', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#333' }}
+            style={{ width: 120, height: 120, borderRadius: 20, backgroundColor: '#1a1a1a', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#333' }}
           >
-            <Ionicons name="camera" size={48} color={colors.primary} />
-            <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600', marginTop: 12 }}>Caméra</Text>
+            <Ionicons name="camera" size={40} color={colors.primary} />
+            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600', marginTop: 10 }}>Caméra</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={pickFromGallery}
-            style={{ width: 140, height: 140, borderRadius: 20, backgroundColor: '#1a1a1a', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#333' }}
+            style={{ width: 120, height: 120, borderRadius: 20, backgroundColor: '#1a1a1a', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#333' }}
           >
-            <Ionicons name="images" size={48} color={colors.primary} />
-            <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600', marginTop: 12 }}>Galerie</Text>
+            <Ionicons name="images" size={40} color={colors.primary} />
+            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600', marginTop: 10 }}>Galerie</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => { setStoryMode('text'); setStep('edit') }}
+            style={{ width: 120, height: 120, borderRadius: 20, backgroundColor: '#1a1a1a', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#333' }}
+          >
+            <Ionicons name="text" size={40} color={colors.primary} />
+            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600', marginTop: 10 }}>Texte</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
     )
   }
 
-  // STEP 2: EDIT
+  // STEP 2: TEXT EDIT
+  if (step === 'edit' && storyMode === 'text') {
+    return (
+      <View style={{ flex: 1 }}>
+        <LinearGradient
+          colors={selectedBg.colors as [string, string]}
+          style={{ flex: 1 }}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <SafeAreaView style={{ flex: 1 }}>
+            {/* TOP BAR */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 }}>
+              <BackButton style={{ padding: 8 }} />
+              <View />
+            </View>
+
+            {/* TEXT INPUT */}
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 }}>
+              <TextInput
+                value={textStoryContent}
+                onChangeText={setTextStoryContent}
+                placeholder="Écris ton message..."
+                placeholderTextColor="rgba(255,255,255,0.4)"
+                maxLength={300}
+                multiline
+                textAlign="center"
+                style={{ color: '#fff', fontSize: 28, fontWeight: '700', width: '100%', minHeight: 120 }}
+              />
+            </View>
+
+            {/* BACKGROUND PICKER */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 12, gap: 10 }}
+            >
+              {STORY_BACKGROUNDS.map((bg) => (
+                <TouchableOpacity
+                  key={bg.id}
+                  onPress={() => setSelectedBg(bg)}
+                  style={{
+                    width: 44, height: 44, borderRadius: 22,
+                    borderWidth: selectedBg.id === bg.id ? 3 : 0,
+                    borderColor: '#fff',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <LinearGradient colors={bg.colors as [string, string]} style={{ flex: 1 }} />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            {/* PUBLISH BUTTON */}
+            <View style={{ padding: 20, paddingBottom: 40 }}>
+              <TouchableOpacity
+                onPress={publishTextStory}
+                disabled={!textStoryContent.trim()}
+                style={{
+                  backgroundColor: textStoryContent.trim() ? colors.primary : '#333',
+                  borderRadius: 25, paddingVertical: 14, alignItems: 'center',
+                }}
+              >
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>Publier</Text>
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
+        </LinearGradient>
+      </View>
+    )
+  }
+
+  // STEP 2: MEDIA EDIT
   if (step === 'edit' && mediaUri) {
     return (
       <View style={{ flex: 1, backgroundColor: '#000' }}>

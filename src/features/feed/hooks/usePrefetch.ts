@@ -46,6 +46,9 @@ export function usePrefetch(videos: Video[], customIndex: number = 0, isActive: 
   const currentIndex = customIndex
   const lastIndexRef = useRef(currentIndex)
   const scrollSpeedRef = useRef(0)
+  // Sens du scroll : +1 vers le bas (défaut), -1 vers le haut. Sert à préfetcher
+  // dans la direction où l'utilisateur va réellement, façon TikTok/IG.
+  const directionRef = useRef<1 | -1>(1)
 
   useEffect(() => {
     const now = Date.now()
@@ -56,6 +59,8 @@ export function usePrefetch(videos: Video[], customIndex: number = 0, isActive: 
       const instantSpeed = delta / (elapsed / 1000)
       scrollSpeedRef.current = scrollSpeedRef.current * 0.7 + instantSpeed * 0.3
     }
+    if (currentIndex > lastIndexRef.current) directionRef.current = 1
+    else if (currentIndex < lastIndexRef.current) directionRef.current = -1
 
     lastIndexRef.current = currentIndex
   }, [currentIndex])
@@ -67,15 +72,22 @@ export function usePrefetch(videos: Video[], customIndex: number = 0, isActive: 
     if (videos.length === 0) return
 
     const isFastScrolling = scrollSpeedRef.current > SCROLL_SPEED_THRESHOLD
+    const dir = directionRef.current
 
-    const priorities: [number, 1 | 2 | 3][] = [
-      [1, 3],
-      [2, 2],
-      [3, 1],
-      [4, 1],
-      [5, 1],
-      [6, 1],
-    ]
+    // Profondeur de préchargement adaptée au réseau (façon TikTok : on charge
+    // loin quand le débit le permet, on se restreint aux 2 prochaines en réseau
+    // lent pour ne pas saturer la bande passante du CURRENT).
+    const depth = networkQuality === 'FAST' ? 6 : networkQuality === 'MEDIUM' ? 4 : 2
+
+    // Fenêtre orientée : d'abord dans le sens du scroll (priorités hautes),
+    // puis 1 cran dans le sens opposé (retour arrière fluide).
+    const priorities: [number, 1 | 2 | 3][] = []
+    for (let i = 1; i <= depth; i++) {
+      const priority: 1 | 2 | 3 = i === 1 ? 3 : i === 2 ? 2 : 1
+      priorities.push([dir * i, priority])
+    }
+    // Un cran dans le sens inverse (léger), pour un demi-tour immédiat.
+    priorities.push([-dir, 1])
 
     for (const [offset, priority] of priorities) {
       if (isFastScrolling && priority < 3) continue
@@ -87,7 +99,7 @@ export function usePrefetch(videos: Video[], customIndex: number = 0, isActive: 
           const uri = resolveVideoUrl(video)
           PrefetchQueue.enqueue(video.id, uri, priority)
           prefetchedCache.add(video.id)
-          if (FEED_DEBUG) console.log('[FEED_DEBUG] PREFETCH: enqueue', video.id, 'priority:', priority)
+          if (FEED_DEBUG) console.log('[FEED_DEBUG] PREFETCH: enqueue', video.id, 'priority:', priority, 'dir:', dir)
 
           if (priority === 3) {
             extractAndCacheFirstFrame(video)
@@ -96,10 +108,13 @@ export function usePrefetch(videos: Video[], customIndex: number = 0, isActive: 
       }
     }
 
-    const cancelMin = Math.max(0, currentIndex - 3)
+    // Nettoyage : on annule tout ce qui sort de la fenêtre utile [−3, +depth+1]
+    // autour du CURRENT, quel que soit le sens.
+    const cancelMin = Math.max(0, currentIndex - Math.max(3, depth))
+    const cancelMax = currentIndex + depth + 1
     for (const videoId of prefetchedCache) {
       const idx = videos.findIndex((v) => v.id === videoId)
-      if (idx === -1 || idx < cancelMin || idx > currentIndex + 6) {
+      if (idx === -1 || idx < cancelMin || idx > cancelMax) {
         PrefetchQueue.cancel(videoId)
         prefetchedCache.delete(videoId)
         if (FEED_DEBUG) console.log('[FEED_DEBUG] PREFETCH: cancel', videoId)

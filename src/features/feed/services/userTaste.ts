@@ -17,7 +17,7 @@ export async function buildUserTaste(): Promise<UserTaste> {
     const likedHashtags: Record<string, number> = {}
     const likedCreators: Record<string, number> = {}
 
-    await Promise.all(snap.docs.map(async (d) => {
+    await Promise.all(snap.docs.map(async (d: any) => {
       const data = d.data()
       let hashtags: string[] = data.hashtags ?? []
       let creatorId: string | undefined = data.creatorId

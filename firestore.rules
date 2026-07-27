@@ -19,6 +19,29 @@ service cloud.firestore {
           !request.resource.data[field].hasAny([request.auth.uid]) );
     }
 
+    // ===== Audience (qui peut interagir avec un utilisateur) =====
+    // Lit le réglage `whoCanXxx` du destinataire dans sa sous-collection privée
+    // settings/preferences. Retourne 'everyone' par défaut si le doc n'existe pas
+    // encore (rétro-compatibilité).
+    function audiencePref(uid, field) {
+      return get(/databases/$(database)/documents/users/$(uid)/settings/preferences).data[field] || 'everyone';
+    }
+    function audienceAllows(targetUid, callerUid, audience) {
+      return audience == 'everyone' || (audience == 'followers' && get(/databases/$(database)/documents/users/$(targetUid)).data.followers.hasAny([callerUid]));
+    }
+    function canInteract(targetUid, prefField) {
+      return audienceAllows(targetUid, request.auth.uid, audiencePref(targetUid, prefField));
+    }
+
+    function videoAuthor(vid) {
+      return get(/databases/$(database)/documents/videos/$(vid)).data.userId;
+    }
+
+    function otherParticipant(convId) {
+      let conv = get(/databases/$(database)/documents/conversations/$(convId)).data;
+      return conv.participants[0] == request.auth.uid ? conv.participants[1] : conv.participants[0];
+    }
+
     match /users/{userId} {
       // ⚠️ read public conservé pour u/[pseudo] + deep links.
       // NE STOCKE JAMAIS email/tel/données privées dans ce doc.
@@ -50,6 +73,14 @@ service cloud.firestore {
         (changedKeys().hasOnly(['blockedBy','followers','following']) && togglesSelfOnly('blockedBy'))
       );
       allow delete: if isOwner(userId);
+
+      // ✅ Réglages privés (paramètres & confidentialité). Contrairement au doc
+      // user (lecture publique), cette sous-collection est STRICTEMENT réservée
+      // au propriétaire — c'est ici que vivent les préférences privées, jamais
+      // dans le doc user. Synchronisé entre appareils via onSnapshot.
+      match /settings/{docId} {
+        allow read, write: if isOwner(userId);
+      }
     }
 
     // Le mapping username appartient à l'appelant (uid)
@@ -93,12 +124,14 @@ service cloud.firestore {
       }
       match /comments/{commentId} {
         allow read: if isSignedIn();
-        // auteur = appelant, texte borné
+        // auteur = appelant, texte borné, et respect du réglage whoCanComment
+        // de l'auteur de la vidéo (le destinataire du commentaire).
         allow create: if isSignedIn()
           && request.resource.data.userId == request.auth.uid
           && request.resource.data.text is string
           && request.resource.data.text.size() > 0
-          && request.resource.data.text.size() <= 2000;
+          && request.resource.data.text.size() <= 2000
+          && canInteract(videoAuthor(videoId), 'whoCanComment');
         allow update: if isSignedIn() && (
           request.auth.uid == resource.data.userId ||
           ( changedKeys().hasOnly(['likes','likedBy','dislikes','dislikedBy','replyCount'])
@@ -110,11 +143,14 @@ service cloud.firestore {
 
         match /replies/{replyId} {
           allow read: if isSignedIn();
+          // Une réponse commente aussi un contenu : soumise au whoCanComment
+          // de l'auteur de la vidéo parente.
           allow create: if isSignedIn()
             && request.resource.data.userId == request.auth.uid
             && request.resource.data.text is string
             && request.resource.data.text.size() > 0
-            && request.resource.data.text.size() <= 2000;
+            && request.resource.data.text.size() <= 2000
+            && canInteract(videoAuthor(videoId), 'whoCanComment');
           allow update: if isSignedIn() && (
             request.auth.uid == resource.data.userId ||
             ( changedKeys().hasOnly(['likes','likedBy','dislikes','dislikedBy'])
@@ -150,7 +186,10 @@ service cloud.firestore {
       match /messages/{messageId} {
         allow read: if isSignedIn()
           && get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants.hasAny([request.auth.uid]);
-        allow create: if isSignedIn() && request.resource.data.senderId == request.auth.uid;
+        // whoCanMessage : évalue les préférences du destinataire.
+        allow create: if isSignedIn()
+          && request.resource.data.senderId == request.auth.uid
+          && canInteract(otherParticipant(conversationId), 'whoCanMessage');
         allow update: if false;
         allow delete: if isSignedIn() && request.auth.uid == resource.data.senderId;
       }
@@ -175,7 +214,10 @@ service cloud.firestore {
 
     match /reposts/{repostId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      // whoCanRepost : évalue les préférences de l'auteur de la vidéo repostée.
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && canInteract(videoAuthor(request.resource.data.postId), 'whoCanRepost');
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow update: if false;
     }
@@ -195,7 +237,8 @@ service cloud.firestore {
     }
 
     match /posts/{postId} {
-      allow read: if request.auth != null && (
+      allow list: if request.auth != null;
+      allow get: if request.auth != null && (
         resource.data.visibility == 'public' ||
         resource.data.userId == request.auth.uid ||
         (resource.data.visibility == 'followers' &&
@@ -206,7 +249,7 @@ service cloud.firestore {
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.text is string
         && request.resource.data.format in [
-          'text', 'image', 'carousel', 'video'
+          'text', 'image', 'carousel', 'video', 'article', 'video_share'
         ]
         && request.resource.data.visibility in [
           'public', 'followers', 'private'
@@ -218,7 +261,7 @@ service cloud.firestore {
           request.resource.data.userId == resource.data.userId
         ) ||
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'likes', 'likedBy', 'comments', 'shares', 'saves', 'savedBy'
+          'likes', 'likedBy', 'comments', 'shares', 'saves', 'savedBy', 'reactionCounts'
         ])
       );
 
@@ -242,6 +285,18 @@ service cloud.firestore {
           ])
         );
 
+        allow delete: if request.auth != null
+          && request.auth.uid == resource.data.userId;
+      }
+
+      match /reactions/{userId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.type in ['like', 'love', 'fire', 'clap'];
+        allow update: if request.auth != null
+          && request.auth.uid == resource.data.userId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['type']);
         allow delete: if request.auth != null
           && request.auth.uid == resource.data.userId;
       }

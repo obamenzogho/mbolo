@@ -12,6 +12,7 @@ import PagerView from 'react-native-pager-view'
 import FeedScreen from './FeedScreen'
 import LocalExploreScreen from './LocalExploreScreen'
 import FeedTabsHeader from './components/FeedTabsHeader'
+import { ConnectionBanner } from './components/ConnectionBanner'
 import { FEED_DEBUG } from './store/feedStore'
 import { useUserLocation } from '../location/useUserLocation'
 
@@ -109,6 +110,7 @@ export default function FeedTabsScreen({ isTabFocused = true }: FeedTabsScreenPr
         locationGranted={hasPreciseLocation}
         onRequestLocation={request}
       />
+      <ConnectionBanner />
     </View>
   )
 }

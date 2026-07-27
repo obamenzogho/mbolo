@@ -7,7 +7,6 @@ import Reanimated, {
   Easing,
   runOnJS,
   interpolate,
-  type PanGestureHandlerGestureEvent,
 } from 'react-native-reanimated'
 import { GestureDetector, Gesture } from 'react-native-gesture-handler'
 import { Ionicons } from '@expo/vector-icons'
@@ -18,6 +17,7 @@ import { ShareSearchBar } from './ShareSearchBar'
 import { ShareActions } from './ShareActions'
 import { useShare } from '../hooks/useShare'
 import { useShareSearch } from '../hooks/useShareSearch'
+import { useShareSuggestions } from '../hooks/useShareSuggestions'
 import { useShareStore } from '../store/shareStore'
 import OrbitLoader from '@/components/OrbitLoader'
 import { auth } from '@/lib/firebase'
@@ -71,6 +71,11 @@ export default function ShareModal({
 
   const { query, results: searchResults, loading: searchLoading, search, clear: clearSearch } =
     useShareSearch(currentUserId)
+
+  // Suggestions auto (amis / partages récents) quand le parent n'en fournit pas.
+  const { suggestions: autoSuggestions, loading: autoLoading } = useShareSuggestions(shareVideo?.id)
+  const suggestions = preloadedSuggestions.length > 0 ? preloadedSuggestions : autoSuggestions
+  const suggestionsBusy = suggestionsLoading || autoLoading
 
   const config = useMemo(() => ({
     videoId: shareVideo?.id ?? '',
@@ -156,13 +161,13 @@ export default function ShareModal({
   }, [config, handleClose])
 
   const panGesture = Gesture.Pan()
-    .onUpdate((e: PanGestureHandlerGestureEvent['nativeEvent']) => {
+    .onUpdate((e) => {
       if (e.translationY > 0) {
         translateY.value = e.translationY
         backdropOpacity.value = interpolate(e.translationY, [0, SCREEN_HEIGHT], [0.7, 0])
       }
     })
-    .onEnd((e: PanGestureHandlerGestureEvent['nativeEvent']) => {
+    .onEnd((e) => {
       if (e.translationY > 120 || e.velocityY > 500) {
         runOnJS(handleClose)()
       } else {
@@ -179,7 +184,7 @@ export default function ShareModal({
     opacity: backdropOpacity.value,
   }))
 
-  const displayData = query.length > 0 ? searchResults : preloadedSuggestions
+  const displayData = query.length > 0 ? searchResults : suggestions
 
   return (
     <Modal transparent visible={visible} animationType="none" onRequestClose={handleClose}>
@@ -229,7 +234,7 @@ export default function ShareModal({
                 placeholder="Rechercher un ami..."
               />
 
-              {query.length === 0 && preloadedSuggestions.length > 0 && (
+              {query.length === 0 && suggestions.length > 0 && (
                 <Text style={{
                   color: '#888', fontSize: 13, fontWeight: '600',
                   textTransform: 'uppercase', letterSpacing: 1,
@@ -245,7 +250,7 @@ export default function ShareModal({
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
               >
-                {searchLoading || suggestionsLoading ? (
+                {searchLoading || suggestionsBusy ? (
                   <View style={{ padding: 24, alignItems: 'center' }}>
                     <OrbitLoader size={20} />
                   </View>

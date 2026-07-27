@@ -146,7 +146,7 @@ function CommentItemComponent({
           {editing ? (
             <View>
               <TextInput value={editText} onChangeText={setEditText} multiline autoFocus
-                style={[styles.text, { backgroundColor: colors.surfaceLight, borderRadius: 8, padding: 8 }]} />
+                style={[styles.text, { backgroundColor: colors.surfaceElevated, borderRadius: 8, padding: 8 }]} />
               <View style={{ flexDirection: 'row', gap: 16, marginTop: 4 }}>
                 <TouchableOpacity onPress={() => setEditing(false)}>
                   <Text style={styles.actionText}>Annuler</Text>

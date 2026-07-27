@@ -1,9 +1,10 @@
 import { memo, useCallback, useRef, useMemo } from 'react'
-import { FlatList, View, Text, useWindowDimensions, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native'
+import { FlatList, View, Text, Image, StyleSheet, useWindowDimensions, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import OrbitLoader from '../../../components/OrbitLoader'
 import { FeedItem } from './FeedItem'
 import { SuggestionFeedCard } from './SuggestionFeedCard'
+import { useStartupStore } from '../../startup/store/startupStore'
 import type { Video } from '../../../types'
 import type { FollowSuggestion } from '@/features/suggestions/types'
 
@@ -172,19 +173,43 @@ function FeedListComponent({
     [isLoadingMore],
   )
 
+  // Tant qu'un fetch est possible/en cours (hasMore) ou en vol (isLoadingMore),
+  // on n'affiche QUE le loader — jamais le message « Aucune vidéo », qui ne doit
+  // apparaître qu'une fois le chargement terminé et le feed réellement vide.
+  // Évite le flash « Aucune vidéo » au démarrage avant l'arrivée des vidéos.
+  const isTrulyEmpty = !isLoadingMore && !hasMore
+
+  // Miniature de la 1re vidéo préchargée pendant l'écran logo. Quand elle est
+  // dispo, on l'affiche en plein écran comme premier rendu (à la place du loader)
+  // tant que le feed charge → transition douce logo → 1re image, façon TikTok.
+  const firstThumbnailURL = useStartupStore((s) => s.firstThumbnailURL)
+  const showThumbnailPreview = !isTrulyEmpty && !!firstThumbnailURL
+
   const listEmpty = useCallback(
     () => (
       <View style={{ flex: 1, height: ITEM_HEIGHT, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
-        <OrbitLoader size={48} />
-        <Text style={{ color: '#888', fontSize: 16, fontWeight: '600', marginTop: 20, textAlign: 'center' }}>
-          Aucune vidéo pour le moment
-        </Text>
-        <Text style={{ color: '#555', fontSize: 13, marginTop: 8, textAlign: 'center', paddingHorizontal: 40 }}>
-          Appuie sur le bouton + pour créer ton premier reel
-        </Text>
+        {showThumbnailPreview ? (
+          <Image
+            source={{ uri: firstThumbnailURL! }}
+            style={StyleSheet.absoluteFill}
+            resizeMode="cover"
+          />
+        ) : (
+          <OrbitLoader size={48} />
+        )}
+        {isTrulyEmpty && (
+          <>
+            <Text style={{ color: '#888', fontSize: 16, fontWeight: '600', marginTop: 20, textAlign: 'center' }}>
+              Aucune vidéo pour le moment
+            </Text>
+            <Text style={{ color: '#555', fontSize: 13, marginTop: 8, textAlign: 'center', paddingHorizontal: 40 }}>
+              Appuie sur le bouton + pour créer ton premier reel
+            </Text>
+          </>
+        )}
       </View>
     ),
-    [ITEM_HEIGHT],
+    [ITEM_HEIGHT, isTrulyEmpty, showThumbnailPreview, firstThumbnailURL],
   )
 
   return (

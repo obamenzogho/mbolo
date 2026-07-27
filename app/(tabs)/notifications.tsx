@@ -14,6 +14,27 @@ import { markAsRead, markAllAsRead } from '../../src/services/notificationRead'
 import notificationService from '../../src/services/notificationService'
 import { groupByTime } from '../../src/lib/notificationGroups'
 import type { Notification as NotificationType } from '../../src/types'
+import { useSettings } from '../../src/features/settings/SettingsProvider'
+
+// Mappe un type de notification vers la catégorie de réglage qui la contrôle.
+// Quand l'utilisateur désactive une catégorie, les notifs correspondantes sont
+// masquées de la liste (filtrage côté client). Le filtrage côté push (serveur)
+// est assuré par la Cloud Function onNotificationCreate.
+const NOTIF_CATEGORY: Record<NotificationType['type'], keyof ReturnType<typeof useSettings>['settings']['notifications']> = {
+  like: 'likes',
+  post_like: 'likes',
+  comment: 'comments',
+  post_comment: 'comments',
+  reply: 'comments',
+  follow: 'follows',
+  follow_request: 'follows',
+  follow_accept: 'follows',
+  mention: 'mentions',
+  tag: 'mentions',
+  repost: 'reposts',
+  message: 'messages',
+  share: 'reposts',
+}
 
 const handleNotifPress = (item: NotificationType) => {
   markAsRead(item.id)
@@ -51,6 +72,8 @@ export default function Notifications() {
   const [retryCount, setRetryCount] = useState(0)
   const [ready, setReady] = useState(false)
   const userId = auth.currentUser?.uid
+  const { settings } = useSettings()
+  const nSettings = settings.notifications
 
   const subscribe = useCallback(() => {
     if (!userId) return undefined
@@ -134,8 +157,17 @@ export default function Notifications() {
     )
   }
 
-  const sections = groupByTime(notifications)
-  const hasUnread = notifications.some((n: any) => n.read === false)
+  // Filtrage par catégorie selon les réglages de l'utilisateur. Si l'interrupteur
+  // maître est coupé, tout est masqué ; sinon chaque catégorie cache sa notif.
+  const visibleNotifications = notifications.filter((notif) => {
+    if (!nSettings.enabled) return false
+    const cat = NOTIF_CATEGORY[notif.type]
+    if (!cat) return true
+    return nSettings[cat] !== false
+  })
+
+  const sections = groupByTime(visibleNotifications)
+  const hasUnread = visibleNotifications.some((n: any) => n.read === false)
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>

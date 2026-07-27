@@ -14,6 +14,7 @@ interface SuggestedUserCardProps {
   onDismiss?: (userId: string) => void
   onPress?: (userId: string) => void
   compact?: boolean
+  carousel?: boolean
 }
 
 function SuggestedUserCardInner({
@@ -21,6 +22,7 @@ function SuggestedUserCardInner({
   onDismiss,
   onPress,
   compact = false,
+  carousel = false,
 }: SuggestedUserCardProps) {
   const handlePress = useCallback(() => {
     if (onPress) {
@@ -34,33 +36,89 @@ function SuggestedUserCardInner({
     if (onDismiss) onDismiss(suggestion.id)
   }, [suggestion.id, onDismiss])
 
-  if (compact) {
+  if (carousel) {
     return (
-      <TouchableOpacity
-        onPress={handlePress}
-        activeOpacity={0.7}
-        style={styles.compactCard}
-      >
-        <Avatar
-          uri={suggestion.user.photoURL}
-          name={suggestion.user.nom}
-          size={56}
-        />
-        {suggestion.user.verified && (
-          <View style={styles.verifiedBadgeCompact}>
-            <Ionicons name="checkmark-circle" size={14} color={colors.secondary} />
+      <View style={styles.carouselCard}>
+        {onDismiss && (
+          <TouchableOpacity
+            onPress={handleDismiss}
+            style={styles.carouselDismiss}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="close" size={16} color={colors.textSecondary} />
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity onPress={handlePress} activeOpacity={0.8} style={styles.carouselTop}>
+          <Avatar
+            uri={suggestion.user.photoURL}
+            name={suggestion.user.nom}
+            size={72}
+          />
+          <View style={styles.carouselNameRow}>
+            <Text style={styles.carouselName} numberOfLines={1}>
+              {suggestion.user.nom || suggestion.user.pseudo}
+            </Text>
+            {suggestion.user.verified && (
+              <Ionicons name="checkmark-circle" size={14} color={colors.secondary} style={{ marginLeft: 3 }} />
+            )}
           </View>
-        )}
-        <Text style={styles.compactName} numberOfLines={1}>
-          {suggestion.user.pseudo}
-        </Text>
-        {suggestion.mutualCount > 0 && (
-          <Text style={styles.compactMutual} numberOfLines={1}>
-            {suggestion.mutualCount} abonné{suggestion.mutualCount > 1 ? 's' : ''} commun{suggestion.mutualCount > 1 ? 's' : ''}
+          <Text style={styles.carouselPseudo} numberOfLines={1}>
+            @{suggestion.user.pseudo}
           </Text>
+          <Text style={styles.carouselMeta} numberOfLines={1}>
+            {suggestion.mutualCount > 0
+              ? `${suggestion.mutualCount} abonné${suggestion.mutualCount > 1 ? 's' : ''} commun${suggestion.mutualCount > 1 ? 's' : ''}`
+              : suggestion.reasonLabel}
+          </Text>
+        </TouchableOpacity>
+
+        <View style={styles.carouselAction}>
+          <FollowButton targetUserId={suggestion.id} size="md" />
+        </View>
+      </View>
+    )
+  }
+
+  if (compact) {
+    const followerCount = suggestion.user.followerCount ?? 0
+    return (
+      <View style={styles.compactCard}>
+        {onDismiss && (
+          <TouchableOpacity
+            onPress={handleDismiss}
+            style={styles.compactDismiss}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="close" size={14} color={colors.textSecondary} />
+          </TouchableOpacity>
         )}
-        <FollowButton targetUserId={suggestion.id} size="sm" />
-      </TouchableOpacity>
+        <TouchableOpacity onPress={handlePress} activeOpacity={0.7} style={styles.compactContent}>
+          <View style={{ position: 'relative' }}>
+            <Avatar
+              uri={suggestion.user.photoURL}
+              name={suggestion.user.nom}
+              size={56}
+            />
+            {suggestion.user.verified && (
+              <View style={styles.verifiedBadgeCompact}>
+                <Ionicons name="checkmark-circle" size={14} color={colors.secondary} />
+              </View>
+            )}
+          </View>
+          <Text style={styles.compactName} numberOfLines={1}>
+            {suggestion.user.pseudo}
+          </Text>
+          {followerCount > 0 && (
+            <Text style={styles.compactFollowers} numberOfLines={1}>
+              {followerCount >= 1000
+                ? `${(followerCount / 1000).toFixed(1)}k abonnés`
+                : `${followerCount} abonné${followerCount > 1 ? 's' : ''}`}
+            </Text>
+          )}
+          <FollowButton targetUserId={suggestion.id} size="sm" />
+        </TouchableOpacity>
+      </View>
     )
   }
 
@@ -100,13 +158,13 @@ function SuggestedUserCardInner({
             <Text style={styles.reasonLabel}>
               {suggestion.reasonLabel}
             </Text>
-            {suggestion.user.followerCount > 0 && (
+            {(suggestion.user.followerCount ?? 0) > 0 && (
               <>
                 <Text style={styles.metaDot}>·</Text>
                 <Text style={styles.reasonLabel}>
-                  {suggestion.user.followerCount >= 1000
-                    ? `${(suggestion.user.followerCount / 1000).toFixed(1)}k abonnés`
-                    : `${suggestion.user.followerCount} abonnés`}
+                  {(suggestion.user.followerCount ?? 0) >= 1000
+                    ? `${((suggestion.user.followerCount ?? 0) / 1000).toFixed(1)}k abonnés`
+                    : `${suggestion.user.followerCount ?? 0} abonnés`}
                 </Text>
               </>
             )}
@@ -150,7 +208,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   nom: {
-    color: colors.text,
+    color: colors.textPrimary,
     fontSize: 15,
     fontWeight: '600',
     flexShrink: 1,
@@ -187,15 +245,29 @@ const styles = StyleSheet.create({
   },
   dismissBtn: {
     padding: 4,
+    backgroundColor: '#000',
+    borderRadius: 10,
   },
   compactCard: {
-    width: 130,
+    width: 140,
     alignItems: 'center',
     backgroundColor: colors.surface,
     borderRadius: 14,
-    paddingVertical: 16,
+    paddingVertical: 18,
     paddingHorizontal: 10,
     marginRight: 10,
+  },
+  compactDismiss: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    zIndex: 2,
+    padding: 4,
+    backgroundColor: '#000',
+    borderRadius: 10,
+  },
+  compactContent: {
+    alignItems: 'center',
   },
   verifiedBadgeCompact: {
     position: 'absolute',
@@ -203,10 +275,17 @@ const styles = StyleSheet.create({
     right: 10,
   },
   compactName: {
-    color: colors.text,
+    color: colors.textPrimary,
     fontSize: 13,
     fontWeight: '600',
     marginTop: 8,
+    textAlign: 'center',
+  },
+  compactFollowers: {
+    color: colors.textSecondary,
+    fontSize: 10,
+    marginTop: 2,
+    marginBottom: 4,
     textAlign: 'center',
   },
   compactMutual: {
@@ -214,5 +293,62 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 2,
     textAlign: 'center',
+  },
+  // Carte rectangulaire « à la Facebook » pour le carrousel horizontal.
+  carouselCard: {
+    width: 160,
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairline,
+    paddingTop: 22,
+    paddingBottom: 14,
+    paddingHorizontal: 12,
+    marginRight: 12,
+    alignItems: 'center',
+  },
+  carouselDismiss: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    zIndex: 2,
+    padding: 4,
+    backgroundColor: '#000',
+    borderRadius: 10,
+  },
+  carouselTop: {
+    alignItems: 'center',
+    width: '100%',
+  },
+  carouselNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+    maxWidth: '100%',
+  },
+  carouselName: {
+    color: colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '700',
+    flexShrink: 1,
+    textAlign: 'center',
+  },
+  carouselPseudo: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    marginTop: 1,
+  },
+  carouselMeta: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    marginTop: 6,
+    textAlign: 'center',
+    paddingHorizontal: 2,
+  },
+  carouselAction: {
+    marginTop: 12,
+    width: '100%',
+    alignItems: 'center',
   },
 })

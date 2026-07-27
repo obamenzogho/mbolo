@@ -91,7 +91,7 @@ function PickerColumn({
                 style={{
                   fontSize: selectedIndex === i ? 17 : 15,
                   fontWeight: selectedIndex === i ? '700' : '400',
-                  color: selectedIndex === i ? colors.text : colors.textSecondary,
+                  color: selectedIndex === i ? colors.textPrimary : colors.textSecondary,
                 }}
               >
                 {item}
@@ -141,7 +141,7 @@ export default function DatePicker({
             <TouchableOpacity onPress={onCancel}>
               <Text style={{ color: colors.textSecondary, fontSize: 16 }}>Annuler</Text>
             </TouchableOpacity>
-            <Text style={{ color: colors.text, fontSize: 16, fontWeight: '700' }}>
+            <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700' }}>
               Date de naissance
             </Text>
             <TouchableOpacity

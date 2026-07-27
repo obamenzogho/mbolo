@@ -7,9 +7,11 @@ interface VideoOverlayProps {
   onDoubleTapLike: () => void
   onLongPress?: () => void
   onInteraction?: () => void
+  // Notifie le parent d'une pause/lecture VOLONTAIRE (tap ou appui long).
+  onUserTogglePlay?: (isNowPaused: boolean) => void
 }
 
-export const VideoOverlay = memo(function VideoOverlay({ player, onDoubleTapLike, onLongPress, onInteraction }: VideoOverlayProps) {
+export const VideoOverlay = memo(function VideoOverlay({ player, onDoubleTapLike, onLongPress, onInteraction, onUserTogglePlay }: VideoOverlayProps) {
   const { width: SCREEN_WIDTH } = Dimensions.get('window')
 
   const [isPlaying, setIsPlaying] = useState(true)
@@ -67,19 +69,22 @@ export const VideoOverlay = memo(function VideoOverlay({ player, onDoubleTapLike
       setIsSeeking(false)
       if (isPausedRef.current) {
         player.play(); isPausedRef.current = false; setIsPlaying(true); setSeekInfo(null)
+        onUserTogglePlay?.(false)
       } else {
         player.pause(); isPausedRef.current = true; setIsPlaying(false)
+        onUserTogglePlay?.(true)
       }
       showGestureIcon('play')
     } catch {}
-  }, [player, showGestureIcon])
+  }, [player, showGestureIcon, onUserTogglePlay])
 
   const longPressAction = useCallback(() => {
     if (!player) return
     try { player.pause() } catch {}
     isPausedRef.current = true
+    onUserTogglePlay?.(true)
     onLongPress?.()
-  }, [player, onLongPress])
+  }, [player, onLongPress, onUserTogglePlay])
 
   const lastTapRef = useRef(0)
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)

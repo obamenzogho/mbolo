@@ -10,27 +10,43 @@ declare module 'firebase/app' {
 
 declare module 'firebase/auth' {
   export type Auth = any
+  export type User = any
   export const initializeAuth: any
   export const getAuth: any
   export const browserLocalPersistence: any
+  export const getReactNativePersistence: any
   export const onAuthStateChanged: any
   export const signInWithEmailAndPassword: any
   export const createUserWithEmailAndPassword: any
+  export const signInWithCredential: any
   export const signOut: any
   export const updateProfile: any
+  export const sendPasswordResetEmail: any
+  export class GoogleAuthProvider {
+    static credential(idToken: string): any
+  }
+  export class OAuthProvider {
+    constructor(providerId: string)
+    credential(idOrToken: string | { idToken: string }): any
+  }
 }
 
 declare module 'firebase/firestore' {
   export type Firestore = any
   export type DocumentData = any
   export type QueryDocumentSnapshot<T = any> = any
+  export type Timestamp = any
   export const getFirestore: any
   export const collection: any
   export const query: any
   export const where: any
   export const orderBy: any
   export const limit: any
+  export const startAt: any
   export const startAfter: any
+  export const endAt: any
+  export const endBefore: any
+  export const documentId: any
   export const getDocs: any
   export const getDoc: (docRef: any) => Promise<any>
   export const doc: any
@@ -43,7 +59,12 @@ declare module 'firebase/firestore' {
   export const increment: any
   export const arrayUnion: any
   export const arrayRemove: any
+  export const writeBatch: any
   export const runTransaction: (db: any, updateFn: (transaction: any) => Promise<any>) => Promise<any>
+  export const disableNetwork: any
+  export const enableNetwork: any
+  export const initializeFirestore: any
+  export const memoryLocalCache: any
 }
 
 declare module 'firebase/storage' {

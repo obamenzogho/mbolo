@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { View, Text, TouchableOpacity, Animated, StyleSheet } from 'react-native'
+import { View, Text, TouchableOpacity, Pressable, Animated, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../../../lib/theme'
 import { RepostButton } from '@/features/repost/components/RepostButton'
@@ -61,9 +61,16 @@ export const ActionBar = memo(function ActionBar({
         <ShareButton onPress={onShare} size={ICON_SIZE} />
       </View>
 
-      <TouchableOpacity style={styles.itemLast} onPress={onMore} activeOpacity={0.7}>
+      {/* Bouton « plus d'options » — reconstruit : Pressable avec zone de tap
+          explicite (padding + hitSlop) pour garantir la captation du geste,
+          même à proximité de la ProgressBar. */}
+      <Pressable
+        onPress={onMore}
+        hitSlop={12}
+        style={({ pressed }) => [styles.moreButton, pressed && { opacity: 0.6 }]}
+      >
         <Ionicons name="ellipsis-horizontal" size={ICON_SIZE} color={colors.white} />
-      </TouchableOpacity>
+      </Pressable>
     </View>
   )
 })
@@ -72,6 +79,7 @@ const styles = StyleSheet.create({
   column: { alignItems: 'center', zIndex: 30, elevation: 30 },
   item: { alignItems: 'center', marginBottom: ITEM_GAP },
   itemLast: { alignItems: 'center' },
+  moreButton: { alignItems: 'center', justifyContent: 'center', paddingVertical: 4, paddingHorizontal: 8 },
   label: {
     color: colors.white,
     fontSize: 12,

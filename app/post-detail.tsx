@@ -1,36 +1,31 @@
 import { useEffect, useState } from 'react'
 import {
-  ActivityIndicator,
   ScrollView,
   StyleSheet,
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useLocalSearchParams } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { doc, getDoc } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
 import { colors } from '@/lib/theme'
 import { PostCard } from '@/features/news/components/PostCard'
 import NewsCommentsModal from '@/features/news/components/NewsCommentsModal'
-import { useNewsFeed } from '@/features/news/hooks/useNewsFeed'
+import { deletePost } from '@/features/news/services/postMutations'
+import { toDate } from '@/features/news/utils'
+import { ContentActionsSheet } from '@/components/ContentActionsSheet'
+import OrbitLoader from '@/components/OrbitLoader'
 import { BackButton } from '@/components/ui/BackButton'
 import type { NewsPost } from '@/features/news/types'
 
-function toDate(value: any): Date {
-  if (!value) return new Date()
-  if (typeof value.toDate === 'function') return value.toDate()
-  if (typeof value.seconds === 'number') return new Date(value.seconds * 1000)
-  return new Date(value)
-}
-
 export default function PostDetailScreen() {
   const { postId } = useLocalSearchParams<{ postId: string }>()
+  const router = useRouter()
   const uid = auth.currentUser?.uid ?? ''
   const [post, setPost] = useState<NewsPost | null>(null)
   const [loading, setLoading] = useState(true)
   const [commentPost, setCommentPost] = useState<NewsPost | null>(null)
-
-  const { toggleLike, toggleSave, registerShare, deletePost } = useNewsFeed()
+  const [actionsPost, setActionsPost] = useState<NewsPost | null>(null)
 
   useEffect(() => {
     if (!postId) return
@@ -79,7 +74,7 @@ export default function PostDetailScreen() {
       <SafeAreaView style={styles.screen}>
         <BackButton />
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <OrbitLoader size={48} />
         </View>
       </SafeAreaView>
     )
@@ -93,33 +88,14 @@ export default function PostDetailScreen() {
         <PostCard
           post={post}
           currentUserId={uid}
-          onLike={(id) => {
-            toggleLike(id)
-            setPost((p) => p ? {
-              ...p,
-              likes: p.likedBy.includes(uid)
-                ? Math.max(0, p.likes - 1) : p.likes + 1,
-              likedBy: p.likedBy.includes(uid)
-                ? p.likedBy.filter((i) => i !== uid)
-                : [...p.likedBy, uid],
-            } : p)
-          }}
-          onSave={(id) => {
-            toggleSave(id)
-            setPost((p) => p ? {
-              ...p,
-              saves: p.savedBy.includes(uid)
-                ? Math.max(0, p.saves - 1) : p.saves + 1,
-              savedBy: p.savedBy.includes(uid)
-                ? p.savedBy.filter((i) => i !== uid)
-                : [...p.savedBy, uid],
-            } : p)
-          }}
-          onShare={registerShare}
           onComment={setCommentPost}
-          onEdit={() => {}}
-          onDelete={() => {}}
-          onMore={() => {}}
+          onEdit={(p) => router.push({ pathname: '/news-compose', params: { editPostId: p.id } })}
+          onDelete={async () => {
+            if (!post) return
+            const ok = await deletePost(post.id, uid)
+            if (ok) router.back()
+          }}
+          onMore={setActionsPost}
         />
       </ScrollView>
 
@@ -128,6 +104,21 @@ export default function PostDetailScreen() {
         visible={commentPost !== null}
         onClose={() => setCommentPost(null)}
       />
+
+      {actionsPost && (
+        <ContentActionsSheet
+          visible
+          targetType="post"
+          targetId={actionsPost.id}
+          contentOwnerId={actionsPost.userId}
+          contentOwnerName={actionsPost.userName}
+          onClose={() => setActionsPost(null)}
+          onBlocked={() => {
+            setActionsPost(null)
+            router.back()
+          }}
+        />
+      )}
     </SafeAreaView>
   )
 }

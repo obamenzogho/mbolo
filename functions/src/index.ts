@@ -1,8 +1,8 @@
-import { onDocumentCreated, onDocumentDeleted, onDocumentWritten } from 'firebase-functions/v2/firestore'
+import { onDocumentCreated, onDocumentDeleted, onDocumentUpdated, onDocumentWritten } from 'firebase-functions/v2/firestore'
 import { onCall, HttpsError } from 'firebase-functions/v2/https'
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { initializeApp } from 'firebase-admin/app'
-import { getFirestore, FieldValue } from 'firebase-admin/firestore'
+import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore'
 import { getAuth } from 'firebase-admin/auth'
 import { defineSecret } from 'firebase-functions/params'
 import * as crypto from 'crypto'
@@ -222,14 +222,32 @@ export const onNotificationCreate = onDocumentCreated('notifications/{notifId}',
   const { userId, fromUserId, type } = notif
   if (!userId || userId === fromUserId) return
 
-  const [targetSnap, fromSnap] = await Promise.all([
+  const [targetSnap, fromSnap, prefsSnap] = await Promise.all([
     db.doc(`users/${userId}`).get(),
     fromUserId ? db.doc(`users/${fromUserId}`).get() : Promise.resolve(null),
+    db.doc(`users/${userId}/settings/preferences`).get(),
   ])
 
   const target = targetSnap.data()
   const pushToken: string | undefined = target?.pushToken
-  if (!pushToken || target?.notifications === false) return
+
+  // Réglages de notifications : sous-collection privée owner-only
+  // `users/{uid}/settings/preferences`. On retombe sur l'ancien booléen
+  // `target.notifications` (doc user) pour la rétro-compatibilité.
+  const prefs = prefsSnap.data()?.notifications
+  const masterEnabled = prefs?.enabled !== false && target?.notifications !== false
+  if (!pushToken || !masterEnabled) return
+
+  // Filtrage par catégorie. Map identique au client (NOTIF_CATEGORY).
+  const cat: string | undefined = {
+    like: 'likes', post_like: 'likes',
+    comment: 'comments', post_comment: 'comments', reply: 'comments',
+    follow: 'follows', follow_request: 'follows', follow_accept: 'follows',
+    mention: 'mentions', tag: 'mentions',
+    repost: 'reposts', share: 'reposts',
+    message: 'messages',
+  }[type as string]
+  if (cat && prefs && prefs[cat as keyof typeof prefs] === false) return
 
   const fromName = fromSnap?.data()?.pseudo || 'Quelqu\'un'
   const builder = PUSH_MESSAGES[type]
@@ -473,6 +491,112 @@ export const refreshHotScores = onSchedule('every 60 minutes', async () => {
     if (d.data().hotScore === hotScore) continue
     batch.update(d.ref, { hotScore })
     if (++ops === 450) { await batch.commit(); batch = db.batch(); ops = 0 }  // limite 500/batch
+  }
+  if (ops > 0) await batch.commit()
+})
+
+/* ==========================================================
+   POST REACTIONS — posts/{postId}/reactions/{userId}
+   Les compteurs (reactionCounts) sont maintenus par le serveur.
+   ========================================================== */
+
+export const onPostReactionCreate = onDocumentCreated(
+  'posts/{postId}/reactions/{userId}',
+  async (e) => {
+    const type = e.data?.data()?.type
+    if (!type) return
+    const postRef = db.doc(`posts/${e.params.postId}`)
+
+    await postRef.update({
+      [`reactionCounts.${type}`]: FieldValue.increment(1),
+      [`reactionCounts.total`]: FieldValue.increment(1),
+      likes: FieldValue.increment(1),
+      likedBy: FieldValue.arrayUnion(e.params.userId),
+    }).catch((err) => console.warn('onPostReactionCreate:', err?.message ?? err))
+
+    // Notification à l'auteur du post
+    const postSnap = await postRef.get().catch(() => null)
+    const postData = postSnap?.data()
+    if (postData?.userId && postData.userId !== e.params.userId) {
+      await db.doc(`notifications/${db.collection('_').doc().id}`).set({
+        userId: postData.userId,
+        type: 'post_like',
+        fromUserId: e.params.userId,
+        postId: e.params.postId,
+        text: '',
+        read: false,
+        createdAt: FieldValue.serverTimestamp(),
+      }).catch(() => {})
+    }
+  }
+)
+
+export const onPostReactionUpdate = onDocumentUpdated(
+  'posts/{postId}/reactions/{userId}',
+  async (e) => {
+    const oldType = e.data?.before?.data()?.type
+    const newType = e.data?.after?.data()?.type
+    if (!oldType || !newType || oldType === newType) return
+
+    const postRef = db.doc(`posts/${e.params.postId}`)
+    await postRef.update({
+      [`reactionCounts.${oldType}`]: FieldValue.increment(-1),
+      [`reactionCounts.${newType}`]: FieldValue.increment(1),
+    }).catch((err) => console.warn('onPostReactionUpdate:', err?.message ?? err))
+  }
+)
+
+export const onPostReactionDelete = onDocumentDeleted(
+  'posts/{postId}/reactions/{userId}',
+  async (e) => {
+    const type = ((e as any).data?.before)?.data()?.type
+    if (!type) return
+
+    const postRef = db.doc(`posts/${e.params.postId}`)
+    await postRef.update({
+      [`reactionCounts.${type}`]: FieldValue.increment(-1),
+      [`reactionCounts.total`]: FieldValue.increment(-1),
+      likes: FieldValue.increment(-1),
+      likedBy: FieldValue.arrayRemove(e.params.userId),
+    }).catch((err) => console.warn('onPostReactionDelete:', err?.message ?? err))
+  }
+)
+
+/* ==========================================================
+   POST RANKING — Score basé sur engagement + fraîcheur
+   Calculé toutes les 30 minutes pour les 500 posts récents.
+   ========================================================== */
+
+export const updatePostRankingScores = onSchedule('every 30 minutes', async () => {
+  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // 7 derniers jours
+  const snap = await db.collection('posts')
+    .where('createdAt', '>=', cutoff)
+    .orderBy('createdAt', 'desc')
+    .limit(500)
+    .get()
+
+  let batch = db.batch()
+  let ops = 0
+  const now = Date.now()
+
+  for (const doc of snap.docs) {
+    const data = doc.data()
+    const engagement =
+      Math.log1p(data.likes ?? 0) * 1.0 +
+      Math.log1p(data.comments ?? 0) * 1.5 +
+      Math.log1p(data.shares ?? 0) * 2.0 +
+      Math.log1p(data.saves ?? 0) * 1.8 +
+      Math.log1p(data.reactionCounts?.total ?? 0) * 1.2
+
+    const createdMs = data.createdAt?.toMillis?.() ?? now
+    const ageHours = Math.max(0, (now - createdMs) / (1000 * 60 * 60))
+    const freshness = Math.exp(-ageHours / 12) // half-life 12h
+
+    const score = Number((engagement * 1.0 + freshness * 4.0).toFixed(4))
+    if (data.rankingScore === score) continue
+
+    batch.update(doc.ref, { rankingScore: score })
+    if (++ops === 450) { await batch.commit(); batch = db.batch(); ops = 0 }
   }
   if (ops > 0) await batch.commit()
 })

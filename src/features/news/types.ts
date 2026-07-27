@@ -3,6 +3,8 @@ export type NewsPostFormat =
   | 'image'
   | 'carousel'
   | 'video'
+  | 'article'
+  | 'video_share'
 
 export type NewsPostVisibility = 'public' | 'followers' | 'private'
 
@@ -31,6 +33,55 @@ export interface NewsMood {
   label: string
 }
 
+// ── Reactions ─────────────────────────────────────────────
+export type PostReactionType = 'like' | 'love' | 'fire' | 'clap'
+
+export interface PostReaction {
+  type: PostReactionType
+  userId: string
+  createdAt: Date
+}
+
+export interface ReactionCounts {
+  like: number
+  love: number
+  fire: number
+  clap: number
+  total: number
+}
+
+export const REACTION_EMOJI: Record<PostReactionType, string> = {
+  like: '👍',
+  love: '❤️',
+  fire: '🔥',
+  clap: '👏',
+}
+
+export const REACTION_LABELS: Record<PostReactionType, string> = {
+  like: "J'aime",
+  love: 'Adore',
+  fire: 'Feu',
+  clap: 'Bravo',
+}
+
+// ── Article ───────────────────────────────────────────────
+export interface NewsPostArticle {
+  title: string
+  excerpt?: string
+  body: string
+  coverImage?: string
+}
+
+// ── Video Share ───────────────────────────────────────────
+export interface NewsPostVideoShare {
+  sharedVideoId: string
+  sharedVideoURL: string
+  sharedThumbnailURL?: string
+  sharedUserName?: string
+  originalDescription?: string
+}
+
+// ── Post Backgrounds ─────────────────────────────────────
 export const POST_BACKGROUNDS: { id: string; colors: [string, string] }[] = [
   { id: 'none', colors: ['#111214', '#111214'] },
   { id: 'sunset', colors: ['#F58529', '#DD2A7B'] },
@@ -41,6 +92,7 @@ export const POST_BACKGROUNDS: { id: string; colors: [string, string] }[] = [
   { id: 'gabon', colors: ['#009E60', '#FCD116'] },
 ]
 
+// ── NewsPost ──────────────────────────────────────────────
 export interface NewsPost {
   id: string
   userId: string
@@ -63,8 +115,15 @@ export interface NewsPost {
   location?: NewsLocation
   mood?: NewsMood
   poll?: NewsPoll
+  // ── Nouveaux champs (Phase 0) ──
+  reactionCounts?: ReactionCounts
+  myReaction?: PostReactionType | null
+  article?: NewsPostArticle
+  videoShare?: NewsPostVideoShare
+  rankingScore?: number
 }
 
+// ── NewsComment ───────────────────────────────────────────
 export interface NewsComment {
   id: string
   postId: string

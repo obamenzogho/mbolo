@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../src/lib/theme'
 import OrbitLoader from '../../src/components/OrbitLoader'
 import { BackButton } from '../../src/components/ui/BackButton'
+import { getVideosByHashtag, getHashtagMeta } from '../../src/services/hashtagService'
 
 const { width } = Dimensions.get('window')
 const COL = 3
@@ -31,9 +32,9 @@ export default function HashtagPage() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 }}>
-        <BackButton icon="arrow-back" size={24} color={colors.text} />
+        <BackButton icon="arrow-back" size={24} color={colors.textPrimary} />
         <View>
-          <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700' }}>#{tag}</Text>
+          <Text style={{ color: colors.textPrimary, fontSize: 20, fontWeight: '700' }}>#{tag}</Text>
           {count !== null && (
             <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
               {count} video{count > 1 ? 's' : ''}

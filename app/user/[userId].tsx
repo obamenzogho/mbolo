@@ -12,7 +12,7 @@ import {
 } from 'react-native-reanimated'
 import { GestureDetector, Gesture } from 'react-native-gesture-handler'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useLocalSearchParams } from 'expo-router'
+import { useLocalSearchParams, router, Redirect } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { doc, onSnapshot } from 'firebase/firestore'
 import { auth, db } from '../../src/lib/firebase'
@@ -101,14 +101,14 @@ export default function UserProfile() {
     if (!userId) return
     const unsub = onSnapshot(
       doc(db, 'users', userId),
-      (snap) => {
+      (snap: any) => {
         if (snap.exists()) {
           setProfile(snap.data() as UserType)
           setImgError(false)
         }
         setProfileLoaded(true)
       },
-      (error) => {
+      (error: any) => {
         captureException(error, { context: 'userProfile onSnapshot' })
         setProfileLoaded(true)
       },
@@ -370,7 +370,7 @@ export default function UserProfile() {
                 Share.share({ message: `Découvre @${profile?.pseudo || ''} sur Mbolo !` }).catch(() => {})
               }}
             >
-              <Ionicons name="share-outline" size={22} color="#fff" />
+              <Ionicons name="arrow-redo-outline" size={22} color="#fff" />
               <Text style={{ color: '#fff', fontSize: 16 }}>Partager le profil</Text>
             </TouchableOpacity>
             <View style={{ height: 1, backgroundColor: '#222' }} />

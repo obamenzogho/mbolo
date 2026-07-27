@@ -38,9 +38,9 @@ export default function PlacePage() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 }}>
-        <BackButton icon="arrow-back" size={24} color={colors.text} />
+        <BackButton icon="arrow-back" size={24} color={colors.textPrimary} />
         <View>
-          <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700' }}>{id}</Text>
+          <Text style={{ color: colors.textPrimary, fontSize: 20, fontWeight: '700' }}>{id}</Text>
           <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
             {videos.length} vidéo{videos.length !== 1 ? 's' : ''}
           </Text>

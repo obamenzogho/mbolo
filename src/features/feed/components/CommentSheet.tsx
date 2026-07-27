@@ -234,14 +234,14 @@ export default function CommentSheet({ videoId, videoOwnerId, isOwner, previewCo
       backgroundStyle={styles.background}
       handleIndicatorStyle={styles.handleIndicator}
       handleStyle={styles.handleBar}
-      keyboardBehavior="none"
+      keyboardBehavior="fillParent"
       keyboardBlurBehavior="restore"
       onChange={handleSheetChange}
     >
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Commentaires</Text>
         <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
-          <Ionicons name="close" size={20} color={colors.text} />
+          <Ionicons name="close" size={20} color={colors.textPrimary} />
         </TouchableOpacity>
       </View>
 
@@ -326,7 +326,7 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   headerTitle: {
-    color: colors.text,
+    color: colors.textPrimary,
     fontSize: 15,
     fontWeight: '700',
   },
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   sortTabTextActive: {
-    color: colors.text,
+    color: colors.textPrimary,
   },
   emptyContainer: {
     alignItems: 'center',

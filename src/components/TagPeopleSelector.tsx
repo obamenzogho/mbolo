@@ -36,8 +36,8 @@ export function TagPeopleSelector({ visible, selected, onClose, onChange }: Prop
     const me = auth.currentUser?.uid
     setResults(
       snap.docs
-        .map((d) => ({ id: d.id, ...(d.data() as any) }))
-        .filter((u) => u.id !== me),
+        .map((d: any) => ({ id: d.id, ...(d.data() as any) }))
+        .filter((u: any) => u.id !== me),
     )
   }, [])
 
@@ -58,9 +58,9 @@ export function TagPeopleSelector({ visible, selected, onClose, onChange }: Prop
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 }}>
           <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close" size={26} color={colors.text} />
+            <Ionicons name="close" size={26} color={colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={{ color: colors.text, fontSize: 18, fontWeight: '700' }}>
+          <Text style={{ color: colors.textPrimary, fontSize: 18, fontWeight: '700' }}>
             Identifier des personnes
           </Text>
           <TouchableOpacity onPress={onClose} style={{ marginLeft: 'auto' }}>
@@ -74,7 +74,7 @@ export function TagPeopleSelector({ visible, selected, onClose, onChange }: Prop
           placeholder="Rechercher un pseudo..."
           placeholderTextColor={colors.textSecondary}
           autoCapitalize="none"
-          style={{ backgroundColor: colors.surface, color: colors.text, margin: 16, borderRadius: 10, padding: 12 }}
+          style={{ backgroundColor: colors.surface, color: colors.textPrimary, margin: 16, borderRadius: 10, padding: 12 }}
         />
 
         <FlatList
@@ -87,9 +87,9 @@ export function TagPeopleSelector({ visible, selected, onClose, onChange }: Prop
                 onPress={() => toggle(item)}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 10 }}
               >
-                <Image source={{ uri: item.photoURL }} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceLight }} />
+                <Image source={{ uri: item.photoURL }} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceElevated }} />
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: colors.text }}>@{item.pseudo}</Text>
+                  <Text style={{ color: colors.textPrimary }}>@{item.pseudo}</Text>
                   {item.nom ? <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{item.nom}</Text> : null}
                 </View>
                 <Ionicons

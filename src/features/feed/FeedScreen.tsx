@@ -135,11 +135,18 @@ export default function FeedScreen({ feedType = 'forYou', isActive = true, place
   // Même pattern que les commentaires : la sheet monte fermée (index={-1}) puis
   // on l'ouvre explicitement. Un BottomSheet monté directement à index={0}
   // n'anime pas son ouverture de façon fiable → le menu ne s'affichait pas.
+  // On masque aussi la navbar (position: absolute, zIndex 10) le temps de
+  // l'affichage, sinon elle se peint PAR-DESSUS le bas de la sheet.
   useEffect(() => {
     if (!videoOptionsTarget) return
+    // On masque la navbar le temps de l'affichage (elle se peindrait sinon
+    // par-dessus le bas de la sheet). À la FERMETURE on ne force PAS showTabBar :
+    // on laisse le cycle immersif du FeedItem reprendre la main → la navbar
+    // reste masquée et réapparaît au toucher de l'écran, comme avant l'ouverture.
+    hideTabBar()
     const timer = setTimeout(() => videoOptionsSheetRef.current?.snapToIndex(0), 50)
     return () => clearTimeout(timer)
-  }, [videoOptionsTarget])
+  }, [videoOptionsTarget, hideTabBar])
 
   useEffect(() => {
     VideoCache.warm().catch((e) => {

@@ -22,6 +22,7 @@ import { auth } from '../src/lib/firebase'
 import ErrorBoundary from '../src/components/ErrorBoundary'
 import { I18nProvider } from '../src/i18n/index'
 import { DataSaverProvider } from '../src/contexts/DataSaverContext'
+import { SettingsProvider } from '../src/features/settings/SettingsProvider'
 import { colors } from '../src/lib/theme'
 
 import notificationService from '../src/services/notificationService'
@@ -165,12 +166,14 @@ export default function RootLayout() {
         <SafeAreaProvider initialMetrics={initialWindowMetrics}>
         <I18nProvider>
           <DataSaverProvider>
+          <SettingsProvider>
           <ErrorBoundary>
             <StatusBar style="light" backgroundColor={colors.background} />
             <NavigationHistoryProvider>
               <RootContent />
             </NavigationHistoryProvider>
           </ErrorBoundary>
+          </SettingsProvider>
           </DataSaverProvider>
         </I18nProvider>
         </SafeAreaProvider>

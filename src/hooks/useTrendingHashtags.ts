@@ -1,16 +1,18 @@
 import { useState, useEffect, useCallback } from 'react'
-import { getTrendingHashtags, type TrendingHashtag } from '../services/hashtagService'
+import { getTrendingHashtags, getTrendingHashtagsByCity, type TrendingHashtag } from '../services/hashtagService'
 
-export function useTrendingHashtags(max = 10) {
+export function useTrendingHashtags(max = 10, city?: string | null) {
   const [tags, setTags] = useState<TrendingHashtag[]>([])
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
     setLoading(true)
-    const data = await getTrendingHashtags(max)
+    const data = city
+      ? await getTrendingHashtagsByCity(city, max)
+      : await getTrendingHashtags(max)
     setTags(data)
     setLoading(false)
-  }, [max])
+  }, [max, city])
 
   useEffect(() => {
     load()

@@ -28,7 +28,7 @@ export interface User {
   genre?: 'homme' | 'femme' | 'non-binaire' | 'prefere-ne-pas-dire'
 }
 
-export type ProfileTab = 'grid' | 'saved' | 'liked' | 'reposted' | 'tagged'
+export type ProfileTab = 'grid' | 'saved' | 'liked' | 'reposted' | 'tagged' | 'reels'
 
 export interface Repost {
   id: string
@@ -124,16 +124,6 @@ export interface Message {
   type: 'text' | 'image' | 'story_reply'
   mediaUrl?: string
   storyRef?: StoryRef
-  createdAt: Date
-}
-
-export interface Story {
-  id: string
-  userId: string
-  mediaURL: string
-  type: 'image' | 'video'
-  expiresAt: Date
-  viewers: string[]
   createdAt: Date
 }
 

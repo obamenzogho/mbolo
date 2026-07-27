@@ -12,20 +12,23 @@ import {
 import { Ionicons } from '@expo/vector-icons'
 import { VideoView, useVideoPlayer } from 'expo-video'
 import { LinearGradient } from 'expo-linear-gradient'
+import { doc, runTransaction, increment, arrayUnion, arrayRemove } from 'firebase/firestore'
+import { db } from '@/lib/firebase'
+import { captureException } from '@/lib/sentry'
 import { colors } from '@/lib/theme'
 import RichPostText from './RichPostText'
 import ImageGalleryModal from './ImageGalleryModal'
 import PollView from './PollView'
-import { POST_BACKGROUNDS } from '../types'
-import type { NewsPost, NewsPostMedia } from '../types'
+import { ReactionPicker } from './ReactionPicker'
+import { useReactions } from '../hooks/useReactions'
+import { REACTION_EMOJI, POST_BACKGROUNDS } from '../types'
+import type { NewsPost, NewsPostMedia, PostReactionType } from '../types'
 
 interface PostCardProps {
   post: NewsPost
   currentUserId: string
-  onLike: (postId: string) => void
   onComment: (post: NewsPost) => void
-  onShare: (postId: string) => void
-  onSave: (postId: string) => void
+  onSave?: (postId: string) => void
   onEdit: (post: NewsPost) => void
   onDelete: (post: NewsPost) => void
   onMore: (post: NewsPost) => void
@@ -139,19 +142,45 @@ function MediaGrid({ media, onImagePress }: { media: NewsPostMedia[]; onImagePre
 function PostCardComponent({
   post,
   currentUserId,
-  onLike,
   onComment,
-  onShare,
   onSave,
   onEdit,
   onDelete,
   onMore,
   onPress,
 }: PostCardProps) {
-  const liked = post.likedBy.includes(currentUserId)
+  const { myReaction, toggleReaction } = useReactions(post.id, currentUserId)
+  const liked = post.likedBy.includes(currentUserId) || !!myReaction
   const saved = post.savedBy.includes(currentUserId)
   const isOwner = post.userId === currentUserId
   const [galleryIndex, setGalleryIndex] = useState<number | null>(null)
+  const [expanded, setExpanded] = useState(false)
+  const [showReactionPicker, setShowReactionPicker] = useState(false)
+
+  const handleSave = useCallback(async () => {
+    if (!currentUserId) return
+    const wasSaved = saved
+    // Optimistic update
+    try {
+      await runTransaction(db, async (transaction) => {
+        const postRef = doc(db, 'posts', post.id)
+        const snap = await transaction.get(postRef)
+        if (!snap.exists()) return
+        const data = snap.data()
+        const currentSavedBy: string[] = data.savedBy ?? []
+        const isSaved = currentSavedBy.includes(currentUserId)
+        transaction.update(postRef, {
+          savedBy: isSaved ? arrayRemove(currentUserId) : arrayUnion(currentUserId),
+          saves: increment(isSaved ? -1 : 1),
+        })
+      })
+    } catch (error) {
+      captureException(
+        error instanceof Error ? error : new Error(String(error)),
+        { context: 'PostCard.handleSave', postId: post.id },
+      )
+    }
+  }, [post.id, currentUserId, saved])
 
   const handleShare = useCallback(async () => {
     try {
@@ -160,10 +189,13 @@ function PostCardComponent({
           ? `${post.text}\n\nPublication Mbolo`
           : 'Découvre cette publication sur Mbolo',
       })
-
-      onShare(post.id)
-    } catch {}
-  }, [post.id, post.text, onShare])
+    } catch (error) {
+      captureException(
+        error instanceof Error ? error : new Error(String(error)),
+        { context: 'PostCard.handleShare', postId: post.id },
+      )
+    }
+  }, [post.id, post.text])
 
   return (
     <Pressable
@@ -246,7 +278,19 @@ function PostCardComponent({
           <Text style={styles.bgText}>{post.text}</Text>
         </LinearGradient>
       ) : !!post.text ? (
-        <RichPostText text={post.text} style={styles.bodyText} />
+        <View>
+          <RichPostText
+            text={expanded ? post.text : post.text.slice(0, 280)}
+            style={[styles.bodyText, !expanded && post.text.length > 280 && { maxHeight: 105 }]}
+          />
+          {post.text.length > 280 && (
+            <Pressable onPress={() => setExpanded(!expanded)}>
+              <Text style={{ color: '#888', fontSize: 14, paddingHorizontal: 14, paddingBottom: 4 }}>
+                {expanded ? 'Voir moins' : 'Voir plus'}
+              </Text>
+            </Pressable>
+          )}
+        </View>
       ) : null}
 
       {post.location && (
@@ -263,13 +307,28 @@ function PostCardComponent({
 
       {post.poll && <PollView poll={post.poll} postId={post.id} currentUserId={currentUserId} />}
 
-      {(post.likes > 0 || post.comments > 0 || post.shares > 0) && (
+      {(post.reactionCounts?.total ?? post.likes) > 0 || post.comments > 0 || post.shares > 0 ? (
         <View style={styles.stats}>
           <View style={styles.likeStat}>
-            <View style={styles.likeCircle}>
-              <Ionicons name="thumbs-up" size={11} color="#fff" />
-            </View>
-            <Text style={styles.statText}>{post.likes}</Text>
+            {/* Top 3 reaction emojis */}
+            {post.reactionCounts && post.reactionCounts.total > 0 ? (
+              <View style={styles.reactionEmojis}>
+                {(Object.entries(post.reactionCounts)
+                  .filter(([k, v]) => k !== 'total' && v > 0)
+                  .sort(([, a], [, b]) => b - a)
+                  .slice(0, 3) as [string, number][])
+                  .map(([type]) => (
+                    <Text key={type} style={styles.reactionEmoji}>
+                      {REACTION_EMOJI[type as PostReactionType] ?? '👍'}
+                    </Text>
+                  ))}
+              </View>
+            ) : (
+              <View style={styles.likeCircle}>
+                <Ionicons name="thumbs-up" size={11} color="#fff" />
+              </View>
+            )}
+            <Text style={styles.statText}>{post.reactionCounts?.total ?? post.likes}</Text>
           </View>
 
           <View style={styles.statsRight}>
@@ -286,29 +345,40 @@ function PostCardComponent({
             )}
           </View>
         </View>
-      )}
+      ) : null}
 
       <View style={styles.divider} />
 
       <View style={styles.actions}>
         <Pressable
-          onPress={() => onLike(post.id)}
-          style={styles.action}
+          onPress={() => toggleReaction()}
+          onLongPress={() => setShowReactionPicker(true)}
+          style={[styles.action, !!myReaction && styles.actionActive]}
         >
-          <Ionicons
-            name={liked ? 'thumbs-up' : 'thumbs-up-outline'}
-            size={21}
-            color={liked ? colors.primary : '#B5B5B5'}
-          />
+          {myReaction ? (
+            <Text style={{ fontSize: 20 }}>{REACTION_EMOJI[myReaction]}</Text>
+          ) : (
+            <Ionicons
+              name={liked ? 'thumbs-up' : 'thumbs-up-outline'}
+              size={21}
+              color={liked ? colors.primary : '#B5B5B5'}
+            />
+          )}
           <Text
             style={[
               styles.actionText,
-              liked && { color: colors.primary },
+              (liked || myReaction) && { color: colors.primary },
             ]}
           >
-            J'aime
+            {myReaction ? (myReaction === 'like' ? "J'aime" : myReaction === 'love' ? 'Adore' : myReaction === 'fire' ? 'Feu' : 'Bravo') : "J'aime"}
           </Text>
         </Pressable>
+
+        <ReactionPicker
+          visible={showReactionPicker}
+          onSelect={(type) => toggleReaction(type)}
+          onClose={() => setShowReactionPicker(false)}
+        />
 
         {post.commentsEnabled && (
           <Pressable
@@ -325,7 +395,7 @@ function PostCardComponent({
         )}
 
         <Pressable
-          onPress={() => onSave(post.id)}
+          onPress={handleSave}
           style={styles.action}
         >
           <Ionicons
@@ -454,6 +524,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  reactionEmojis: {
+    flexDirection: 'row',
+    marginRight: 2,
+  },
+  reactionEmoji: {
+    fontSize: 14,
+    marginLeft: -4,
+  },
   statsRight: {
     flexDirection: 'row',
     gap: 12,
@@ -479,6 +557,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 7,
+  },
+  actionActive: {
+    backgroundColor: 'rgba(0,200,83,0.1)',
+    borderRadius: 20,
   },
   actionText: {
     color: '#B5B5B5',

@@ -3,6 +3,7 @@ import { View, Text, Image, Pressable, StyleSheet } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '@/lib/theme'
+import { STORY_BACKGROUNDS } from '../constants'
 import type { StoryGroup } from '../hooks/useStoriesFeed'
 
 const CARD_W = 108
@@ -16,10 +17,27 @@ interface StoryCardProps {
 function StoryCardComponent({ group, onPress }: StoryCardProps) {
   const preview = group.stories[group.firstUnseenIndex] ?? group.stories[0]
   const isImage = preview?.mediaType === 'image'
+  const isText = preview?.mediaType === 'text'
 
   return (
     <Pressable onPress={onPress} style={styles.card}>
-      {isImage && preview?.mediaUrl ? (
+      {isText ? (
+        <LinearGradient
+          colors={(preview.backgroundGradient?.length === 2
+            ? preview.backgroundGradient
+            : STORY_BACKGROUNDS.find(b => b.id === preview.backgroundColor)?.colors
+            || STORY_BACKGROUNDS[0].colors) as [string, string]}
+          style={StyleSheet.absoluteFill}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8 }}>
+            <Text numberOfLines={3} style={{ color: '#fff', fontSize: 13, fontWeight: '700', textAlign: 'center' }}>
+              {preview.text}
+            </Text>
+          </View>
+        </LinearGradient>
+      ) : isImage && preview?.mediaUrl ? (
         <Image source={{ uri: preview.mediaUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
       ) : (
         <LinearGradient colors={['#2A2C31', '#141518']} style={StyleSheet.absoluteFill}>

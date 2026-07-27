@@ -8,7 +8,7 @@ export default function Terms() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <BackButton />
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
-        <Text style={{ color: colors.text, fontSize: 22, fontWeight: '700', marginBottom: 16 }}>
+        <Text style={{ color: colors.textPrimary, fontSize: 22, fontWeight: '700', marginBottom: 16 }}>
           Conditions Générales d'Utilisation de Mbolo
         </Text>
         <Text style={{ color: colors.textSecondary, fontSize: 13, marginBottom: 20 }}>
@@ -58,7 +58,7 @@ export default function Terms() {
 
           14. Contact: support@mbolo.app{'\n\n'}
 
-          Mbolo • Fait avec 🇬🇦 au Gabon
+          © 2026 Mbolo. Tous droits réservés.
         </Text>
       </ScrollView>
     </SafeAreaView>

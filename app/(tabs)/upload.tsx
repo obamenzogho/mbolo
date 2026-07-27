@@ -128,7 +128,7 @@ export default function Upload() {
               multiline
               maxLength={500}
               style={{
-                width: '100%', color: colors.text, backgroundColor: colors.surface,
+                width: '100%', color: colors.textPrimary, backgroundColor: colors.surface,
                 borderRadius: 12, padding: 14, fontSize: 15, marginBottom: 16,
                 borderWidth: 1, borderColor: colors.border, maxHeight: 100,
               }}
@@ -137,8 +137,8 @@ export default function Upload() {
               onPress={() => setTagOpen(true)}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, marginBottom: 16 }}
             >
-              <Ionicons name="person-add-outline" size={20} color={colors.text} />
-              <Text style={{ color: colors.text }}>
+              <Ionicons name="person-add-outline" size={20} color={colors.textPrimary} />
+              <Text style={{ color: colors.textPrimary }}>
                 {tagged.length ? `${tagged.length} personne(s) identifiée(s)` : 'Identifier des personnes'}
               </Text>
             </TouchableOpacity>
@@ -146,12 +146,12 @@ export default function Upload() {
               <TouchableOpacity
                 onPress={() => setVideo(null)}
                 style={{
-                  backgroundColor: colors.surfaceLight,
+                  backgroundColor: colors.surfaceElevated,
                   paddingHorizontal: 20, paddingVertical: 12,
                   borderRadius: 12, borderWidth: 1, borderColor: colors.border,
                 }}
               >
-                <Text style={{ color: colors.text }}>Changer</Text>
+                <Text style={{ color: colors.textPrimary }}>Changer</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={uploadVideo}

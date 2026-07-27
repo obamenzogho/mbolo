@@ -67,7 +67,7 @@ export default function Register() {
 
   const inputBase = {
     backgroundColor: colors.surface,
-    color: colors.text,
+    color: colors.textPrimary,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -299,7 +299,7 @@ export default function Register() {
                   placeholderTextColor={colors.textSecondary}
                   onFocus={() => setFocusedField('nom')}
                   onBlur={() => setFocusedField(null)}
-                  style={{ color: colors.text, fontSize: 16 }}
+                  style={{ color: colors.textPrimary, fontSize: 16 }}
                 />
               </View>
             </View>
@@ -328,7 +328,7 @@ export default function Register() {
                   autoCorrect={false}
                   onFocus={() => setFocusedField('username')}
                   onBlur={() => setFocusedField(null)}
-                  style={{ flex: 1, color: colors.text, fontSize: 16 }}
+                  style={{ flex: 1, color: colors.textPrimary, fontSize: 16 }}
                 />
                 {username.length >= 2 && (
                   usernameStatus === 'checking' ? (
@@ -382,7 +382,7 @@ export default function Register() {
                   autoComplete="email"
                   onFocus={() => setFocusedField('email')}
                   onBlur={() => setFocusedField(null)}
-                  style={{ flex: 1, color: colors.text, fontSize: 16 }}
+                  style={{ flex: 1, color: colors.textPrimary, fontSize: 16 }}
                 />
                 {email.length >= 5 && email.includes('@') && (
                   emailStatus === 'checking' ? (
@@ -412,7 +412,7 @@ export default function Register() {
                 ]}
               >
                 <Ionicons name="calendar-outline" size={20} color={dateOfBirth ? colors.primary : colors.textSecondary} style={{ marginRight: 10 }} />
-                <Text style={{ flex: 1, color: dateOfBirth ? colors.text : colors.textSecondary, fontSize: 16 }}>
+                <Text style={{ flex: 1, color: dateOfBirth ? colors.textPrimary : colors.textSecondary, fontSize: 16 }}>
                   {dateLabel || 'Sélectionne ta date de naissance'}
                 </Text>
                 <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
@@ -449,7 +449,7 @@ export default function Register() {
                     }}
                   >
                     <Ionicons name={option.icon as any} size={18} color={genre === option.key ? colors.white : colors.textSecondary} />
-                    <Text style={{ color: genre === option.key ? colors.white : colors.text, fontSize: 13, fontWeight: '600' }}>{option.label}</Text>
+                    <Text style={{ color: genre === option.key ? colors.white : colors.textPrimary, fontSize: 13, fontWeight: '600' }}>{option.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -476,7 +476,7 @@ export default function Register() {
                   autoComplete="new-password"
                   onFocus={() => setFocusedField('password')}
                   onBlur={() => setFocusedField(null)}
-                  style={{ flex: 1, color: colors.text, fontSize: 16 }}
+                  style={{ flex: 1, color: colors.textPrimary, fontSize: 16 }}
                 />
                 <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ padding: 4 }}>
                   {showPassword ? <EyeOffIcon size={20} color={colors.textSecondary} /> : <EyeIcon size={20} color={colors.textSecondary} />}
@@ -528,7 +528,7 @@ export default function Register() {
                   autoComplete="new-password"
                   onFocus={() => setFocusedField('passwordConfirm')}
                   onBlur={() => setFocusedField(null)}
-                  style={{ flex: 1, color: colors.text, fontSize: 16 }}
+                  style={{ flex: 1, color: colors.textPrimary, fontSize: 16 }}
                 />
                 <TouchableOpacity onPress={() => setShowPasswordConfirm(!showPasswordConfirm)} style={{ padding: 4 }}>
                   {showPasswordConfirm ? <EyeOffIcon size={20} color={colors.textSecondary} /> : <EyeIcon size={20} color={colors.textSecondary} />}

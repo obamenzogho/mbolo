@@ -54,7 +54,7 @@ export function MessageBubble({
         style={[
           styles.bubble,
           {
-            backgroundColor: isMine ? colors.primary : colors.surfaceLight,
+            backgroundColor: isMine ? colors.primary : colors.surfaceElevated,
             borderBottomRightRadius: isMine ? 4 : 16,
             borderBottomLeftRadius: isMine ? 16 : 4,
           },
@@ -100,7 +100,7 @@ export function MessageBubble({
           </Pressable>
         )}
 
-        <Text style={[styles.message, { color: isMine ? '#fff' : colors.text }]}>
+        <Text style={[styles.message, { color: isMine ? '#fff' : colors.textPrimary }]}>
           {text}
         </Text>
 

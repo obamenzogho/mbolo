@@ -12,7 +12,7 @@
       "backgroundColor": "#0D1117"
     },
     "scheme": "mbolo",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "developmentClient": {
       "silentLaunch": false
     },
@@ -123,8 +123,7 @@
           "android": {
             "compileSdkVersion": 35,
             "targetSdkVersion": 35,
-            "minSdkVersion": 24,
-            "kotlinVersion": "1.9.25"
+            "minSdkVersion": 24
           }
         }
       ],
@@ -136,7 +135,9 @@
         }
       ],
       "expo-video",
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      "expo-font",
+      "./ffmpeg-kit-plugin.js"
     ],
     "extra": {
       "router": {},

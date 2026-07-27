@@ -248,7 +248,7 @@ export default function ConversationDetail() {
           const msgDate = msg.createdAt && typeof (msg.createdAt as any).toDate === 'function'
             ? (msg.createdAt as any).toDate() : new Date(msg.createdAt)
           const lastReadDate = lastRead && typeof (lastRead as any).toDate === 'function'
-            ? (lastRead as any).toDate() : new Date(lastRead)
+            ? (lastRead as any).toDate() : new Date(lastRead as any)
           const isRead = !!(lastRead && msg.createdAt && msgDate.getTime() <= lastReadDate.getTime())
           return (
             <MessageBubble

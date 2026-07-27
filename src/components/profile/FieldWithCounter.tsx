@@ -14,14 +14,14 @@ export const FieldWithCounter = memo(function FieldWithCounter({ label, value, m
   const len = value.length
   const nearLimit = maxLength ? len >= maxLength * 0.9 : false
 
-  const handleFocus = useCallback(() => {
+  const handleFocus = useCallback((e?: any) => {
     setFocused(true)
-    onFocus?.()
+    onFocus?.(e)
   }, [onFocus])
 
-  const handleBlur = useCallback(() => {
+  const handleBlur = useCallback((e?: any) => {
     setFocused(false)
-    onBlur?.()
+    onBlur?.(e)
   }, [onBlur])
 
   return (

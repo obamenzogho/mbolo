@@ -1,338 +1,90 @@
-const fs = require('fs');
-const path = require('path');
-const {
-  withPlugins,
-  withDangerousMod,
-  withAppBuildGradle,
-  withProjectBuildGradle,
-  withXcodeProject,
-} = require('@expo/config-plugins');
-const {
-  mergeContents,
-} = require('@expo/config-plugins/build/utils/generateCode');
+/**
+ * Expo config plugin: ffmpeg-kit-plugin
+ *
+ * Contexte : le paquet officiel `com.arthenica:ffmpeg-kit-*` a été retiré des
+ * dépôts Maven le 6 janvier 2025 (binaires supprimés). `ffmpeg-kit-react-native`
+ * ne peut donc plus résoudre son artefact natif Android et le build Gradle échoue
+ * sur `Could not find com.arthenica:ffmpeg-kit-https:6.0-2`.
+ *
+ * Solution : rediriger la dépendance native vers le fork communautaire maintenu
+ * `JamaisMagic/ffmpeg-kit-16KB`, publié sur Maven Central. Ce fork :
+ *   - fournit un AAR complet (classes Java `com.arthenica.ffmpegkit` + libs .so),
+ *     donc c'est un drop-in : la couche JS `utils/ffmpeg.ts` reste inchangée.
+ *   - est compilé avec le NDK r27 => alignement 16 KB page size, requis par
+ *     Google Play pour les nouvelles apps / mises à jour.
+ *
+ * On garde la variante `full-gpl` car le code utilise libx264 (encodage H.264),
+ * qui n'est disponible que dans les variantes GPL.
+ *
+ * NB : le fork ne publie que des binaires Android. iOS nécessitera une solution
+ * distincte (podspec auto-hébergé ou autre) le moment venu.
+ */
+const { withProjectBuildGradle } = require('@expo/config-plugins');
 
-function patchFfmpegPodspec(projectRoot) {
-  const podspecPath = path.join(
-    projectRoot,
-    'node_modules',
-    'ffmpeg-kit-react-native',
-    'ffmpeg-kit-react-native.podspec',
-  );
-  if (fs.existsSync(podspecPath)) {
-    let content = fs.readFileSync(podspecPath, 'utf-8');
-    const patched = content.replace(
-      "s.default_subspec   = 'https'",
-      "s.default_subspec   = 'full-gpl'",
-    );
-    if (patched !== content) {
-      fs.writeFileSync(podspecPath, patched, 'utf-8');
-      console.log('[ffmpeg-kit-plugin] Patched default_subspec to full-gpl');
-    }
-  }
-}
+// Coordonnée Maven Central du fork (variante full-gpl, build 16 KB / NDK r27).
+const FORK_ARTIFACT =
+  'io.github.jamaismagic.ffmpeg:ffmpeg-kit-main-full-gpl-16kb:6.1.4';
 
-function addSwiftConcurrencyFix(podfileContent) {
-  const marker = '# [ffmpeg-kit-plugin] Swift concurrency fix';
-  if (podfileContent.includes(marker)) return podfileContent;
+// Variantes de l'ancien paquet retiré susceptibles d'être demandées par
+// l'autolinking de ffmpeg-kit-react-native, toutes redirigées vers le fork.
+const RETIRED_MODULES = [
+  'com.arthenica:ffmpeg-kit-https',
+  'com.arthenica:ffmpeg-kit-min',
+  'com.arthenica:ffmpeg-kit-min-gpl',
+  'com.arthenica:ffmpeg-kit-audio',
+  'com.arthenica:ffmpeg-kit-video',
+  'com.arthenica:ffmpeg-kit-full',
+  'com.arthenica:ffmpeg-kit-full-gpl',
+];
 
-  const lines = podfileContent.split('\n');
-  let postInstallIndex = -1;
-  let postInstallIndent = '';
+const START_MARKER = '// [ffmpeg-kit-plugin] START — redirection vers le fork Maven Central';
+const END_MARKER = '// [ffmpeg-kit-plugin] END';
 
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].includes('post_install do |installer|')) {
-      postInstallIndex = i;
-      postInstallIndent = lines[i].match(/^(\s*)/)[1];
-      break;
-    }
-  }
+function buildSubstitutionBlock() {
+  const substitutions = RETIRED_MODULES.map(
+    (mod) =>
+      `                substitute module('${mod}') using module('${FORK_ARTIFACT}')`,
+  ).join('\n');
 
-  if (postInstallIndex === -1) return podfileContent;
-
-  let endIndex = -1;
-  for (let i = postInstallIndex + 1; i < lines.length; i++) {
-    if (lines[i].trim() === 'end' && lines[i].startsWith(postInstallIndent)) {
-      endIndex = i;
-      break;
-    }
-  }
-
-  if (endIndex === -1) return podfileContent;
-
-  const fix = [
-    `${postInstallIndent}  ${marker}`,
-    `${postInstallIndent}  installer.pods_project.targets.each do |target|`,
-    `${postInstallIndent}    target.build_configurations.each do |config|`,
-    `${postInstallIndent}      config.build_settings['SWIFT_STRICT_CONCURRENCY'] = 'minimal'`,
-    `${postInstallIndent}    end`,
-    `${postInstallIndent}  end`,
-    `${postInstallIndent}  # Also fix the main project targets`,
-    `${postInstallIndent}  installer.generated_projects.each do |project|`,
-    `${postInstallIndent}    project.targets.each do |target|`,
-    `${postInstallIndent}      target.build_configurations.each do |config|`,
-    `${postInstallIndent}        config.build_settings['SWIFT_STRICT_CONCURRENCY'] = 'minimal'`,
-    `${postInstallIndent}      end`,
-    `${postInstallIndent}    end`,
-    `${postInstallIndent}  end`,
-  ];
-
-  lines.splice(endIndex, 0, ...fix);
-  return lines.join('\n');
-}
-
-function addFfmpegHooks(podfileContent) {
-  const marker = '# [ffmpeg-kit-plugin] hooks';
-  if (podfileContent.includes(marker)) {
-    return podfileContent;
-  }
-
-  const podDeclarations = `
-${marker}
-# Override ffmpeg-kit-ios-full-gpl with custom podspec (community-hosted binaries)
-pod 'ffmpeg-kit-ios-full-gpl', :podspec => './ffmpeg-kit-ios-full-gpl.podspec'
-# Explicitly select the full-gpl subspec, overriding the default 'https' subspec
-pod 'ffmpeg-kit-react-native', :path => '../node_modules/ffmpeg-kit-react-native', :subspecs => ['full-gpl']
-`;
-
-  // Insert pod declarations BEFORE post_install (inside the target block)
-  podfileContent = podfileContent.replace(
-    /\n(\s+post_install do \|installer\|)/,
-    podDeclarations + '$1',
-  );
-
-  // Add Swift concurrency fix inside the existing post_install hook
-  podfileContent = addSwiftConcurrencyFix(podfileContent);
-
-  return podfileContent;
-}
-
-const withSwiftConcurrency = (config) => {
-  return withXcodeProject(config, (cfg) => {
-    const xcodeProject = cfg.modResults;
-    const configurations = xcodeProject.hash.project.objects.XCBuildConfiguration;
-
-    for (const key of Object.keys(configurations)) {
-      const configEntry = configurations[key];
-      if (configEntry.buildSettings) {
-        configEntry.buildSettings.SWIFT_STRICT_CONCURRENCY = 'minimal';
-      }
-    }
-
-    return cfg;
-  });
-};
-
-function ensureDir(dir) {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-}
-
-const withFfmpegKitIos = (config, { iosUrl }) => {
-  return withDangerousMod(config, [
-    'ios',
-    async (cfg) => {
-      const projectRoot = cfg.modRequest.projectRoot;
-      const { platformProjectRoot } = cfg.modRequest;
-
-      patchFfmpegPodspec(projectRoot);
-
-      const podspecFile = path.join(
-        platformProjectRoot,
-        'ffmpeg-kit-ios-full-gpl.podspec',
-      );
-      const podspec = `
-Pod::Spec.new do |s|
-    s.name             = 'ffmpeg-kit-ios-full-gpl'
-    s.version          = '6.0'
-    s.summary          = 'Custom full-gpl FFmpegKit iOS frameworks'
-    s.homepage         = 'https://github.com/arthenica/ffmpeg-kit'
-    s.license          = { :type => 'LGPL' }
-    s.author           = { 'NooruddinLakhani' => 'https://github.com/NooruddinLakhani' }
-    s.platform         = :ios, '12.1'
-    s.static_framework = true
-
-    s.source           = { :http => '${iosUrl}' }
-
-    s.vendored_frameworks = [
-      'ffmpeg-kit-ios-full-gpl-latest/ffmpeg-kit-ios-full-gpl/6.0-80adc/libswscale.xcframework',
-      'ffmpeg-kit-ios-full-gpl-latest/ffmpeg-kit-ios-full-gpl/6.0-80adc/libswresample.xcframework',
-      'ffmpeg-kit-ios-full-gpl-latest/ffmpeg-kit-ios-full-gpl/6.0-80adc/libavutil.xcframework',
-      'ffmpeg-kit-ios-full-gpl-latest/ffmpeg-kit-ios-full-gpl/6.0-80adc/libavformat.xcframework',
-      'ffmpeg-kit-ios-full-gpl-latest/ffmpeg-kit-ios-full-gpl/6.0-80adc/libavfilter.xcframework',
-      'ffmpeg-kit-ios-full-gpl-latest/ffmpeg-kit-ios-full-gpl/6.0-80adc/libavdevice.xcframework',
-      'ffmpeg-kit-ios-full-gpl-latest/ffmpeg-kit-ios-full-gpl/6.0-80adc/libavcodec.xcframework',
-      'ffmpeg-kit-ios-full-gpl-latest/ffmpeg-kit-ios-full-gpl/6.0-80adc/ffmpegkit.xcframework'
-    ]
-end
-`;
-      fs.writeFileSync(podspecFile, podspec);
-
-      const podfilePath = path.join(platformProjectRoot, 'Podfile');
-      let podfileContent = fs.readFileSync(podfilePath, 'utf-8');
-
-      podfileContent = addFfmpegHooks(podfileContent);
-      fs.writeFileSync(podfilePath, podfileContent, 'utf-8');
-
-      return cfg;
-    },
-  ]);
-};
-
-const withFfmpegKitAndroid = (config, { androidUrl }) => {
-  config = withAppBuildGradle(config, (cfg) => {
-    let buildGradle = cfg.modResults.contents;
-
-    const appFlatDirRepo = `
-    repositories {
-        flatDir {
-            dirs "${'$'}{projectDir}/../libs"
-        }
-    }`;
-
-    if (!buildGradle.includes("dirs \"${'$'}{projectDir}/../libs\"")) {
-      buildGradle = mergeContents({
-        tag: 'ffmpeg-kit-app-flatdir-repo',
-        src: buildGradle,
-        newSrc: appFlatDirRepo,
-        anchor: /android\s*\{/,
-        offset: 1,
-        comment: '//',
-      }).contents;
-    }
-
-    const newDependencies = `
-    implementation(name: 'ffmpeg-kit-full-gpl', ext: 'aar')
-    implementation 'com.arthenica:smart-exception-java:0.2.1'`;
-    if (!buildGradle.includes("name: 'ffmpeg-kit-full-gpl', ext: 'aar'")) {
-      buildGradle = mergeContents({
-        tag: 'ffmpeg-kit-dependencies',
-        src: buildGradle,
-        newSrc: newDependencies,
-        anchor: /dependencies\s*\{/,
-        offset: 1,
-        comment: '//',
-      }).contents;
-    }
-
-    const excludeConfig = `
+  return `
+${START_MARKER}
+// L'artefact officiel com.arthenica:ffmpeg-kit-* n'existe plus (retiré le 2025-01-06).
+// On substitue toute demande par le fork 16 KB publié sur Maven Central.
+allprojects {
     configurations.all {
-        exclude group: 'com.arthenica', module: 'ffmpeg-kit-https'
-        exclude group: 'com.arthenica', module: 'ffmpeg-kit-min'
-        exclude group: 'com.arthenica', module: 'ffmpeg-kit-audio'
-        exclude group: 'com.arthenica', module: 'ffmpeg-kit-video'
-        exclude group: 'com.arthenica', module: 'ffmpeg-kit-full'
-        exclude group: 'com.arthenica', module: 'ffmpeg-kit-full-gpl'
-    }`;
-
-    if (!buildGradle.includes('configurations.all')) {
-      buildGradle = mergeContents({
-        tag: 'ffmpeg-kit-exclude-config',
-        src: buildGradle,
-        newSrc: excludeConfig,
-        anchor: /android\s*\{/,
-        offset: -1,
-        comment: '//',
-      }).contents;
-    }
-
-    const downloadBlock = `
-def aarUrl = '${androidUrl}'
-def aarFile = file("\${projectDir}/../libs/ffmpeg-kit-full-gpl.aar")
-
-if (!aarFile.parentFile.exists()) {
-    aarFile.parentFile.mkdirs()
-}
-
-if (!aarFile.exists()) {
-    println "[ffmpeg-kit] Downloading AAR from \$aarUrl..."
-    try {
-        new URL(aarUrl).withInputStream { i ->
-            aarFile.withOutputStream { it << i }
-        }
-        println "[ffmpeg-kit] AAR downloaded successfully"
-    } catch (Exception e) {
-        println "[ffmpeg-kit] Failed to download AAR: \${e.message}"
-    }
-}
-
-afterEvaluate {
-    tasks.register("downloadAar") {
-        description = "Downloads ffmpeg-kit AAR file"
-        group = "ffmpeg-kit"
-        outputs.file(aarFile)
-        doLast {
-            if (!aarFile.exists()) {
-                println "[ffmpeg-kit] Downloading AAR from \$aarUrl..."
-                new URL(aarUrl).withInputStream { i ->
-                    aarFile.withOutputStream { it << i }
-                }
-                println "[ffmpeg-kit] AAR downloaded successfully"
-            }
+        resolutionStrategy.dependencySubstitution {
+${substitutions}
         }
     }
-    preBuild.dependsOn("downloadAar")
-}`;
+}
+${END_MARKER}
+`;
+}
 
-    if (!buildGradle.includes('def aarUrl =')) {
-      buildGradle = buildGradle + '\n' + downloadBlock;
+const withFfmpegKitAndroid = (config) => {
+  return withProjectBuildGradle(config, (cfg) => {
+    if (cfg.modResults.language !== 'groovy') {
+      throw new Error(
+        '[ffmpeg-kit-plugin] Seul le build.gradle Groovy est supporté.',
+      );
     }
 
-    cfg.modResults.contents = buildGradle;
-    return cfg;
-  });
+    let contents = cfg.modResults.contents;
 
-  config = withProjectBuildGradle(config, (cfg) => {
-    let buildGradle = cfg.modResults.contents;
-
-    const projectFlatDirLibsPath = '$rootDir/libs';
-    const flatDirString = `        flatDir {\n            dirs "${projectFlatDirLibsPath}"\n        }`;
-    const allProjectsRepositoriesRegex =
-      /(allprojects\s*\{\s*repositories\s*\{)/;
-    const existingFlatDirRegex = new RegExp(
-      `allprojects\\s*\\{[\\s\\S]*?repositories\\s*\\{[\\s\\S]*?flatDir\\s*\\{[\\s\\S]*?dirs\\s*['"]${projectFlatDirLibsPath.replace(
-        /[$.]/g,
-        '\\$&',
-      )}['"]`,
-    );
-
-    if (!buildGradle.match(existingFlatDirRegex)) {
-      const match = buildGradle.match(allProjectsRepositoriesRegex);
-      if (match) {
-        const insertionPoint = match.index + match[0].length;
-        buildGradle =
-          buildGradle.substring(0, insertionPoint) +
-          '\n' +
-          flatDirString +
-          buildGradle.substring(insertionPoint);
+    // Idempotence : retirer un bloc déjà injecté avant de le réécrire.
+    const startIdx = contents.indexOf(START_MARKER);
+    if (startIdx !== -1) {
+      const endIdx = contents.indexOf(END_MARKER);
+      if (endIdx !== -1) {
+        contents =
+          contents.slice(0, startIdx).replace(/\n+$/, '\n') +
+          contents.slice(endIdx + END_MARKER.length).replace(/^\n+/, '\n');
       }
     }
 
-    cfg.modResults.contents = buildGradle;
+    cfg.modResults.contents = contents.replace(/\s*$/, '\n') + buildSubstitutionBlock();
     return cfg;
   });
-
-  return config;
 };
 
-module.exports = (config, options = {}) => {
-  const { iosUrl, androidUrl } = options;
-
-  if (!iosUrl) {
-    throw new Error(
-      'FFmpeg Kit plugin requires "iosUrl" option',
-    );
-  }
-
-  if (!androidUrl) {
-    throw new Error(
-      'FFmpeg Kit plugin requires "androidUrl" option',
-    );
-  }
-
-  return withPlugins(config, [
-    (config) => withFfmpegKitIos(config, { iosUrl }),
-    (config) => withFfmpegKitAndroid(config, { androidUrl }),
-    withSwiftConcurrency,
-  ]);
-};
+module.exports = (config) => withFfmpegKitAndroid(config);

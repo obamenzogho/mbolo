@@ -42,9 +42,9 @@ export function ReportModal({ visible, targetType, targetId, contentOwnerId, com
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
         <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '80%' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 0.5, borderBottomColor: colors.border }}>
-            <Text style={{ color: colors.text, fontSize: 18, fontWeight: '700', flex: 1 }}>Signaler</Text>
+            <Text style={{ color: colors.textPrimary, fontSize: 18, fontWeight: '700', flex: 1 }}>Signaler</Text>
             <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={26} color={colors.text} />
+              <Ionicons name="close" size={26} color={colors.textPrimary} />
             </TouchableOpacity>
           </View>
 
@@ -60,11 +60,11 @@ export function ReportModal({ visible, targetType, targetId, contentOwnerId, com
                 style={{
                   flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
                   paddingVertical: 14, paddingHorizontal: 14, borderRadius: 10, marginBottom: 8,
-                  backgroundColor: reason === r.key ? colors.surfaceLight : colors.surface,
+                  backgroundColor: reason === r.key ? colors.surfaceElevated : colors.surface,
                   borderWidth: 1, borderColor: reason === r.key ? colors.primary : colors.border,
                 }}
               >
-                <Text style={{ color: colors.text, fontSize: 15 }}>{r.label}</Text>
+                <Text style={{ color: colors.textPrimary, fontSize: 15 }}>{r.label}</Text>
                 {reason === r.key && <Ionicons name="checkmark-circle" size={22} color={colors.primary} />}
               </TouchableOpacity>
             ))}
@@ -77,7 +77,7 @@ export function ReportModal({ visible, targetType, targetId, contentOwnerId, com
                 placeholderTextColor={colors.textSecondary}
                 multiline
                 style={{
-                  backgroundColor: colors.surface, color: colors.text, borderRadius: 10,
+                  backgroundColor: colors.surface, color: colors.textPrimary, borderRadius: 10,
                   padding: 12, minHeight: 80, textAlignVertical: 'top', marginTop: 4,
                   borderWidth: 1, borderColor: colors.border,
                 }}
@@ -88,7 +88,7 @@ export function ReportModal({ visible, targetType, targetId, contentOwnerId, com
               onPress={submit}
               disabled={!reason || submitting}
               style={{
-                backgroundColor: reason && !submitting ? colors.primary : colors.surfaceLight,
+                backgroundColor: reason && !submitting ? colors.primary : colors.surfaceElevated,
                 borderRadius: 12, paddingVertical: 15, alignItems: 'center', marginTop: 16,
               }}
             >

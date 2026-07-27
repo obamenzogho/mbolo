@@ -63,7 +63,7 @@ export async function blockConversation(conversationId: string, userId: string) 
 interface StoryReplyReference {
   storyId: string
   mediaUrl: string
-  mediaType: 'image' | 'video'
+  mediaType: 'image' | 'video' | 'text'
   ownerId: string
 }
 

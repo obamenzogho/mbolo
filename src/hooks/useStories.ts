@@ -13,7 +13,10 @@ export interface Story {
   username: string
   avatarUrl: string
   mediaUrl: string
-  mediaType: 'image' | 'video'
+  mediaType: 'image' | 'video' | 'text'
+  text?: string
+  backgroundColor?: string
+  backgroundGradient?: string[]
   caption?: string
   textOverlay?: string
   textPosition?: { x: number; y: number }
@@ -22,6 +25,7 @@ export interface Story {
   savedToHighlight: boolean
   views: number
   viewedBy: string[]
+  moderationStatus?: 'visible' | 'hidden'
 }
 
 function toDate(value: any): Date {
@@ -62,6 +66,38 @@ export function useStories() {
       caption: caption || '',
       textOverlay: textOverlay || '',
       textPosition: textPosition || { x: 0, y: 0 },
+      createdAt: serverTimestamp(),
+      expiresAt,
+      savedToHighlight: false,
+      views: 0,
+      viewedBy: [],
+    })
+
+    return storyDoc.id
+  }, [user])
+
+  const uploadTextStory = useCallback(async (
+    text: string,
+    backgroundColor: string,
+    backgroundGradient?: string[],
+  ): Promise<string> => {
+    if (!user) throw new Error('Non authentifié')
+
+    const now = new Date()
+    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000)
+
+    const storyDoc = await addDoc(collection(db, 'stories'), {
+      userId: user.uid,
+      username: user.displayName || 'Utilisateur',
+      avatarUrl: user.photoURL || '',
+      mediaUrl: '',
+      mediaType: 'text',
+      text,
+      backgroundColor,
+      backgroundGradient: backgroundGradient || [],
+      caption: '',
+      textOverlay: '',
+      textPosition: { x: 0, y: 0 },
       createdAt: serverTimestamp(),
       expiresAt,
       savedToHighlight: false,
@@ -190,6 +226,7 @@ export function useStories() {
     myStories,
     loading,
     uploadStory,
+    uploadTextStory,
     deleteStory,
     getMyStories,
     getUserStories,
