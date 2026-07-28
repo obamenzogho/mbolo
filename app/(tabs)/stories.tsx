@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   View,
   Text,
-  Image,
   Pressable,
   FlatList,
   ScrollView,
@@ -114,24 +113,6 @@ export default function ActusScreen() {
 
   const header = (
     <>
-      <View style={styles.composer}>
-        {userPhotoURL ? (
-          <Image source={{ uri: userPhotoURL }} style={styles.composerAvatar} />
-        ) : (
-          <View style={[styles.composerAvatar, styles.avatarFallback]}>
-            <Ionicons name="person" size={18} color="#777" />
-          </View>
-        )}
-        <Pressable onPress={() => router.push('/news-compose')} style={styles.composerInput}>
-          <Text style={styles.composerPlaceholder}>Quoi de neuf ?</Text>
-        </Pressable>
-        <Pressable onPress={() => router.push('/news-compose')} hitSlop={10}>
-          <Ionicons name="images" size={24} color="#45BD62" />
-        </Pressable>
-      </View>
-
-      <View style={styles.separator} />
-
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -270,19 +251,6 @@ const styles = StyleSheet.create({
   },
   title: { color: '#fff', fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
   iconBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#292B2F', alignItems: 'center', justifyContent: 'center' },
-
-  composer: {
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    backgroundColor: '#111214',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  composerAvatar: { width: 40, height: 40, borderRadius: 20 },
-  avatarFallback: { backgroundColor: '#25272A', alignItems: 'center', justifyContent: 'center' },
-  composerInput: { flex: 1, height: 40, paddingHorizontal: 14, borderRadius: 20, borderWidth: 1, borderColor: '#3A3C40', justifyContent: 'center' },
-  composerPlaceholder: { color: '#C8C8C8', fontSize: 14 },
 
   separator: { height: 6, backgroundColor: '#08090A' },
 
