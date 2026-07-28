@@ -344,7 +344,14 @@ async function backfill() {
 
   // Posts backfill (all types: text, image, carousel, video, etc.)
   const postsSnap = await db.collection('posts').where('visibility', '==', 'public').orderBy('createdAt', 'desc').limit(500).get()
-  const postDocs = postsSnap.docs.map(mapPost)
+  const postDocs = postsSnap.docs
+    .map(mapPost)
+    .filter(
+      (post) =>
+        post.visibility === 'public' &&
+        post.moderationStatus !== 'hidden' &&
+        post.moderationStatus !== 'blocked',
+    )
   if (postDocs.length) {
     await ts.collections('posts').documents().import(postDocs, { action: 'upsert' })
     console.log(`  ✅ ${postDocs.length} posts imported (all media types)`)
@@ -429,7 +436,16 @@ function startListeners() {
       const { doc, type } = change
 
       if (type === 'added' || type === 'modified') {
-        ts.collections('posts').documents().upsert(mapPost(doc)).catch((err) => {
+        const mapped = mapPost(doc)
+        const vis = mapped.visibility ?? 'public'
+        const mod = mapped.moderationStatus ?? 'approved'
+
+        if (vis !== 'public' || mod === 'hidden' || mod === 'blocked') {
+          ts.collections('posts').documents(doc.id).delete().catch(() => {})
+          continue
+        }
+
+        ts.collections('posts').documents().upsert(mapped).catch((err) => {
           console.warn(`⚠ Posts upsert failed for ${doc.id}:`, err?.message ?? err)
         })
       } else if (type === 'removed') {
