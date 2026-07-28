@@ -4,26 +4,34 @@
 
 import {
   collection,
-  query,
-  orderBy,
-  limit,
-  getDocs,
+  doc,
   getDoc,
+  getDocs,
+  limit,
+  orderBy,
+  query,
   startAfter,
   where,
-  doc,
   type QueryDocumentSnapshot,
+  type DocumentData,
 } from 'firebase/firestore'
-import { db } from '../../../lib/firebase'
-import { auth } from '../../../lib/firebase'
+import { auth, db } from '../../../lib/firebase'
 import { captureException } from '../../../lib/sentry'
 import { rankPosts, type PostUserTaste } from './postRanking'
 import { buildPostUserTaste } from './buildPostUserTaste'
 import type { NewsPost } from '../types'
 
 const PAGE_SIZE = 20
-const MIN_KEEP = 5
-const MAX_EXTRA_FETCHES = 3
+const FOLLOWING_CHUNK_SIZE = 30
+const MAX_CONCURRENT_FOLLOWING_QUERIES = 3
+
+type PostSnapshot = QueryDocumentSnapshot<DocumentData>
+
+interface FollowingCursor {
+  ids: string[]
+  lastDoc: PostSnapshot | null
+  exhausted: boolean
+}
 
 export interface NewsFeedPage {
   posts: NewsPost[]
@@ -31,26 +39,36 @@ export interface NewsFeedPage {
   hasMore: boolean
 }
 
-function mapDocToPost(d: QueryDocumentSnapshot): NewsPost {
-  const data = d.data() as any
+function mapDocToPost(snapshot: PostSnapshot): NewsPost {
+  const data = snapshot.data() as Record<string, any>
+  const createdAt =
+    typeof data.createdAt?.toDate === 'function'
+      ? data.createdAt.toDate()
+      : data.createdAt instanceof Date
+        ? data.createdAt
+        : new Date()
+
   return {
-    id: d.id,
-    userId: data.userId,
-    userName: data.userName ?? '',
+    id: snapshot.id,
+    userId: String(data.userId ?? ''),
+    userName: String(data.userName ?? ''),
     userPhotoURL: data.userPhotoURL ?? undefined,
-    text: data.text || '',
-    format: data.format || 'text',
-    media: data.media ?? [],
-    visibility: data.visibility || 'public',
+    text: String(data.text ?? ''),
+    format: data.format ?? 'text',
+    media: Array.isArray(data.media) ? data.media : [],
+    visibility: data.visibility ?? 'public',
     commentsEnabled: data.commentsEnabled !== false,
-    likes: data.likes ?? 0,
-    likedBy: data.likedBy ?? [],
-    comments: data.comments ?? 0,
-    shares: data.shares ?? 0,
-    saves: data.saves ?? 0,
-    savedBy: data.savedBy ?? [],
-    createdAt: data.createdAt?.toDate?.() ?? new Date(),
-    updatedAt: data.updatedAt?.toDate?.() ?? undefined,
+    likes: Number(data.likes ?? 0),
+    likedBy: Array.isArray(data.likedBy) ? data.likedBy : [],
+    comments: Number(data.comments ?? 0),
+    shares: Number(data.shares ?? 0),
+    saves: Number(data.saves ?? 0),
+    savedBy: Array.isArray(data.savedBy) ? data.savedBy : [],
+    createdAt,
+    updatedAt:
+      typeof data.updatedAt?.toDate === 'function'
+        ? data.updatedAt.toDate()
+        : undefined,
     background: data.background,
     location: data.location,
     mood: data.mood,
@@ -59,155 +77,432 @@ function mapDocToPost(d: QueryDocumentSnapshot): NewsPost {
     myReaction: data.myReaction ?? undefined,
     article: data.article,
     videoShare: data.videoShare,
-    rankingScore: data.rankingScore,
+    rankingScore:
+      typeof data.rankingScore === 'number'
+        ? data.rankingScore
+        : undefined,
   }
 }
 
-class NewsFeedSource {
-  // Cursors séparés pour chaque requête (3 requêtes mergées)
-  private lastDocPublic: QueryDocumentSnapshot | null = null
-  private lastDocFollowing: QueryDocumentSnapshot | null = null
-  private lastDocOwn: QueryDocumentSnapshot | null = null
-  private isFirstFetch = true
-  private loading = false
-  private extraFetches = 0
-  private taste: PostUserTaste = { likedAuthors: {}, likedHashtags: {} }
-  private tasteLoaded = false
-  private blockedIds: Set<string> = new Set()
-  private followingIds: string[] = []
-  private userDataLoaded = false
-  private hasMoreValue = true
+function chunk<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = []
 
-  get isLoading() { return this.loading }
-  get hasMoreFlag() { return this.hasMoreValue }
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size))
+  }
 
-  async fetchNext(): Promise<NewsFeedPage | null> {
-    if (this.loading || !this.hasMoreValue) return null
-    this.loading = true
+  return chunks
+}
 
-    try {
-      const uid = auth.currentUser?.uid
-      if (!uid) { this.loading = false; return null }
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = []
+  let nextIndex = 0
 
-      // Charger les données utilisateur une seule fois (blocked + following)
-      if (!this.userDataLoaded) {
-        try {
-          const userSnap = await getDoc(doc(db, 'users', uid))
-          if (userSnap.exists()) {
-            const data = userSnap.data()
-            this.blockedIds = new Set(data.blocked ?? [])
-            this.followingIds = data.following ?? []
-          }
-        } catch (e) {
-          captureException(e instanceof Error ? e : new Error(String(e)), { context: 'newsFeedSource.loadUserData' })
-        }
-        this.userDataLoaded = true
-      }
-      if (!this.tasteLoaded) {
-        this.taste = await buildPostUserTaste(uid)
-        this.tasteLoaded = true
+  async function runWorker(): Promise<void> {
+    while (true) {
+      const currentIndex = nextIndex
+      nextIndex += 1
+
+      if (currentIndex >= items.length) {
+        return
       }
 
-      const isFirst = this.isFirstFetch
-      let allPosts: NewsPost[] = []
-      let anyHasMore = false
-
-      // 1) Posts publics
-      try {
-        const qPublic = this.lastDocPublic
-          ? query(collection(db, 'posts'), where('visibility', '==', 'public'), orderBy('createdAt', 'desc'), startAfter(this.lastDocPublic), limit(PAGE_SIZE))
-          : query(collection(db, 'posts'), where('visibility', '==', 'public'), orderBy('createdAt', 'desc'), limit(PAGE_SIZE))
-        const snap = await getDocs(qPublic)
-        if (snap.docs.length > 0) {
-          this.lastDocPublic = snap.docs[snap.docs.length - 1]
-          allPosts.push(...snap.docs.map(mapDocToPost))
-          if (snap.docs.length >= PAGE_SIZE) anyHasMore = true
-        }
-    } catch (e) {
-      captureException(e instanceof Error ? e : new Error(String(e)), { context: 'newsFeedSource.fetchPublic' })
-    }
-
-    // 2) Posts followers-only des abonnements
-    if (this.followingIds.length > 0) {
-      try {
-        for (let i = 0; i < this.followingIds.length; i += 30) {
-          const chunk = this.followingIds.slice(i, i + 30)
-          const qFollowers = this.lastDocFollowing
-            ? query(collection(db, 'posts'), where('userId', 'in', chunk), where('visibility', '==', 'followers'), orderBy('createdAt', 'desc'), startAfter(this.lastDocFollowing), limit(PAGE_SIZE))
-            : query(collection(db, 'posts'), where('userId', 'in', chunk), where('visibility', '==', 'followers'), orderBy('createdAt', 'desc'), limit(PAGE_SIZE))
-          const snap = await getDocs(qFollowers)
-          if (snap.docs.length > 0) {
-            this.lastDocFollowing = snap.docs[snap.docs.length - 1]
-            allPosts.push(...snap.docs.map(mapDocToPost))
-            if (snap.docs.length >= PAGE_SIZE) anyHasMore = true
-          }
-        }
-      } catch (e) {
-        captureException(e instanceof Error ? e : new Error(String(e)), { context: 'newsFeedSource.fetchFollowing' })
-      }
-    }
-
-    // 3) Mes propres posts
-    try {
-      const qOwn = this.lastDocOwn
-        ? query(collection(db, 'posts'), where('userId', '==', uid), orderBy('createdAt', 'desc'), startAfter(this.lastDocOwn), limit(PAGE_SIZE))
-        : query(collection(db, 'posts'), where('userId', '==', uid), orderBy('createdAt', 'desc'), limit(PAGE_SIZE))
-      const snap = await getDocs(qOwn)
-      if (snap.docs.length > 0) {
-        this.lastDocOwn = snap.docs[snap.docs.length - 1]
-        allPosts.push(...snap.docs.map(mapDocToPost))
-        if (snap.docs.length >= PAGE_SIZE) anyHasMore = true
-      }
-    } catch (e) {
-      captureException(e instanceof Error ? e : new Error(String(e)), { context: 'newsFeedSource.fetchOwn' })
-    }
-
-      // Dedup + filtre blocked
-      const seen = new Set<string>()
-      allPosts = allPosts.filter((p) => {
-        if (seen.has(p.id) || this.blockedIds.has(p.userId)) return false
-        seen.add(p.id)
-        return true
-      })
-
-      // Ranking client-side
-      allPosts = rankPosts(allPosts, this.taste)
-
-      // Sécurité : si trop peu de posts, fetch supplémentaire
-      if (allPosts.length < MIN_KEEP && anyHasMore && this.extraFetches < MAX_EXTRA_FETCHES) {
-        this.extraFetches++
-        this.loading = false
-        const next = await this.fetchNext()
-        if (next) {
-          allPosts = [...allPosts, ...next.posts]
-          anyHasMore = next.hasMore
-        }
-      } else {
-        this.extraFetches = 0
-      }
-
-      this.hasMoreValue = anyHasMore
-      this.isFirstFetch = false
-      this.loading = false
-
-      return { posts: allPosts.slice(0, PAGE_SIZE), isFirst, hasMore: this.hasMoreValue }
-    } catch (e) {
-      captureException(e instanceof Error ? e : new Error(String(e)), { context: 'newsFeedSource' })
-      this.loading = false
-      return null
+      results[currentIndex] = await worker(items[currentIndex])
     }
   }
 
-  reset() {
-    this.lastDocPublic = null
-    this.lastDocFollowing = null
-    this.lastDocOwn = null
+  const workers = Array.from(
+    {
+      length: Math.min(concurrency, items.length),
+    },
+    () => runWorker(),
+  )
+
+  await Promise.all(workers)
+
+  return results
+}
+
+class NewsFeedSource {
+  private lastPublicDoc: PostSnapshot | null = null
+  private lastOwnDoc: PostSnapshot | null = null
+
+  private followingCursors: FollowingCursor[] = []
+
+  private pendingPosts: NewsPost[] = []
+  private pendingIds = new Set<string>()
+
+  private isFirstFetch = true
+  private loading = false
+  private hasMoreValue = true
+
+  private publicSourceExhausted = false
+  private ownSourceExhausted = false
+
+  private blockedIds = new Set<string>()
+  private followingIds: string[] = []
+  private userDataLoaded = false
+
+  private taste: PostUserTaste = {
+    likedAuthors: {},
+    likedHashtags: {},
+  }
+
+  private tasteLoaded = false
+
+  get isLoading(): boolean {
+    return this.loading
+  }
+
+  get hasMoreFlag(): boolean {
+    return this.hasMoreValue || this.pendingPosts.length > 0
+  }
+
+  private async loadUserData(uid: string): Promise<void> {
+    if (this.userDataLoaded) {
+      return
+    }
+
+    try {
+      const snapshot = await getDoc(doc(db, 'users', uid))
+
+      if (snapshot.exists()) {
+        const data = snapshot.data()
+
+        this.blockedIds = new Set(
+          Array.isArray(data.blocked) ? data.blocked : [],
+        )
+
+        const rawFollowing: unknown = data.following
+        this.followingIds = Array.isArray(rawFollowing)
+          ? rawFollowing.filter(
+              (value: unknown): value is string =>
+                typeof value === 'string',
+            )
+          : []
+      }
+
+      this.followingCursors = chunk(
+        this.followingIds,
+        FOLLOWING_CHUNK_SIZE,
+      ).map((ids) => ({
+        ids,
+        lastDoc: null,
+        exhausted: false,
+      }))
+
+      this.userDataLoaded = true
+    } catch (error) {
+      captureException(
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          context: 'newsFeedSource.loadUserData',
+        },
+      )
+
+      this.userDataLoaded = true
+    }
+  }
+
+  private async loadTaste(uid: string): Promise<void> {
+    if (this.tasteLoaded) {
+      return
+    }
+
+    try {
+      this.taste = await buildPostUserTaste(uid)
+    } catch (error) {
+      captureException(
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          context: 'newsFeedSource.loadTaste',
+        },
+      )
+
+      this.taste = {
+        likedAuthors: {},
+        likedHashtags: {},
+      }
+    } finally {
+      this.tasteLoaded = true
+    }
+  }
+
+  private async fetchPublicPage(): Promise<NewsPost[]> {
+    if (this.publicSourceExhausted) {
+      return []
+    }
+
+    const constraints: any[] = [
+      where('visibility', '==', 'public'),
+      orderBy('createdAt', 'desc'),
+      limit(PAGE_SIZE),
+    ]
+
+    if (this.lastPublicDoc) {
+      constraints.push(startAfter(this.lastPublicDoc))
+    }
+
+    const snapshot = await getDocs(
+      query(collection(db, 'posts'), ...constraints),
+    )
+
+    if (snapshot.docs.length > 0) {
+      this.lastPublicDoc =
+        snapshot.docs[snapshot.docs.length - 1]
+    }
+
+    if (snapshot.docs.length < PAGE_SIZE) {
+      this.publicSourceExhausted = true
+    }
+
+    return snapshot.docs.map(mapDocToPost)
+  }
+
+  private async fetchOwnPage(uid: string): Promise<NewsPost[]> {
+    if (this.ownSourceExhausted) {
+      return []
+    }
+
+    const constraints: any[] = [
+      where('userId', '==', uid),
+      orderBy('createdAt', 'desc'),
+      limit(PAGE_SIZE),
+    ]
+
+    if (this.lastOwnDoc) {
+      constraints.push(startAfter(this.lastOwnDoc))
+    }
+
+    const snapshot = await getDocs(
+      query(collection(db, 'posts'), ...constraints),
+    )
+
+    if (snapshot.docs.length > 0) {
+      this.lastOwnDoc =
+        snapshot.docs[snapshot.docs.length - 1]
+    }
+
+    if (snapshot.docs.length < PAGE_SIZE) {
+      this.ownSourceExhausted = true
+    }
+
+    return snapshot.docs.map(mapDocToPost)
+  }
+
+  private async fetchFollowingChunk(
+    cursor: FollowingCursor,
+  ): Promise<NewsPost[]> {
+    if (cursor.exhausted || cursor.ids.length === 0) {
+      return []
+    }
+
+    const constraints: any[] = [
+      where('userId', 'in', cursor.ids),
+      where('visibility', '==', 'followers'),
+      orderBy('createdAt', 'desc'),
+      limit(PAGE_SIZE),
+    ]
+
+    if (cursor.lastDoc) {
+      constraints.push(startAfter(cursor.lastDoc))
+    }
+
+    const snapshot = await getDocs(
+      query(collection(db, 'posts'), ...constraints),
+    )
+
+    if (snapshot.docs.length > 0) {
+      cursor.lastDoc = snapshot.docs[snapshot.docs.length - 1]
+    }
+
+    if (snapshot.docs.length < PAGE_SIZE) {
+      cursor.exhausted = true
+    }
+
+    return snapshot.docs.map(mapDocToPost)
+  }
+
+  private async fetchRawBatch(uid: string): Promise<NewsPost[]> {
+    const followingResults = await mapWithConcurrency(
+      this.followingCursors.filter((cursor) => !cursor.exhausted),
+      MAX_CONCURRENT_FOLLOWING_QUERIES,
+      (cursor) => this.fetchFollowingChunk(cursor),
+    )
+
+    const results = await Promise.all([
+      this.fetchPublicPage(),
+      this.fetchOwnPage(uid),
+    ])
+
+    const allPosts = [
+      ...results[0],
+      ...results[1],
+      ...followingResults.flat(),
+    ]
+
+    const seen = new Set<string>()
+
+    return allPosts.filter((post) => {
+      if (seen.has(post.id)) {
+        return false
+      }
+
+      if (this.blockedIds.has(post.userId)) {
+        return false
+      }
+
+      if (!post.userId) {
+        return false
+      }
+
+      seen.add(post.id)
+      return true
+    })
+  }
+
+  private pushToPending(posts: NewsPost[]): void {
+    const unique = posts.filter((post) => {
+      if (this.pendingIds.has(post.id)) {
+        return false
+      }
+
+      this.pendingIds.add(post.id)
+      return true
+    })
+
+    if (unique.length === 0) {
+      return
+    }
+
+    const ranked = rankPosts(
+      [...this.pendingPosts, ...unique],
+      this.taste,
+    )
+
+    this.pendingPosts = ranked
+  }
+
+  private hasRawSourcesRemaining(): boolean {
+    const followingRemaining = this.followingCursors.some(
+      (cursor) => !cursor.exhausted,
+    )
+
+    return (
+      !this.publicSourceExhausted ||
+      !this.ownSourceExhausted ||
+      followingRemaining
+    )
+  }
+
+  async fetchNext(): Promise<NewsFeedPage | null> {
+    if (this.loading || !this.hasMoreFlag) {
+      return null
+    }
+
+    const uid = auth.currentUser?.uid
+
+    if (!uid) {
+      return null
+    }
+
+    this.loading = true
+
+    try {
+      await this.loadUserData(uid)
+      await this.loadTaste(uid)
+
+      const isFirst = this.isFirstFetch
+
+      // On remplit le buffer jusqu'à pouvoir servir une page complète.
+      while (
+        this.pendingPosts.length < PAGE_SIZE &&
+        this.hasRawSourcesRemaining()
+      ) {
+        const rawPosts = await this.fetchRawBatch(uid)
+
+        this.pushToPending(rawPosts)
+
+        // Évite une boucle infinie si Firestore ne renvoie rien.
+        if (rawPosts.length === 0 && !this.hasRawSourcesRemaining()) {
+          break
+        }
+
+        if (rawPosts.length === 0) {
+          const stillMoving = this.hasRawSourcesRemaining()
+
+          if (!stillMoving) {
+            break
+          }
+        }
+      }
+
+      const posts = this.pendingPosts.slice(0, PAGE_SIZE)
+
+      this.pendingPosts = this.pendingPosts.slice(PAGE_SIZE)
+
+      for (const post of posts) {
+        this.pendingIds.delete(post.id)
+      }
+
+      this.hasMoreValue =
+        this.pendingPosts.length > 0 ||
+        this.hasRawSourcesRemaining()
+
+      this.isFirstFetch = false
+
+      return {
+        posts,
+        isFirst,
+        hasMore: this.hasMoreValue,
+      }
+    } catch (error) {
+      captureException(
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          context: 'newsFeedSource.fetchNext',
+        },
+      )
+
+      return null
+    } finally {
+      this.loading = false
+    }
+  }
+
+  reset(): void {
+    this.lastPublicDoc = null
+    this.lastOwnDoc = null
+    this.followingCursors = []
+
+    this.pendingPosts = []
+    this.pendingIds.clear()
+
     this.isFirstFetch = true
     this.loading = false
-    this.extraFetches = 0
     this.hasMoreValue = true
-    this.tasteLoaded = false
+
+    this.publicSourceExhausted = false
+    this.ownSourceExhausted = false
+
+    this.blockedIds = new Set()
+    this.followingIds = []
     this.userDataLoaded = false
+
+    this.taste = {
+      likedAuthors: {},
+      likedHashtags: {},
+    }
+    this.tasteLoaded = false
+  }
+
+  invalidateUserData(): void {
+    this.userDataLoaded = false
+    this.tasteLoaded = false
   }
 }
 

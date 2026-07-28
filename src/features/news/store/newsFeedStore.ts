@@ -2,6 +2,7 @@
    Pattern identique à feedStore.ts : une instance singleton pour l'onglet Actus. */
 
 import { createStore, useStore } from 'zustand'
+import type { StoreApi } from 'zustand'
 import type { NewsPost } from '../types'
 
 export interface NewsFeedState {
@@ -59,3 +60,5 @@ export const newsFeedStore = createNewsFeedStore()
 export function useNewsFeedStore<T>(selector: (s: NewsFeedState) => T): T {
   return useStore(newsFeedStore, selector)
 }
+
+export type NewsFeedStoreApi = StoreApi<NewsFeedState>

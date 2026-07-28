@@ -139,6 +139,8 @@ export const backfillSearch = onCall({ secrets: SECRETS, timeoutSeconds: 540 }, 
   const db = getFirestore()
   const ts = client()
 
+  const BACKFILL_PAGE_SIZE = 300
+
   const usersSnap = await db.collection('users').get()
   const userDocs = usersSnap.docs.map((d) => {
     const u = d.data()
@@ -154,8 +156,38 @@ export const backfillSearch = onCall({ secrets: SECRETS, timeoutSeconds: 540 }, 
     .map((d) => ({ id: d.id, tag: d.data().tag ?? d.id, videoCount: d.data().videoCount ?? 0, trendingScore: d.data().trendingScore ?? 0 }))
     .filter((h) => h.videoCount > 0)
 
-  const postsSnap = await db.collection('posts').where('visibility', '==', 'public').orderBy('createdAt', 'desc').limit(1000).get()
-  const postDocs = postsSnap.docs.map((d) => mapPost(d.data(), d.id))
+  const postDocs: ReturnType<typeof mapPost>[] = []
+  let lastPostDoc: FirebaseFirestore.QueryDocumentSnapshot | undefined
+
+  while (true) {
+    let postsQuery = db
+      .collection('posts')
+      .where('visibility', '==', 'public')
+      .orderBy('createdAt', 'desc')
+      .limit(BACKFILL_PAGE_SIZE)
+
+    if (lastPostDoc) {
+      postsQuery = postsQuery.startAfter(lastPostDoc)
+    }
+
+    const postsSnap = await postsQuery.get()
+
+    if (postsSnap.empty) {
+      break
+    }
+
+    postDocs.push(
+      ...postsSnap.docs.map((snapshot) =>
+        mapPost(snapshot.data(), snapshot.id),
+      ),
+    )
+
+    lastPostDoc = postsSnap.docs[postsSnap.docs.length - 1]
+
+    if (postsSnap.docs.length < BACKFILL_PAGE_SIZE) {
+      break
+    }
+  }
 
   if (userDocs.length) await ts.collections('users').documents().import(userDocs, { action: 'upsert' })
   if (tagDocs.length) await ts.collections('hashtags').documents().import(tagDocs, { action: 'upsert' })

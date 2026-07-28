@@ -2,79 +2,117 @@
    Branche le newsFeedStore sur newsFeedSource.
    Pattern identique à useFeedData.ts. */
 
-import { useEffect, useRef, useCallback } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useStore } from 'zustand'
 import type { StoreApi } from 'zustand'
 import { newsFeedSource } from '../services/newsFeedSource'
 import type { NewsFeedState } from '../store/newsFeedStore'
 
-const TRIGGER_OFFSET = 10
+export function useNewsFeedData({
+  store,
+}: {
+  store: StoreApi<NewsFeedState>
+}) {
+  const firstFetchStarted = useRef(false)
+  const mountedRef = useRef(true)
 
-export function useNewsFeedData({ store }: { store: StoreApi<NewsFeedState> }) {
-  const fetchAttemptedRef = useRef(false)
-  const posts = useStore(store, (s) => s.posts)
-  const isLoadingMore = useStore(store, (s) => s.loadingMore)
-  const hasMore = useStore(store, (s) => s.hasMore)
-  const setPosts = useStore(store, (s) => s.setPosts)
-  const appendPosts = useStore(store, (s) => s.appendPosts)
-  const setLoadingMore = useStore(store, (s) => s.setLoadingMore)
-  const setHasMore = useStore(store, (s) => s.setHasMore)
-  const setLoading = useStore(store, (s) => s.setLoading)
+  const posts = useStore(store, (state) => state.posts)
+  const loading = useStore(store, (state) => state.loading)
+  const loadingMore = useStore(store, (state) => state.loadingMore)
+  const hasMore = useStore(store, (state) => state.hasMore)
 
-  const fetchPosts = useCallback(async () => {
-    if (newsFeedSource.isLoading || !newsFeedSource.hasMoreFlag) return
-    setLoadingMore(true)
-    const page = await newsFeedSource.fetchNext()
-    if (!page) {
+  const setPosts = useStore(store, (state) => state.setPosts)
+  const appendPosts = useStore(store, (state) => state.appendPosts)
+  const setLoading = useStore(store, (state) => state.setLoading)
+  const setLoadingMore = useStore(store, (state) => state.setLoadingMore)
+  const setHasMore = useStore(store, (state) => state.setHasMore)
+
+  useEffect(() => {
+    mountedRef.current = true
+
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
+
+  const fetchPosts = useCallback(
+    async (isRefresh = false) => {
+      if (newsFeedSource.isLoading) {
+        return
+      }
+
+      if (!isRefresh && !hasMore) {
+        return
+      }
+
+      if (isRefresh) {
+        setLoading(true)
+      } else {
+        setLoadingMore(true)
+      }
+
+      const page = await newsFeedSource.fetchNext()
+
+      if (!mountedRef.current) {
+        return
+      }
+
+      if (!page) {
+        setLoading(false)
+        setLoadingMore(false)
+        return
+      }
+
+      if (page.isFirst || isRefresh) {
+        setPosts(page.posts)
+      } else if (page.posts.length > 0) {
+        appendPosts(page.posts)
+      }
+
+      setHasMore(page.hasMore)
+      setLoading(false)
       setLoadingMore(false)
+    },
+    [
+      appendPosts,
+      hasMore,
+      setHasMore,
+      setLoading,
+      setLoadingMore,
+      setPosts,
+    ],
+  )
+
+  useEffect(() => {
+    if (firstFetchStarted.current) {
       return
     }
-    if (page.posts.length > 0) {
-      if (page.isFirst) setPosts(page.posts)
-      else appendPosts(page.posts)
-    } else {
-      setLoadingMore(false)
-    }
-    setHasMore(page.hasMore)
-  }, [setPosts, appendPosts, setLoadingMore, setHasMore])
 
-  // Premier fetch
-  useEffect(() => {
-    if (fetchAttemptedRef.current) return
-    if (posts.length > 0) { fetchAttemptedRef.current = true; return }
-    if (newsFeedSource.isLoading) return
-    fetchAttemptedRef.current = true
-    fetchPosts()
-  }, [fetchPosts, posts.length])
-
-  // Pagination : fetch quand on approche de la fin
-  useEffect(() => {
-    if (posts.length === 0) return
-    if (!hasMore) return
-    if (newsFeedSource.isLoading) return
-
-    // Utilise onEndReached du FlatList dans le composant parent
-    // Ici on expose juste loadMore
-  }, [posts.length, hasMore])
+    firstFetchStarted.current = true
+    void fetchPosts()
+  }, [fetchPosts])
 
   const loadMore = useCallback(() => {
-    if (!hasMore || newsFeedSource.isLoading) return
-    fetchPosts()
-  }, [hasMore, fetchPosts])
+    if (loadingMore || loading || !hasMore) {
+      return
+    }
+
+    void fetchPosts()
+  }, [fetchPosts, hasMore, loading, loadingMore])
 
   const refresh = useCallback(() => {
-    setLoading(true)
     newsFeedSource.reset()
-    fetchAttemptedRef.current = true
+    firstFetchStarted.current = true
     setHasMore(true)
-    fetchPosts()
-  }, [fetchPosts, setHasMore, setLoading])
+    void fetchPosts(true)
+  }, [fetchPosts, setHasMore])
 
   return {
     posts,
-    isLoadingMore,
+    loading,
+    loadingMore,
     hasMore,
-    isEmpty: !useStore(store, (s) => s.loading) && posts.length === 0,
+    isEmpty: !loading && posts.length === 0,
     loadMore,
     refresh,
   }

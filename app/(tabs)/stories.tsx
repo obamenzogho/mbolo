@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   View,
   Text,
@@ -23,7 +23,6 @@ import NewsCommentsModal from '@/features/news/components/NewsCommentsModal'
 import { deletePost } from '@/features/news/services/postMutations'
 import { newsFeedSource } from '@/features/news/services/newsFeedSource'
 import { ContentActionsSheet } from '@/components/ContentActionsSheet'
-import OrbitLoader from '@/components/OrbitLoader'
 import { useStoriesFeed } from '@/features/stories/hooks/useStoriesFeed'
 import StoryViewer from '@/features/stories/components/StoryViewer'
 import { StoryCard, CreateStoryCard } from '@/features/stories/components/StoryCard'
@@ -67,6 +66,51 @@ export default function ActusScreen() {
 
   const [commentPost, setCommentPost] = useState<NewsPost | null>(null)
   const [actionsPost, setActionsPost] = useState<NewsPost | null>(null)
+
+  const handleRefresh = useCallback(() => {
+    void feedData.refresh()
+  }, [feedData])
+
+  const loadMore = useCallback(() => {
+    void feedData.loadMore()
+  }, [feedData])
+
+  const renderPostItem = useCallback(
+    ({ item }: { item: NewsPost }) => (
+      <PostCard
+        post={item}
+        currentUserId={uid}
+        onComment={setCommentPost}
+        onEdit={(post) =>
+          router.push({
+            pathname: '/news-compose',
+            params: { editPostId: post.id },
+          })
+        }
+        onDelete={(post) => {
+          Alert.alert('Supprimer ?', 'Cette action est définitive.', [
+            { text: 'Annuler', style: 'cancel' },
+            {
+              text: 'Supprimer',
+              style: 'destructive',
+              onPress: async () => {
+                newsFeedStore.getState().removePost(post.id)
+                await deletePost(post.id, uid)
+              },
+            },
+          ])
+        }}
+        onMore={setActionsPost}
+        onPress={(post) =>
+          router.push({
+            pathname: '/post-detail',
+            params: { postId: post.id },
+          })
+        }
+      />
+    ),
+    [uid],
+  )
 
   const header = (
     <>
@@ -133,35 +177,21 @@ export default function ActusScreen() {
       <FlatList
         data={posts}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <PostCard
-            post={item}
-            currentUserId={uid}
-            onComment={setCommentPost}
-            onPress={(post) => router.push({ pathname: '/post-detail', params: { postId: post.id } })}
-            onEdit={(post) => router.push({ pathname: '/news-compose', params: { editPostId: post.id } })}
-            onDelete={(post) => {
-              Alert.alert('Supprimer ?', 'Cette action est définitive.', [
-                { text: 'Annuler', style: 'cancel' },
-                {
-                  text: 'Supprimer',
-                  style: 'destructive',
-                  onPress: async () => {
-                    newsFeedStore.getState().removePost(post.id)
-                    await deletePost(post.id, uid)
-                  },
-                },
-              ])
-            }}
-            onMore={setActionsPost}
-          />
-        )}
+        renderItem={renderPostItem}
         ListHeaderComponent={header}
         refreshing={refreshing}
-        onRefresh={feedData.refresh}
-        onEndReached={hasMore ? feedData.loadMore : undefined}
-        onEndReachedThreshold={0.5}
+        onRefresh={handleRefresh}
+        onEndReached={hasMore ? loadMore : undefined}
+        onEndReachedThreshold={0.7}
         showsVerticalScrollIndicator={false}
+        initialNumToRender={4}
+        maxToRenderPerBatch={4}
+        windowSize={5}
+        updateCellsBatchingPeriod={50}
+        removeClippedSubviews={true}
+        maintainVisibleContentPosition={{
+          minIndexForVisible: 0,
+        }}
         ListEmptyComponent={
           loading ? (
             <View style={{ paddingTop: 8 }}>
@@ -180,7 +210,13 @@ export default function ActusScreen() {
             </View>
           )
         }
-        ListFooterComponent={loadingMore ? <View style={{ alignItems: 'center', marginVertical: 20 }}><OrbitLoader size={28} /></View> : null}
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={{ alignItems: 'center', marginVertical: 20 }}>
+              <PostCardSkeleton />
+            </View>
+          ) : null
+        }
       />
 
       {commentPost && (

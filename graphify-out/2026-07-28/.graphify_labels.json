@@ -1962,6 +1962,7 @@
   "2173": "cleanupTemp",
   "2178": "cmd",
   "2180": "cmd",
+  "2188": "cmd",
   "2191": "compressVideo",
   "2192": "../config/devMode",
   "2193": "convertToMp4",

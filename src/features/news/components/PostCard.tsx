@@ -10,12 +10,12 @@ import {
   Alert,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { VideoView, useVideoPlayer } from 'expo-video'
 import { LinearGradient } from 'expo-linear-gradient'
 import { doc, runTransaction, increment, arrayUnion, arrayRemove } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { captureException } from '@/lib/sentry'
 import { colors } from '@/lib/theme'
+import { getAvatarImageUrl, getFeedImageUrl } from '@/lib/cloudinary'
 import RichPostText from './RichPostText'
 import ImageGalleryModal from './ImageGalleryModal'
 import PollView from './PollView'
@@ -52,37 +52,45 @@ function timeAgo(date: Date): string {
   })
 }
 
-function EmbeddedVideo({ media }: { media: NewsPostMedia }) {
-  const player = useVideoPlayer(media.url, (instance) => {
-    instance.loop = false
-  })
+function MediaVideoPreview({
+  media,
+  onPress,
+}: {
+  media: NewsPostMedia
+  onPress: () => void
+}) {
+  const thumbnail = media.thumbnailUrl ?? media.url
 
   return (
-    <VideoView
-      player={player}
-      style={styles.video}
-      contentFit="contain"
-      nativeControls
-      allowsFullscreen
-    />
+    <Pressable onPress={onPress} style={styles.videoPreview}>
+      <Image
+        source={{ uri: getFeedImageUrl(thumbnail, 720) }}
+        style={StyleSheet.absoluteFill}
+        resizeMode="cover"
+      />
+
+      <View style={styles.videoOverlay}>
+        <Ionicons name="play" size={34} color="#fff" />
+      </View>
+    </Pressable>
   )
 }
 
-function MediaGrid({ media, onImagePress }: { media: NewsPostMedia[]; onImagePress?: (index: number) => void }) {
+function MediaGrid({ media, onImagePress, onVideoPress }: { media: NewsPostMedia[]; onImagePress?: (index: number) => void; onVideoPress?: () => void }) {
   const { width } = useWindowDimensions()
   const availableWidth = Math.min(width, 720)
 
   if (media.length === 0) return null
 
   if (media[0].type === 'video') {
-    return <EmbeddedVideo media={media[0]} />
+    return <MediaVideoPreview media={media[0]} onPress={() => onVideoPress?.()} />
   }
 
   if (media.length === 1) {
     return (
       <Pressable onPress={() => onImagePress?.(0)}>
         <Image
-          source={{ uri: media[0].url }}
+          source={{ uri: getFeedImageUrl(media[0].url, 720) }}
           style={{
             width: availableWidth,
             height: Math.min(availableWidth * 1.05, 620),
@@ -122,7 +130,7 @@ function MediaGrid({ media, onImagePress }: { media: NewsPostMedia[]; onImagePre
             }}
           >
             <Image
-              source={{ uri: item.url }}
+              source={{ uri: getFeedImageUrl(item.url, 720) }}
               style={StyleSheet.absoluteFill}
               resizeMode="cover"
             />
@@ -205,7 +213,7 @@ function PostCardComponent({
       <View style={styles.header}>
         {post.userPhotoURL ? (
           <Image
-            source={{ uri: post.userPhotoURL }}
+            source={{ uri: getAvatarImageUrl(post.userPhotoURL, 120) }}
             style={styles.avatar}
           />
         ) : (
@@ -303,6 +311,7 @@ function PostCardComponent({
       <MediaGrid
         media={post.media}
         onImagePress={(index) => setGalleryIndex(index)}
+        onVideoPress={onPress ? () => onPress(post) : undefined}
       />
 
       {post.poll && <PollView poll={post.poll} postId={post.id} currentUserId={currentUserId} />}
@@ -488,10 +497,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingBottom: 12,
   },
-  video: {
+  videoPreview: {
     width: '100%',
     aspectRatio: 16 / 9,
     backgroundColor: '#000',
+    overflow: 'hidden',
+  },
+  videoOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.25)',
   },
   moreOverlay: {
     ...StyleSheet.absoluteFillObject,

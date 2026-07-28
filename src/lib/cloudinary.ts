@@ -158,3 +158,39 @@ export function generateThumbnailURL(videoURL: string | null | undefined): strin
     return null
   }
 }
+
+export function getFeedImageUrl(
+  url: string | undefined,
+  width = 720,
+): string | undefined {
+  if (!url) {
+    return undefined
+  }
+
+  if (!url.includes(CLOUDINARY_BASE)) {
+    return url
+  }
+
+  return url.replace(
+    '/upload/',
+    `/upload/f_auto,q_auto,w_${width}/`,
+  )
+}
+
+export function getAvatarImageUrl(
+  url: string | undefined,
+  width = 120,
+): string | undefined {
+  if (!url) {
+    return undefined
+  }
+
+  if (!url.includes(CLOUDINARY_BASE)) {
+    return url
+  }
+
+  return url.replace(
+    '/upload/',
+    `/upload/f_auto,q_auto,c_fill,g_face,w_${width},h_${width}/`,
+  )
+}

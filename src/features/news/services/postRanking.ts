@@ -48,10 +48,31 @@ export function scorePost(post: NewsPost, taste: PostUserTaste, now = Date.now()
   return (engagement * 1.0 + affinity * 3.0 + freshness * 4.0) * formatWeight + baseScore * 0.5
 }
 
-export function rankPosts(posts: NewsPost[], taste: PostUserTaste): NewsPost[] {
+export function rankPosts(
+  posts: NewsPost[],
+  taste: PostUserTaste,
+): NewsPost[] {
   const now = Date.now()
-  return [...posts]
-    .map((p) => ({ p, s: scorePost(p, taste, now) * (0.92 + Math.random() * 0.16) }))
-    .sort((a, b) => b.s - a.s)
-    .map((x) => x.p)
+
+  return posts
+    .map((post) => ({
+      post,
+      score: scorePost(post, taste, now),
+    }))
+    .sort((a, b) => {
+      if (b.score !== a.score) {
+        return b.score - a.score
+      }
+
+      const timeDifference =
+        b.post.createdAt.getTime() -
+        a.post.createdAt.getTime()
+
+      if (timeDifference !== 0) {
+        return timeDifference
+      }
+
+      return a.post.id.localeCompare(b.post.id)
+    })
+    .map(({ post }) => post)
 }
