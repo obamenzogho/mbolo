@@ -12,7 +12,12 @@ import { useFollowSuggestions } from '@/features/suggestions/hooks/useFollowSugg
 import { useInterestGraph } from '@/features/suggestions/hooks/useInterestGraph'
 import { SuggestionsSection } from '@/features/suggestions/components/SuggestionsSection'
 import { useUserLocation } from '@/features/location/useUserLocation'
-import { searchMulti, normalizeAndMerge, mapPostHit } from '@/services/searchService'
+import {
+  searchMulti,
+  normalizeAndMerge,
+  mapPostHit,
+  mapVideoHit,
+} from '@/services/searchService'
 import type {
   UserResult,
   HashtagResult,
@@ -101,9 +106,34 @@ export default function Explore() {
       )
       setHashtags(multi.hashtags.hits.map((h: any) => h.document as HashtagResult))
 
-      const allPosts: PostResult[] = multi.posts.hits.map(mapPostHit)
+      const postResults = multi.posts.hits.map(mapPostHit)
+
+      const videoResults = multi.videos.hits.map(
+        mapVideoHit,
+      )
+
+      const allPosts = [
+        ...postResults,
+        ...videoResults.map((video) => ({
+          id: video.id,
+          description: video.description,
+          text: video.description,
+          thumbnailUrl: video.thumbnailURL,
+          mediaUrl: video.videoURL,
+          userName: video.userName,
+          userPhoto: video.userPhoto,
+          likeCount: video.likes,
+          commentCount: video.comments,
+          viewCount: video.views,
+          mediaType: 'video' as const,
+          createdAt: video.createdAt,
+        })),
+      ]
+
       setPosts(allPosts)
-      setVideos(allPosts.filter((p) => p.mediaType === 'video' || p.mediaType === 'video_share'))
+      setVideos(allPosts.filter(
+        (post) => post.mediaType === 'video',
+      ))
     } catch (e) {
       if (requestIdRef.current !== currentId) return
       captureException(e instanceof Error ? e : new Error(String(e)), { context: 'explore.performSearch' })
@@ -152,7 +182,7 @@ export default function Explore() {
   const showResults =
     isSearching &&
     (hasSubmitted ||
-      (!loading && (merged.length > 0 || users.length > 0 || hashtags.length > 0 || posts.length > 0)))
+      (!loading && (merged.length > 0 || users.length > 0 || hashtags.length > 0 || posts.length > 0 || videos.length > 0)))
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>

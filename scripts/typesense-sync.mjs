@@ -92,17 +92,55 @@ const POSTS_SCHEMA = {
     { name: 'userName', type: 'string' },
     { name: 'userId', type: 'string' },
     { name: 'userPhoto', type: 'string', optional: true },
+    { name: 'city', type: 'string', optional: true },
+    { name: 'hashtags', type: 'string[]', optional: true },
+    { name: 'soundId', type: 'string', optional: true },
     { name: 'likeCount', type: 'int32' },
     { name: 'commentCount', type: 'int32' },
-    { name: 'createdAt', type: 'int64' },
-    { name: 'visibility', type: 'string', optional: true },
-    { name: 'moderationStatus', type: 'string', optional: true },
+    { name: 'shareCount', type: 'int32' },
+    { name: 'saveCount', type: 'int32' },
+    { name: 'viewCount', type: 'int32' },
     { name: 'mediaType', type: 'string', optional: true },
     { name: 'mediaUrl', type: 'string', optional: true },
     { name: 'thumbnailUrl', type: 'string', optional: true },
+    { name: 'createdAt', type: 'int64' },
+    { name: 'visibility', type: 'string', optional: true },
+    { name: 'moderationStatus', type: 'string', optional: true },
+    { name: 'engagementScore', type: 'float', optional: true },
     { name: 'recencyScore', type: 'float', optional: true },
   ],
-  default_sorting_field: 'createdAt',
+  default_sorting_field: 'recencyScore',
+}
+
+const VIDEOS_SCHEMA = {
+  name: 'videos',
+  fields: [
+    { name: 'text', type: 'string' },
+    { name: 'description', type: 'string' },
+    { name: 'userName', type: 'string' },
+    { name: 'userId', type: 'string' },
+    { name: 'userPhoto', type: 'string', optional: true },
+    { name: 'city', type: 'string', optional: true },
+    { name: 'hashtags', type: 'string[]', optional: true },
+    { name: 'soundId', type: 'string', optional: true },
+    { name: 'likeCount', type: 'int32' },
+    { name: 'commentCount', type: 'int32' },
+    { name: 'shareCount', type: 'int32' },
+    { name: 'saveCount', type: 'int32' },
+    { name: 'viewCount', type: 'int32' },
+    { name: 'mediaType', type: 'string', optional: true },
+    { name: 'videoURL', type: 'string' },
+    { name: 'videoURL_360p', type: 'string', optional: true },
+    { name: 'videoURL_480p', type: 'string', optional: true },
+    { name: 'thumbnailUrl', type: 'string', optional: true },
+    { name: 'createdAt', type: 'int64' },
+    { name: 'visibility', type: 'string', optional: true },
+    { name: 'moderationStatus', type: 'string', optional: true },
+    { name: 'engagementScore', type: 'float', optional: true },
+    { name: 'recencyScore', type: 'float', optional: true },
+    { name: 'hotScore', type: 'float', optional: true },
+  ],
+  default_sorting_field: 'hotScore',
 }
 
 // ─── Counter buffer (30s flush) ─────────────────────────────
@@ -168,24 +206,31 @@ function mapHashtag(doc) {
 
 function mapPost(doc) {
   const d = doc.data()
-  const ts = d.createdAt
-  const createdAtMs = ts?.toMillis?.() ?? (ts?.seconds ? ts.seconds * 1000 : 0)
-  const likeCount = d.likes ?? d.likeCount ?? 0
-  const commentCount = d.commentCount ?? d.comments ?? 0
-  const viewCount = d.viewCount ?? d.views ?? 0
+  const createdAtMs = d.createdAt?.toMillis?.() ?? (d.createdAt?.seconds ? d.createdAt.seconds * 1000 : 0)
+  const likeCount = Number(d.likes ?? d.likeCount ?? 0)
+  const commentCount = Number(d.comments ?? d.commentCount ?? 0)
+  const shareCount = Number(d.shares ?? d.shareCount ?? 0)
+  const saveCount = Number(d.saves ?? d.saveCount ?? 0)
+  const viewCount = Number(d.views ?? d.viewCount ?? 0)
   const media = Array.isArray(d.media) ? d.media : []
   const firstMedia = media[0]
   const mediaUrl = d.mediaUrl ?? firstMedia?.url ?? ''
   const thumbnailUrl = d.thumbnailUrl ?? d.thumbnailURL ?? firstMedia?.thumbnailUrl ?? mediaUrl
-  const mediaType = d.mediaType ?? (firstMedia?.type ?? (media.length > 1 ? 'carousel' : (firstMedia ? 'image' : 'text')))
+  const mediaType = d.mediaType ?? (firstMedia?.type ?? (media.length > 1 ? 'carousel' : (media.length === 1 ? 'image' : 'text')))
+  const engagementScore = computeEngagementScore(likeCount, commentCount, shareCount, saveCount, viewCount)
   return {
     id: doc.id,
     text: d.text ?? d.description ?? '',
     userName: d.userName ?? '',
     userId: d.userId ?? '',
-    userPhoto: d.userPhoto ?? d.authorPhoto ?? '',
+    userPhoto: d.userPhoto ?? d.userPhotoURL ?? d.authorPhoto ?? '',
+    city: d.city ?? '',
+    hashtags: normalizeHashtags(d.hashtags),
+    soundId: d.soundId ?? '',
     likeCount,
     commentCount,
+    shareCount,
+    saveCount,
     viewCount,
     mediaType,
     mediaUrl,
@@ -193,18 +238,33 @@ function mapPost(doc) {
     createdAt: createdAtMs,
     visibility: d.visibility ?? 'public',
     moderationStatus: d.moderationStatus ?? 'approved',
-    recencyScore: computeRecencyScore(likeCount, createdAtMs),
+    engagementScore,
+    recencyScore: computeRecencyScore(createdAtMs, engagementScore),
   }
 }
 
-/**
- * Boost les vidéos récentes : recencyScore = likeCount * exp(-age_days / 30).
- * Une vidéo d'il y a 30j avec 100 likes = 100/e ≈ 37 ; une vidéo d'aujourd'hui = likeCount.
- */
-function computeRecencyScore(likeCount, createdAtMs) {
-  if (!createdAtMs) return likeCount
-  const ageDays = (Date.now() - createdAtMs) / (1000 * 60 * 60 * 24)
-  return likeCount * Math.exp(-Math.max(ageDays, 0) / 30)
+function computeEngagementScore(likeCount, commentCount, shareCount, saveCount, viewCount) {
+  return (
+    Math.log1p(Math.max(0, likeCount)) * 1 +
+    Math.log1p(Math.max(0, commentCount)) * 1.5 +
+    Math.log1p(Math.max(0, shareCount)) * 2 +
+    Math.log1p(Math.max(0, saveCount)) * 1.8 +
+    Math.log1p(Math.max(0, viewCount)) * 0.2
+  )
+}
+
+function computeRecencyScore(createdAtMs, engagementScore) {
+  if (!createdAtMs) return engagementScore
+  const ageHours = Math.max(0, (Date.now() - createdAtMs) / (1000 * 60 * 60))
+  const freshness = Math.exp(-ageHours / 24)
+  return freshness * 3 + engagementScore * 0.7
+}
+
+function computeHotScore(createdAtMs, engagementScore) {
+  if (!createdAtMs) return engagementScore
+  const ageHours = Math.max(0, (Date.now() - createdAtMs) / (1000 * 60 * 60))
+  const freshness = Math.exp(-ageHours / 48)
+  return freshness * 4 + engagementScore * 0.8
 }
 
 function hasCounterChanges(before, after) {
@@ -213,6 +273,59 @@ function hasCounterChanges(before, after) {
     if (before.data()[field] !== after.data()[field]) return true
   }
   return false
+}
+
+function normalizeHashtags(value) {
+  if (!Array.isArray(value)) return []
+
+  return value
+    .filter((item) => typeof item === 'string')
+    .map((item) => item.replace(/^#/, '').trim().toLowerCase())
+    .filter(Boolean)
+}
+
+function mapVideo(doc) {
+  const d = doc.data()
+  const createdAtMs =
+    d.createdAt?.toMillis?.() ??
+    (d.createdAt?.seconds
+      ? d.createdAt.seconds * 1000
+      : 0)
+
+  const likeCount = Number(d.likes ?? 0)
+  const commentCount = Number(d.comments ?? 0)
+  const shareCount = Number(d.shares ?? 0)
+  const saveCount = Number(d.saves ?? 0)
+  const viewCount = Number(d.views ?? 0)
+  const engagementScore = computeEngagementScore(likeCount, commentCount, shareCount, saveCount, viewCount)
+
+  return {
+    id: doc.id,
+    text: d.description ?? d.text ?? '',
+    description: d.description ?? d.text ?? '',
+    userName: d.userName ?? '',
+    userId: d.userId ?? '',
+    userPhoto: d.userPhotoURL ?? d.userPhoto ?? '',
+    city: d.city ?? '',
+    hashtags: normalizeHashtags(d.hashtags),
+    soundId: d.soundId ?? '',
+    likeCount,
+    commentCount,
+    shareCount,
+    saveCount,
+    viewCount,
+    mediaType: 'video',
+    videoURL: d.videoURL ?? d.videoUrl ?? '',
+    videoURL_360p: d.videoURL_360p ?? '',
+    videoURL_480p: d.videoURL_480p ?? '',
+    thumbnailUrl: d.thumbnailURL ?? d.thumbnailUrl ?? '',
+    createdAt: createdAtMs,
+    visibility: d.visibility ?? 'public',
+    moderationStatus: d.moderationStatus ?? 'approved',
+    engagementScore,
+    recencyScore: computeRecencyScore(createdAtMs, engagementScore),
+    hotScore: d.hotScore ?? computeHotScore(createdAtMs, engagementScore),
+  }
 }
 
 // ─── Backfill ───────────────────────────────────────────────
@@ -272,12 +385,37 @@ async function backfill() {
     await ts.collections('posts').documents().import(postDocs, { action: 'upsert' })
     console.log(`  ✅ ${postDocs.length} posts imported (all media types)`)
   }
+
+  const videosSnap = await db
+    .collection('videos')
+    .orderBy('createdAt', 'desc')
+    .get()
+
+  const videoDocs = videosSnap.docs
+    .map(mapVideo)
+    .filter(
+      (video) =>
+        video.videoURL &&
+        video.moderationStatus !== 'hidden' &&
+        video.moderationStatus !== 'blocked',
+    )
+
+  if (videoDocs.length) {
+    await ts
+      .collections('videos')
+      .documents()
+      .import(videoDocs, { action: 'upsert' })
+
+    console.log(
+      ` ✅ ${videoDocs.length} videos imported`,
+    )
+  }
 }
 
 // ─── Init schemas ──────────────────────────────────────────
 async function initSchemas() {
   console.log('\n📐 Initializing Typesense schemas...')
-  for (const schema of [USERS_SCHEMA, HASHTAGS_SCHEMA, POSTS_SCHEMA]) {
+  for (const schema of [USERS_SCHEMA, HASHTAGS_SCHEMA, POSTS_SCHEMA, VIDEOS_SCHEMA]) {
     await ts.collections(schema.name).delete().catch(() => {})
     await ts.collections().create(schema)
     console.log(`  ✅ Collection "${schema.name}" created`)
@@ -378,6 +516,51 @@ function startListeners() {
         })
       } else if (type === 'removed') {
         ts.collections('posts').documents(doc.id).delete().catch(() => {})
+      }
+    }
+  })
+
+  db.collection('videos').onSnapshot((snap) => {
+    for (const change of snap.docChanges()) {
+      const { doc, type } = change
+
+      if (type === 'removed') {
+        ts
+          .collections('videos')
+          .documents(doc.id)
+          .delete()
+          .catch(() => {})
+
+        continue
+      }
+
+      if (type === 'added' || type === 'modified') {
+        const mapped = mapVideo(doc)
+
+        if (
+          !mapped.videoURL ||
+          mapped.moderationStatus === 'hidden' ||
+          mapped.moderationStatus === 'blocked'
+        ) {
+          ts
+            .collections('videos')
+            .documents(doc.id)
+            .delete()
+            .catch(() => {})
+
+          continue
+        }
+
+        ts
+          .collections('videos')
+          .documents()
+          .upsert(mapped)
+          .catch((error) => {
+            console.warn(
+              `⚠ Video upsert failed for ${doc.id}:`,
+              error?.message ?? error,
+            )
+          })
       }
     }
   })

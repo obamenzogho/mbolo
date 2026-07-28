@@ -1,163 +1,768 @@
-import { onDocumentWritten } from 'firebase-functions/v2/firestore'
-import { onCall, HttpsError } from 'firebase-functions/v2/https'
-import { defineSecret } from 'firebase-functions/params'
-import { getFirestore, Timestamp } from 'firebase-admin/firestore'
+import {
+  onDocumentWritten,
+} from 'firebase-functions/v2/firestore'
+
+import {
+  onCall,
+  HttpsError,
+} from 'firebase-functions/v2/https'
+
+import {
+  defineSecret,
+} from 'firebase-functions/params'
+
+import {
+  getFirestore,
+  Timestamp,
+} from 'firebase-admin/firestore'
+
 import Typesense from 'typesense'
-import { USERS_SCHEMA, HASHTAGS_SCHEMA, POSTS_SCHEMA } from '../../src/lib/typesense-schemas'
+
+import {
+  USERS_SCHEMA,
+  HASHTAGS_SCHEMA,
+  POSTS_SCHEMA,
+  VIDEOS_SCHEMA,
+} from '../../src/lib/typesense-schemas'
 
 const TYPESENSE_HOST = defineSecret('TYPESENSE_HOST')
 const TYPESENSE_ADMIN_KEY = defineSecret('TYPESENSE_ADMIN_KEY')
 
-const SECRETS = [TYPESENSE_HOST, TYPESENSE_ADMIN_KEY]
+const SECRETS = [
+  TYPESENSE_HOST,
+  TYPESENSE_ADMIN_KEY,
+]
 
-function client() {
+const BACKFILL_PAGE_SIZE = 300
+
+type PostMediaType =
+  | 'text'
+  | 'image'
+  | 'carousel'
+  | 'article'
+  | 'video'
+  | 'video_share'
+
+type SearchDocument = Record<string, unknown>
+
+function client(): Typesense.Client {
   return new Typesense.Client({
-    nodes: [{ host: TYPESENSE_HOST.value(), port: 443, protocol: 'https' }],
+    nodes: [
+      {
+        host: TYPESENSE_HOST.value(),
+        port: 443,
+        protocol: 'https',
+      },
+    ],
     apiKey: TYPESENSE_ADMIN_KEY.value(),
     connectionTimeoutSeconds: 5,
   })
 }
 
-type PostMediaType = 'text' | 'image' | 'carousel' | 'article' | 'video' | 'video_share'
+function toMs(
+  value:
+    | Timestamp
+    | { seconds: number }
+    | number
+    | undefined
+    | null,
+): number {
+  if (!value) {
+    return 0
+  }
 
-function toMs(ts: Timestamp | { seconds: number; nanoseconds: number } | number | undefined | null): number {
-  if (!ts) return 0
-  if (typeof ts === 'number') return ts
-  if ('toMillis' in ts && typeof (ts as Timestamp).toMillis === 'function') return (ts as Timestamp).toMillis()
-  if ('seconds' in ts) return (ts as { seconds: number }).seconds * 1000
+  if (typeof value === 'number') {
+    return value
+  }
+
+  if (
+    typeof value === 'object' &&
+    'toMillis' in value &&
+    typeof value.toMillis === 'function'
+  ) {
+    return value.toMillis()
+  }
+
+  if (
+    typeof value === 'object' &&
+    'seconds' in value
+  ) {
+    return Number(value.seconds) * 1000
+  }
+
   return 0
 }
 
-function computeRecencyScore(likeCount: number, createdAtMs: number): number {
-  if (!createdAtMs) return likeCount
-  const ageDays = (Date.now() - createdAtMs) / (1000 * 60 * 60 * 24)
-  return likeCount * Math.exp(-Math.max(ageDays, 0) / 30)
+function normalizeHashtags(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .filter(
+      (item): item is string =>
+        typeof item === 'string',
+    )
+    .map((item) =>
+      item
+        .trim()
+        .toLowerCase()
+        .replace(/^#/, ''),
+    )
+    .filter(Boolean)
 }
 
-function mapPost(d: FirebaseFirestore.DocumentData, id: string) {
-  const likeCount = (d.likes ?? d.likeCount ?? 0) as number
-  const commentCount = (d.commentCount ?? d.comments ?? 0) as number
-  const viewCount = (d.viewCount ?? d.views ?? 0) as number
-  const media = Array.isArray(d.media) ? d.media : []
-  const firstMedia = media[0] as { url?: string; thumbnailUrl?: string; type?: string } | undefined
-  const mediaUrl = (d.mediaUrl ?? firstMedia?.url ?? '') as string
-  const thumbnailUrl = (d.thumbnailUrl ?? d.thumbnailURL ?? firstMedia?.thumbnailUrl ?? mediaUrl) as string
-  const mediaType = (d.mediaType ?? (firstMedia?.type ?? (media.length > 1 ? 'carousel' : (firstMedia ? 'image' : 'text')))) as PostMediaType
-  const createdAtMs = toMs(d.createdAt as Timestamp)
+function getVisibility(value: unknown): string {
+  return typeof value === 'string'
+    ? value
+    : 'public'
+}
+
+function getModerationStatus(value: unknown): string {
+  return typeof value === 'string'
+    ? value
+    : 'approved'
+}
+
+function computeEngagementScore(
+  likeCount: number,
+  commentCount: number,
+  shareCount: number,
+  saveCount: number,
+  viewCount: number,
+): number {
+  return (
+    Math.log1p(Math.max(0, likeCount)) * 1 +
+    Math.log1p(Math.max(0, commentCount)) * 1.5 +
+    Math.log1p(Math.max(0, shareCount)) * 2 +
+    Math.log1p(Math.max(0, saveCount)) * 1.8 +
+    Math.log1p(Math.max(0, viewCount)) * 0.2
+  )
+}
+
+function computeRecencyScore(
+  createdAtMs: number,
+  engagementScore: number,
+): number {
+  if (!createdAtMs) {
+    return engagementScore
+  }
+
+  const ageHours = Math.max(
+    0,
+    (Date.now() - createdAtMs) /
+      (1000 * 60 * 60),
+  )
+
+  const freshness = Math.exp(-ageHours / 24)
+
+  return (
+    freshness * 3 +
+    engagementScore * 0.7
+  )
+}
+
+function computeHotScore(
+  createdAtMs: number,
+  engagementScore: number,
+): number {
+  if (!createdAtMs) {
+    return engagementScore
+  }
+
+  const ageHours = Math.max(
+    0,
+    (Date.now() - createdAtMs) /
+      (1000 * 60 * 60),
+  )
+
+  const freshness = Math.exp(-ageHours / 48)
+
+  return (
+    freshness * 4 +
+    engagementScore * 0.8
+  )
+}
+
+function getNumber(
+  value: unknown,
+  fallback = 0,
+): number {
+  const parsed = Number(value)
+
+  return Number.isFinite(parsed)
+    ? parsed
+    : fallback
+}
+
+function getString(
+  value: unknown,
+  fallback = '',
+): string {
+  return typeof value === 'string'
+    ? value
+    : fallback
+}
+
+function getFirstMedia(
+  data: FirebaseFirestore.DocumentData,
+): FirebaseFirestore.DocumentData {
+  if (
+    Array.isArray(data.media) &&
+    data.media.length > 0 &&
+    data.media[0] &&
+    typeof data.media[0] === 'object'
+  ) {
+    return data.media[0]
+  }
+
+  return {}
+}
+
+function mapUser(
+  data: FirebaseFirestore.DocumentData,
+  id: string,
+): SearchDocument {
   return {
     id,
-    text: (d.text ?? d.description ?? '') as string,
-    userName: (d.userName ?? '') as string,
-    userId: (d.userId ?? '') as string,
-    userPhoto: (d.userPhoto ?? d.authorPhoto ?? '') as string,
+    pseudo: getString(data.pseudo),
+    nom: getString(data.nom),
+    bio: getString(data.bio),
+    city: getString(data.city),
+    interests: Array.isArray(data.interests)
+      ? data.interests
+          .filter(
+            (item): item is string =>
+              typeof item === 'string',
+          )
+          .slice(0, 20)
+      : [],
+    photoURL: getString(
+      data.photoURL ?? data.userPhotoURL,
+    ),
+    verified: Boolean(data.verified),
+    followerCount: getNumber(data.followerCount),
+  }
+}
+
+function mapHashtag(
+  data: FirebaseFirestore.DocumentData,
+  id: string,
+): SearchDocument {
+  return {
+    id,
+    tag: getString(data.tag, id)
+      .trim()
+      .replace(/^#/, '')
+      .toLowerCase(),
+    videoCount: getNumber(data.videoCount),
+    trendingScore: getNumber(data.trendingScore),
+  }
+}
+
+function mapPost(
+  data: FirebaseFirestore.DocumentData,
+  id: string,
+  authorCity = '',
+): SearchDocument {
+  const likeCount = getNumber(
+    data.likes ?? data.likeCount,
+  )
+
+  const commentCount = getNumber(
+    data.comments ?? data.commentCount,
+  )
+
+  const shareCount = getNumber(
+    data.shares ?? data.shareCount,
+  )
+
+  const saveCount = getNumber(
+    data.saves ?? data.saveCount,
+  )
+
+  const viewCount = getNumber(
+    data.views ?? data.viewCount,
+  )
+
+  const firstMedia = getFirstMedia(data)
+
+  const mediaUrl = getString(
+    data.mediaUrl ??
+      firstMedia.url,
+  )
+
+  const thumbnailUrl = getString(
+    data.thumbnailUrl ??
+      data.thumbnailURL ??
+      firstMedia.thumbnailUrl ??
+      mediaUrl,
+  )
+
+  const mediaType = getString(
+    data.mediaType ??
+      firstMedia.type ??
+      (Array.isArray(data.media)
+        ? data.media.length > 1
+          ? 'carousel'
+          : data.media.length === 1
+            ? 'image'
+            : 'text'
+        : 'text'),
+  ) as PostMediaType
+
+  const createdAt = toMs(data.createdAt)
+
+  const engagementScore = computeEngagementScore(
     likeCount,
     commentCount,
+    shareCount,
+    saveCount,
+    viewCount,
+  )
+
+  return {
+    id,
+    text: getString(
+      data.text ?? data.description,
+    ),
+    userName: getString(data.userName),
+    userId: getString(data.userId),
+    userPhoto: getString(
+      data.userPhoto ??
+        data.userPhotoURL ??
+        data.authorPhoto,
+    ),
+    city: getString(
+      data.city ?? authorCity,
+    ),
+    hashtags: normalizeHashtags(data.hashtags),
+    soundId: getString(data.soundId),
+    likeCount,
+    commentCount,
+    shareCount,
+    saveCount,
     viewCount,
     mediaType,
     mediaUrl,
     thumbnailUrl,
-    createdAt: createdAtMs,
-    visibility: (d.visibility ?? 'public') as string,
-    moderationStatus: (d.moderationStatus ?? 'approved') as string,
-    recencyScore: computeRecencyScore(likeCount, createdAtMs),
+    createdAt,
+    visibility: getVisibility(data.visibility),
+    moderationStatus: getModerationStatus(
+      data.moderationStatus,
+    ),
+    engagementScore,
+    recencyScore: computeRecencyScore(
+      createdAt,
+      engagementScore,
+    ),
   }
 }
 
-// ─── Sync users → Typesense ───
+function mapVideo(
+  data: FirebaseFirestore.DocumentData,
+  id: string,
+  authorCity = '',
+): SearchDocument {
+  const likeCount = getNumber(data.likes)
+  const commentCount = getNumber(data.comments)
+  const shareCount = getNumber(data.shares)
+  const saveCount = getNumber(data.saves)
+  const viewCount = getNumber(data.views)
+
+  const createdAt = toMs(data.createdAt)
+
+  const videoURL = getString(
+    data.videoURL ?? data.videoUrl,
+  )
+
+  const thumbnailUrl = getString(
+    data.thumbnailURL ??
+      data.thumbnailUrl,
+  )
+
+  const engagementScore = computeEngagementScore(
+    likeCount,
+    commentCount,
+    shareCount,
+    saveCount,
+    viewCount,
+  )
+
+  return {
+    id,
+    text: getString(
+      data.description ?? data.text,
+    ),
+    description: getString(
+      data.description ?? data.text,
+    ),
+    userName: getString(data.userName),
+    userId: getString(data.userId),
+    userPhoto: getString(
+      data.userPhotoURL ??
+        data.userPhoto,
+    ),
+    city: getString(
+      data.city ?? authorCity,
+    ),
+    hashtags: normalizeHashtags(data.hashtags),
+    soundId: getString(data.soundId),
+    likeCount,
+    commentCount,
+    shareCount,
+    saveCount,
+    viewCount,
+    mediaType: 'video',
+    videoURL,
+    videoURL_360p: getString(
+      data.videoURL_360p,
+    ),
+    videoURL_480p: getString(
+      data.videoURL_480p,
+    ),
+    thumbnailUrl,
+    createdAt,
+    visibility: getVisibility(data.visibility),
+    moderationStatus: getModerationStatus(
+      data.moderationStatus,
+    ),
+    engagementScore,
+    recencyScore: computeRecencyScore(
+      createdAt,
+      engagementScore,
+    ),
+    hotScore: getNumber(
+      data.hotScore,
+      computeHotScore(
+        createdAt,
+        engagementScore,
+      ),
+    ),
+  }
+}
+
+async function getAuthorCity(
+  db: FirebaseFirestore.Firestore,
+  userId: string,
+): Promise<string> {
+  if (!userId) {
+    return ''
+  }
+
+  try {
+    const snapshot = await db
+      .collection('users')
+      .doc(userId)
+      .get()
+
+    return getString(snapshot.data()?.city)
+  } catch {
+    return ''
+  }
+}
+
+async function enrichWithAuthorCity(
+  db: FirebaseFirestore.Firestore,
+  document: SearchDocument,
+): Promise<SearchDocument> {
+  const userId = getString(document.userId)
+
+  if (document.city || !userId) {
+    return document
+  }
+
+  const city = await getAuthorCity(db, userId)
+
+  return {
+    ...document,
+    city,
+  }
+}
+
+function shouldIndexPost(
+  document: SearchDocument,
+): boolean {
+  const visibility = getString(
+    document.visibility,
+  )
+
+  const moderationStatus = getString(
+    document.moderationStatus,
+  )
+
+  return (
+    visibility === 'public' &&
+    moderationStatus !== 'blocked' &&
+    moderationStatus !== 'hidden'
+  )
+}
+
+function shouldIndexVideo(
+  data: FirebaseFirestore.DocumentData,
+): boolean {
+  const visibility = getVisibility(data.visibility)
+  const moderationStatus = getModerationStatus(
+    data.moderationStatus,
+  )
+
+  return (
+    Boolean(
+      data.videoURL ?? data.videoUrl,
+    ) &&
+    visibility === 'public' &&
+    moderationStatus !== 'blocked' &&
+    moderationStatus !== 'hidden' &&
+    data.corrupted !== true
+  )
+}
+
+async function upsertDocument(
+  collectionName: string,
+  document: SearchDocument,
+): Promise<void> {
+  const ts = client()
+
+  await ts
+    .collections(collectionName)
+    .documents()
+    .upsert(document)
+}
+
+async function deleteDocument(
+  collectionName: string,
+  id: string,
+): Promise<void> {
+  const ts = client()
+
+  await ts
+    .collections(collectionName)
+    .documents(id)
+    .delete()
+    .catch(() => {})
+}
+
 export const syncUserToSearch = onDocumentWritten(
-  { document: 'users/{uid}', secrets: SECRETS },
+  {
+    document: 'users/{uid}',
+    secrets: SECRETS,
+  },
   async (event) => {
     const uid = event.params.uid
     const after = event.data?.after.data()
-    const ts = client()
+
     if (!after) {
-      await ts.collections('users').documents(uid).delete().catch(() => {})
+      await deleteDocument('users', uid)
       return
     }
-    await ts.collections('users').documents().upsert({
-      id: uid,
-      pseudo: after.pseudo ?? '',
-      nom: after.nom ?? '',
-      photoURL: after.photoURL ?? '',
-      verified: !!after.verified,
-      followerCount: after.followerCount ?? 0,
-    }).catch((e) => console.warn('syncUser failed:', e?.message ?? e))
+
+    try {
+      await upsertDocument(
+        'users',
+        mapUser(after, uid),
+      )
+    } catch (error) {
+      console.warn(
+        'syncUser failed:',
+        error instanceof Error
+          ? error.message
+          : error,
+      )
+    }
   },
 )
 
-// ─── Sync hashtags → Typesense ───
 export const syncHashtagToSearch = onDocumentWritten(
-  { document: 'hashtags/{tag}', secrets: SECRETS },
+  {
+    document: 'hashtags/{tag}',
+    secrets: SECRETS,
+  },
   async (event) => {
     const tag = event.params.tag
     const after = event.data?.after.data()
-    const ts = client()
-    if (!after || (after.videoCount ?? 0) <= 0) {
-      await ts.collections('hashtags').documents(tag).delete().catch(() => {})
+
+    if (
+      !after ||
+      getNumber(after.videoCount) <= 0
+    ) {
+      await deleteDocument('hashtags', tag)
       return
     }
-    await ts.collections('hashtags').documents().upsert({
-      id: tag,
-      tag,
-      videoCount: after.videoCount ?? 0,
-      trendingScore: after.trendingScore ?? 0,
-    }).catch((e) => console.warn('syncHashtag failed:', e?.message ?? e))
+
+    try {
+      await upsertDocument(
+        'hashtags',
+        mapHashtag(after, tag),
+      )
+    } catch (error) {
+      console.warn(
+        'syncHashtag failed:',
+        error instanceof Error
+          ? error.message
+          : error,
+      )
+    }
   },
 )
 
-// ─── Sync posts → Typesense ───
 export const syncPostToSearch = onDocumentWritten(
-  { document: 'posts/{postId}', secrets: SECRETS },
+  {
+    document: 'posts/{postId}',
+    secrets: SECRETS,
+  },
   async (event) => {
     const postId = event.params.postId
     const after = event.data?.after.data()
-    const ts = client()
+
     if (!after) {
-      await ts.collections('posts').documents(postId).delete().catch(() => {})
+      await deleteDocument('posts', postId)
       return
     }
-    await ts.collections('posts').documents().upsert(mapPost(after, postId)).catch((e) =>
-      console.warn('syncPost failed:', e?.message ?? e),
+
+    const db = getFirestore()
+    const rawPost = mapPost(after, postId)
+    const post = await enrichWithAuthorCity(
+      db,
+      rawPost,
     )
+
+    if (!shouldIndexPost(post)) {
+      await deleteDocument('posts', postId)
+      return
+    }
+
+    try {
+      await upsertDocument('posts', post)
+    } catch (error) {
+      console.warn(
+        'syncPost failed:',
+        error instanceof Error
+          ? error.message
+          : error,
+      )
+    }
   },
 )
 
-// ─── Init schéma (callable, une fois) ───
-export const initSearchSchema = onCall({ secrets: SECRETS }, async (req) => {
-  if (!req.auth?.token?.admin) throw new HttpsError('permission-denied', 'Admin only')
-  const ts = client()
-  for (const schema of [USERS_SCHEMA, HASHTAGS_SCHEMA, POSTS_SCHEMA]) {
-    await ts.collections(schema.name).delete().catch(() => {})
-    await ts.collections().create(schema as any)
-  }
-  return { ok: true, created: ['users', 'hashtags', 'posts'] }
-})
+export const syncVideoToSearch = onDocumentWritten(
+  {
+    document: 'videos/{videoId}',
+    secrets: SECRETS,
+  },
+  async (event) => {
+    const videoId = event.params.videoId
+    const after = event.data?.after.data()
 
-// ─── Backfill (callable, admin-only) ───
-export const backfillSearch = onCall({ secrets: SECRETS, timeoutSeconds: 540 }, async (req) => {
-  if (!req.auth?.token?.admin) throw new HttpsError('permission-denied', 'Admin only')
-  const db = getFirestore()
-  const ts = client()
-
-  const BACKFILL_PAGE_SIZE = 300
-
-  const usersSnap = await db.collection('users').get()
-  const userDocs = usersSnap.docs.map((d) => {
-    const u = d.data()
-    return {
-      id: d.id, pseudo: u.pseudo ?? '', nom: u.nom ?? '',
-      photoURL: u.photoURL ?? '', verified: !!u.verified,
-      followerCount: u.followerCount ?? 0,
+    if (!after) {
+      await deleteDocument('videos', videoId)
+      return
     }
-  })
 
-  const tagsSnap = await db.collection('hashtags').get()
-  const tagDocs = tagsSnap.docs
-    .map((d) => ({ id: d.id, tag: d.data().tag ?? d.id, videoCount: d.data().videoCount ?? 0, trendingScore: d.data().trendingScore ?? 0 }))
-    .filter((h) => h.videoCount > 0)
+    if (!shouldIndexVideo(after)) {
+      await deleteDocument('videos', videoId)
+      return
+    }
 
-  const postDocs: ReturnType<typeof mapPost>[] = []
-  let lastPostDoc: FirebaseFirestore.QueryDocumentSnapshot | undefined
+    const db = getFirestore()
+    const rawVideo = mapVideo(after, videoId)
+    const video = await enrichWithAuthorCity(
+      db,
+      rawVideo,
+    )
+
+    try {
+      await upsertDocument('videos', video)
+    } catch (error) {
+      console.warn(
+        'syncVideo failed:',
+        error instanceof Error
+          ? error.message
+          : error,
+      )
+    }
+  },
+)
+
+export const initSearchSchema = onCall(
+  {
+    secrets: SECRETS,
+  },
+  async (request) => {
+    if (!request.auth?.token?.admin) {
+      throw new HttpsError(
+        'permission-denied',
+        'Admin only',
+      )
+    }
+
+    const ts = client()
+
+    const schemas = [
+      USERS_SCHEMA,
+      HASHTAGS_SCHEMA,
+      POSTS_SCHEMA,
+      VIDEOS_SCHEMA,
+    ]
+
+    for (const schema of schemas) {
+      await ts
+        .collections(schema.name)
+        .delete()
+        .catch(() => {})
+
+      await ts
+        .collections()
+        .create(schema as any)
+    }
+
+    return {
+      ok: true,
+      created: [
+        'users',
+        'hashtags',
+        'posts',
+        'videos',
+      ],
+    }
+  },
+)
+
+async function readAllUsers(
+  db: FirebaseFirestore.Firestore,
+): Promise<SearchDocument[]> {
+  const snapshot = await db
+    .collection('users')
+    .get()
+
+  return snapshot.docs.map((document) =>
+    mapUser(document.data(), document.id),
+  )
+}
+
+async function readAllHashtags(
+  db: FirebaseFirestore.Firestore,
+): Promise<SearchDocument[]> {
+  const snapshot = await db
+    .collection('hashtags')
+    .get()
+
+  return snapshot.docs
+    .map((document) =>
+      mapHashtag(document.data(), document.id),
+    )
+    .filter(
+      (document) =>
+        getNumber(document.videoCount) > 0,
+    )
+}
+
+async function readAllPosts(
+  db: FirebaseFirestore.Firestore,
+): Promise<SearchDocument[]> {
+  const documents: SearchDocument[] = []
+  let lastDocument:
+    | FirebaseFirestore.QueryDocumentSnapshot
+    | undefined
 
   while (true) {
     let postsQuery = db
@@ -166,32 +771,165 @@ export const backfillSearch = onCall({ secrets: SECRETS, timeoutSeconds: 540 }, 
       .orderBy('createdAt', 'desc')
       .limit(BACKFILL_PAGE_SIZE)
 
-    if (lastPostDoc) {
-      postsQuery = postsQuery.startAfter(lastPostDoc)
+    if (lastDocument) {
+      postsQuery = postsQuery.startAfter(lastDocument)
     }
 
-    const postsSnap = await postsQuery.get()
+    const snapshot = await postsQuery.get()
 
-    if (postsSnap.empty) {
+    if (snapshot.empty) {
       break
     }
 
-    postDocs.push(
-      ...postsSnap.docs.map((snapshot) =>
-        mapPost(snapshot.data(), snapshot.id),
-      ),
-    )
+    for (const document of snapshot.docs) {
+      const rawPost = mapPost(
+        document.data(),
+        document.id,
+      )
 
-    lastPostDoc = postsSnap.docs[postsSnap.docs.length - 1]
+      const post = await enrichWithAuthorCity(
+        db,
+        rawPost,
+      )
 
-    if (postsSnap.docs.length < BACKFILL_PAGE_SIZE) {
+      if (shouldIndexPost(post)) {
+        documents.push(post)
+      }
+    }
+
+    lastDocument =
+      snapshot.docs[snapshot.docs.length - 1]
+
+    if (
+      snapshot.docs.length < BACKFILL_PAGE_SIZE
+    ) {
       break
     }
   }
 
-  if (userDocs.length) await ts.collections('users').documents().import(userDocs, { action: 'upsert' })
-  if (tagDocs.length) await ts.collections('hashtags').documents().import(tagDocs, { action: 'upsert' })
-  if (postDocs.length) await ts.collections('posts').documents().import(postDocs, { action: 'upsert' })
+  return documents
+}
 
-  return { ok: true, users: userDocs.length, hashtags: tagDocs.length, posts: postDocs.length }
-})
+async function readAllVideos(
+  db: FirebaseFirestore.Firestore,
+): Promise<SearchDocument[]> {
+  const documents: SearchDocument[] = []
+  let lastDocument:
+    | FirebaseFirestore.QueryDocumentSnapshot
+    | undefined
+
+  while (true) {
+    let videosQuery = db
+      .collection('videos')
+      .where('visibility', '==', 'public')
+      .orderBy('createdAt', 'desc')
+      .limit(BACKFILL_PAGE_SIZE)
+
+    if (lastDocument) {
+      videosQuery = videosQuery.startAfter(lastDocument)
+    }
+
+    const snapshot = await videosQuery.get()
+
+    if (snapshot.empty) {
+      break
+    }
+
+    for (const document of snapshot.docs) {
+      const data = document.data()
+
+      if (!shouldIndexVideo(data)) {
+        continue
+      }
+
+      const rawVideo = mapVideo(
+        data,
+        document.id,
+      )
+
+      const video = await enrichWithAuthorCity(
+        db,
+        rawVideo,
+      )
+
+      documents.push(video)
+    }
+
+    lastDocument =
+      snapshot.docs[snapshot.docs.length - 1]
+
+    if (
+      snapshot.docs.length < BACKFILL_PAGE_SIZE
+    ) {
+      break
+    }
+  }
+
+  return documents
+}
+
+export const backfillSearch = onCall(
+  {
+    secrets: SECRETS,
+    timeoutSeconds: 540,
+  },
+  async (request) => {
+    if (!request.auth?.token?.admin) {
+      throw new HttpsError(
+        'permission-denied',
+        'Admin only',
+      )
+    }
+
+    const db = getFirestore()
+    const ts = client()
+
+    const [
+      users,
+      hashtags,
+      posts,
+      videos,
+    ] = await Promise.all([
+      readAllUsers(db),
+      readAllHashtags(db),
+      readAllPosts(db),
+      readAllVideos(db),
+    ])
+
+    if (users.length > 0) {
+      await ts
+        .collections('users')
+        .documents()
+        .import(users, { action: 'upsert' })
+    }
+
+    if (hashtags.length > 0) {
+      await ts
+        .collections('hashtags')
+        .documents()
+        .import(hashtags, { action: 'upsert' })
+    }
+
+    if (posts.length > 0) {
+      await ts
+        .collections('posts')
+        .documents()
+        .import(posts, { action: 'upsert' })
+    }
+
+    if (videos.length > 0) {
+      await ts
+        .collections('videos')
+        .documents()
+        .import(videos, { action: 'upsert' })
+    }
+
+    return {
+      ok: true,
+      users: users.length,
+      hashtags: hashtags.length,
+      posts: posts.length,
+      videos: videos.length,
+    }
+  },
+)

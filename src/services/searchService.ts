@@ -5,7 +5,6 @@ import { getBlockedUserIds } from '../lib/blockService'
 import { SEARCH_FILTER_BY } from '../lib/typesense-schemas'
 import { withTypesenseRetry } from '../lib/typesenseRetry'
 import { getCached, setCache } from '../lib/searchCache'
-import { getVideosByHashtag, type TrendingHashtag } from './hashtagService'
 
 export type PostMediaType = 'text' | 'image' | 'carousel' | 'article' | 'video' | 'video_share'
 
@@ -42,16 +41,35 @@ export interface PostResult {
   createdAt?: number
 }
 
+export interface VideoResult {
+  id: string
+  description?: string
+  userName?: string
+  userId?: string
+  userPhoto?: string
+  hashtags?: string[]
+  videoURL?: string
+  thumbnailURL?: string
+  type?: string
+  likes?: number
+  comments?: number
+  shares?: number
+  views?: number
+  createdAt?: number
+}
+
 export interface SearchResults {
   users: UserResult[]
   hashtags: HashtagResult[]
   posts: PostResult[]
+  videos: VideoResult[]
 }
 
 export interface MultiSearchResult {
   users: { hits: any[]; found: number; request_params: any }
   hashtags: { hits: any[]; found: number; request_params: any }
   posts: { hits: any[]; found: number; request_params: any }
+  videos: { hits: any[]; found: number; request_params: any }
 }
 
 export interface MergedResult {
@@ -129,6 +147,42 @@ export function mapPostHit(h: any): PostResult {
   }
 }
 
+export function mapVideoHit(hit: any): VideoResult {
+  const data = hit.document
+
+  return {
+    id: String(data.id),
+    description: String(data.description ?? ''),
+    userName: String(data.userName ?? ''),
+    userId: String(data.userId ?? ''),
+    userPhoto: String(data.userPhoto ?? ''),
+    hashtags: Array.isArray(data.hashtags)
+      ? data.hashtags
+      : [],
+    videoURL: String(data.videoURL ?? ''),
+    thumbnailURL: String(data.thumbnailURL ?? ''),
+    type: String(data.type ?? 'video'),
+    likes: Number(data.likes ?? 0),
+    comments: Number(data.comments ?? 0),
+    shares: Number(data.shares ?? 0),
+    views: Number(data.views ?? 0),
+    createdAt: Number(data.createdAt ?? 0),
+  }
+}
+
+function filterBlockedVideos(
+  hits: any[],
+  blockedIds: Set<string>,
+): any[] {
+  return hits.filter((hit) => {
+    const userId = String(
+      hit.document.userId ?? '',
+    )
+
+    return !blockedIds.has(userId)
+  })
+}
+
 export async function searchPosts(term: string, max = 8): Promise<PostResult[]> {
   const q = term.trim().replace(/^#/, '')
   if (!q) return []
@@ -178,122 +232,350 @@ export async function searchPostsByType(
   }
 }
 
-export async function searchAll(term: string): Promise<SearchResults> {
-  const t = term.trim()
-  if (!t) return { users: [], hashtags: [], posts: [] }
+export async function searchAll(
+  term: string,
+): Promise<SearchResults> {
+  const cleanTerm = term.trim()
 
-  if (t.startsWith('#')) {
-    const posts = await getVideosByHashtag(t)
-    return { users: [], hashtags: [], posts }
-  }
-
-  const [users, hashtags, posts] = await Promise.all([
-    searchUsers(t),
-    searchHashtags(t),
-    searchPosts(t),
-  ])
-  return { users, hashtags, posts }
-}
-
-export async function searchMulti(term: string): Promise<MultiSearchResult> {
-  const q = term.trim().replace(/^#/, '')
-  if (!q) {
+  if (!cleanTerm) {
     return {
-      users: { hits: [], found: 0, request_params: {} },
-      hashtags: { hits: [], found: 0, request_params: {} },
-      posts: { hits: [], found: 0, request_params: {} },
+      users: [],
+      hashtags: [],
+      posts: [],
+      videos: [],
     }
   }
 
-  const cached = getCached<MultiSearchResult>(`searchMulti:${q}`)
-  if (cached) return cached
+  if (cleanTerm.startsWith('#')) {
+    const videos = await searchVideosByHashtag(cleanTerm)
 
-  const [usersRes, hashtagsRes, postsRes] = await Promise.all([
+    return {
+      users: [],
+      hashtags: [],
+      posts: [],
+      videos,
+    }
+  }
+
+  const result = await searchMulti(cleanTerm)
+
+  return {
+    users: result.users.hits.map(
+      (hit) => hit.document,
+    ),
+    hashtags: result.hashtags.hits.map(
+      (hit) => hit.document,
+    ),
+    posts: result.posts.hits.map(mapPostHit),
+    videos: result.videos.hits.map(mapVideoHit),
+  }
+}
+
+export async function searchMulti(
+  term: string,
+): Promise<MultiSearchResult> {
+  const q = term.trim().replace(/^#/, '').toLowerCase()
+
+  const emptyResult: MultiSearchResult = {
+    users: {
+      hits: [],
+      found: 0,
+      request_params: {},
+    },
+    hashtags: {
+      hits: [],
+      found: 0,
+      request_params: {},
+    },
+    posts: {
+      hits: [],
+      found: 0,
+      request_params: {},
+    },
+    videos: {
+      hits: [],
+      found: 0,
+      request_params: {},
+    },
+  }
+
+  if (!q) {
+    return emptyResult
+  }
+
+  const blockedIds = await getBlockedUserIds()
+  const cacheKey = `searchMulti:${q}`
+
+  const cached = getCached<MultiSearchResult>(cacheKey)
+
+  if (cached) {
+    return cached
+  }
+
+  const [
+    usersResult,
+    hashtagsResult,
+    postsResult,
+    videosResult,
+  ] = await Promise.all([
     withTypesenseRetry(
       () =>
-        searchClient.collections('users').documents().search({
-          q,
-          query_by: 'pseudo,nom,bio,city',
-          query_by_weights: '3,2,1,1',
-          sort_by: '_text_match:desc,followerCount:desc',
-          num_typos: 2,
-          per_page: 8,
-        }),
+        searchClient
+          .collections('users')
+          .documents()
+          .search({
+            q,
+            query_by: 'pseudo,nom,bio,city',
+            query_by_weights: '4,3,1,1',
+            sort_by: '_text_match:desc,followerCount:desc',
+            num_typos: 2,
+            per_page: 20,
+          }),
       { context: 'searchMulti.users' },
-    ).then((r) => r.data ?? { hits: [], found: 0, request_params: {} as any }),
+    ),
+
     withTypesenseRetry(
       () =>
-        searchClient.collections('hashtags').documents().search({
-          q,
-          query_by: 'tag',
-          query_by_weights: '3,1',
-          sort_by: '_text_match:desc,trendingScore:desc,videoCount:desc',
-          num_typos: 1,
-          per_page: 8,
-        }),
+        searchClient
+          .collections('hashtags')
+          .documents()
+          .search({
+            q,
+            query_by: 'tag',
+            sort_by:
+              '_text_match:desc,trendingScore:desc,videoCount:desc',
+            num_typos: 1,
+            per_page: 10,
+          }),
       { context: 'searchMulti.hashtags' },
-    ).then((r) => r.data ?? { hits: [], found: 0, request_params: {} as any }),
+    ),
+
     withTypesenseRetry(
       () =>
-        searchClient.collections('posts').documents().search({
-          q,
-          query_by: 'text,userName',
-          query_by_weights: '2,1',
-          sort_by: '_text_match:desc,recencyScore:desc',
-          num_typos: 2,
-          per_page: 12,
-          filter_by: SEARCH_FILTER_BY,
-        }),
+        searchClient
+          .collections('posts')
+          .documents()
+          .search({
+            q,
+            query_by: 'text,userName',
+            query_by_weights: '3,1',
+            sort_by:
+              '_text_match:desc,recencyScore:desc,createdAt:desc',
+            num_typos: 2,
+            per_page: 20,
+            filter_by: SEARCH_FILTER_BY,
+          }),
       { context: 'searchMulti.posts' },
-    ).then((r) => r.data ?? { hits: [], found: 0, request_params: {} as any }),
+    ),
+
+    withTypesenseRetry(
+      () =>
+        searchClient
+          .collections('videos')
+          .documents()
+          .search({
+            q,
+            query_by:
+              'description,userName,hashtags,soundId',
+            query_by_weights: '4,3,2,1',
+            sort_by:
+              '_text_match:desc,hotScore:desc,createdAt:desc',
+            num_typos: 2,
+            per_page: 30,
+            filter_by:
+              'moderationStatus:!=hidden && moderationStatus:!=blocked',
+          }),
+      { context: 'searchMulti.videos' },
+    ),
   ])
 
+  const users = (usersResult.data?.hits ?? [])
+    .filter((hit: any) => {
+      const id = hit.document.id
+      const me = auth.currentUser?.uid
+
+      return id !== me && !blockedIds.has(id)
+    })
+    .slice(0, 10)
+
+  const posts = (postsResult.data?.hits ?? [])
+    .filter((hit: any) => {
+      const userId = String(
+        hit.document.userId ?? '',
+      )
+
+      return !blockedIds.has(userId)
+    })
+    .slice(0, 12)
+
+  const videos = filterBlockedVideos(
+    videosResult.data?.hits ?? [],
+    blockedIds,
+  ).slice(0, 20)
+
   const result: MultiSearchResult = {
-    users: usersRes as any,
-    hashtags: hashtagsRes as any,
-    posts: postsRes as any,
+    users: {
+      ...(usersResult.data ?? emptyResult.users),
+      hits: users,
+    },
+    hashtags: hashtagsResult.data ?? emptyResult.hashtags,
+    posts: {
+      ...(postsResult.data ?? emptyResult.posts),
+      hits: posts,
+    },
+    videos: {
+      ...(videosResult.data ?? emptyResult.videos),
+      hits: videos,
+    },
   }
-  setCache(`searchMulti:${q}`, result)
+
+  setCache(cacheKey, result)
+
   return result
 }
 
-export function normalizeAndMerge(multi: MultiSearchResult): MergedResult[] {
+export async function searchVideosByHashtag(
+  hashtag: string,
+  max = 30,
+): Promise<VideoResult[]> {
+  const q = hashtag
+    .replace(/^#/, '')
+    .trim()
+    .toLowerCase()
+
+  if (!q) {
+    return []
+  }
+
+  const blockedIds = await getBlockedUserIds()
+
+  const result = await withTypesenseRetry(
+    () =>
+      searchClient
+        .collections('videos')
+        .documents()
+        .search({
+          q: '*',
+          query_by: 'description,userName,hashtags',
+          filter_by:
+            `hashtags:=${q} && ` +
+            'moderationStatus:!=hidden && ' +
+            'moderationStatus:!=blocked',
+          sort_by:
+            'hotScore:desc,createdAt:desc',
+          per_page: max * 2,
+        }),
+    {
+      context: 'searchVideosByHashtag',
+    },
+  )
+
+  return (result.data?.hits ?? [])
+    .filter((hit: any) => {
+      const userId = String(
+        hit.document.userId ?? '',
+      )
+
+      return !blockedIds.has(userId)
+    })
+    .slice(0, max)
+    .map(mapVideoHit)
+}
+
+export function normalizeAndMerge(
+  multi: MultiSearchResult,
+): MergedResult[] {
   const merged: MergedResult[] = []
 
-  const maxUserScore = Math.max(...(multi.users.hits.map((h: any) => h.text_match) || [1]), 1)
-  for (const hit of multi.users.hits) {
-    const doc = hit.document
-    merged.push({
-      id: doc.id,
-      type: 'user',
-      normalizedScore: (hit.text_match ?? 0) / maxUserScore,
-      user: doc as UserResult,
-    })
+  const addHits = (
+    hits: any[],
+    type: 'user' | 'hashtag' | 'post',
+    mapper: (hit: any) => Partial<MergedResult>,
+  ) => {
+    const maxScore = Math.max(
+      ...hits.map((hit) => hit.text_match ?? 0),
+      1,
+    )
+
+    for (const hit of hits) {
+      merged.push({
+        id: String(hit.document.id),
+        type,
+        normalizedScore:
+          (hit.text_match ?? 0) / maxScore,
+        ...mapper(hit),
+      })
+    }
   }
 
-  const maxHashScore = Math.max(...(multi.hashtags.hits.map((h: any) => h.text_match) || [1]), 1)
-  for (const hit of multi.hashtags.hits) {
-    const doc = hit.document
-    merged.push({
-      id: doc.tag ?? doc.id,
-      type: 'hashtag',
-      normalizedScore: (hit.text_match ?? 0) / maxHashScore,
-      hashtag: doc as HashtagResult,
-    })
-  }
+  addHits(multi.users.hits, 'user', (hit) => ({
+    user: hit.document as UserResult,
+  }))
 
-  const maxPostScore = Math.max(...(multi.posts.hits.map((h: any) => h.text_match) || [1]), 1)
-  for (const hit of multi.posts.hits) {
-    const doc = hit.document
+  addHits(multi.hashtags.hits, 'hashtag', (hit) => ({
+    id: String(
+      hit.document.tag ?? hit.document.id,
+    ),
+    hashtag: hit.document as HashtagResult,
+  }))
+
+  addHits(multi.posts.hits, 'post', (hit) => ({
+    post: mapPostHit(hit),
+  }))
+
+  const videoScores = Math.max(
+    ...multi.videos.hits.map(
+      (hit) => hit.text_match ?? 0,
+    ),
+    1,
+  )
+
+  for (const hit of multi.videos.hits) {
     merged.push({
-      id: doc.id,
+      id: `video:${hit.document.id}`,
       type: 'post',
-      normalizedScore: (hit.text_match ?? 0) / maxPostScore,
-      post: mapPostHit(hit),
+      normalizedScore:
+        (hit.text_match ?? 0) / videoScores,
+      post: {
+        id: String(hit.document.id),
+        description: String(
+          hit.document.description ?? '',
+        ),
+        text: String(
+          hit.document.description ?? '',
+        ),
+        userName: String(
+          hit.document.userName ?? '',
+        ),
+        userPhoto: String(
+          hit.document.userPhoto ?? '',
+        ),
+        thumbnailUrl: String(
+          hit.document.thumbnailURL ?? '',
+        ),
+        mediaUrl: String(
+          hit.document.videoURL ?? '',
+        ),
+        mediaType: 'video',
+        likeCount: Number(hit.document.likes ?? 0),
+        commentCount: Number(
+          hit.document.comments ?? 0,
+        ),
+        viewCount: Number(hit.document.views ?? 0),
+        createdAt: Number(
+          hit.document.createdAt ?? 0,
+        ),
+      },
     })
   }
 
-  return merged.sort((a, b) => b.normalizedScore - a.normalizedScore)
+  return merged.sort((a, b) => {
+    if (b.normalizedScore !== a.normalizedScore) {
+      return b.normalizedScore - a.normalizedScore
+    }
+
+    return a.id.localeCompare(b.id)
+  })
 }
 
 export function filterPostsByType(posts: PostResult[], types: PostMediaType[]): PostResult[] {
