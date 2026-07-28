@@ -149,10 +149,17 @@ export default function ActusScreen() {
       <View style={styles.topBar}>
         <Text style={styles.title}>Actus</Text>
         <View style={{ flexDirection: 'row', gap: 8 }}>
+          <Pressable
+            onPress={() => router.push('/news-compose')}
+            hitSlop={8}
+            style={styles.iconBtn}
+          >
+            <Ionicons name="add-circle" size={24} color={colors.primary} />
+         </Pressable>
           <Pressable onPress={() => router.push({ pathname: '/(tabs)/explore', params: { from: '/(tabs)/stories' } })} style={styles.iconBtn}>
             <Ionicons name="search" size={22} color="#fff" />
-          </Pressable>
-        </View>
+         </Pressable>
+       </View>
       </View>
 
       <FlatList
