@@ -506,10 +506,12 @@ function shouldIndexVideo(
     data.moderationStatus,
   )
 
+  const videoUrl = getString(
+    data.videoURL ?? data.videoUrl,
+  )
+
   return (
-    Boolean(
-      data.videoURL ?? data.videoUrl,
-    ) &&
+    videoUrl.length > 0 &&
     visibility === 'public' &&
     moderationStatus !== 'blocked' &&
     moderationStatus !== 'hidden' &&

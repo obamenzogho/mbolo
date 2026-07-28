@@ -143,42 +143,7 @@ const VIDEOS_SCHEMA = {
   default_sorting_field: 'hotScore',
 }
 
-// ─── Counter buffer (30s flush) ─────────────────────────────
-const BUFFER_INTERVAL_MS = 30_000
-const counterBuffer = new Map() // key: `${collection}/${id}` → { id, collection, data }
-
-function flushCounterBuffer() {
-  if (counterBuffer.size === 0) return
-
-  const entries = [...counterBuffer.values()]
-  counterBuffer.clear()
-
-  const byCollection = {}
-  for (const e of entries) {
-    if (!byCollection[e.collection]) byCollection[e.collection] = {}
-    byCollection[e.collection][e.id] = e.data
-  }
-
-  for (const [collection, docs] of Object.entries(byCollection)) {
-    const updates = Object.entries(docs).map(([id, data]) =>
-      ts.collections(collection).documents().update({ ...data, id }).catch((err) => {
-        console.warn(`⚠ Buffer flush failed for ${collection}/${id}:`, err?.message ?? err)
-      })
-    )
-    Promise.all(updates).then(() => {
-      console.log(`  📦 Flushed ${Object.keys(docs).length} ${collection} counter(s)`)
-    })
-  }
-}
-
-setInterval(flushCounterBuffer, BUFFER_INTERVAL_MS)
-
 // ─── Helpers ────────────────────────────────────────────────
-const COUNTER_FIELDS = new Set([
-  'viewCount', 'likeCount', 'followerCount', 'followingCount',
-  'videoCount', 'trendingScore', 'totalViews', 'postsCount',
-])
-
 function mapUser(doc) {
   const d = doc.data()
   return {
@@ -267,14 +232,6 @@ function computeHotScore(createdAtMs, engagementScore) {
   return freshness * 4 + engagementScore * 0.8
 }
 
-function hasCounterChanges(before, after) {
-  if (!before || !after) return false
-  for (const field of COUNTER_FIELDS) {
-    if (before.data()[field] !== after.data()[field]) return true
-  }
-  return false
-}
-
 function normalizeHashtags(value) {
   if (!Array.isArray(value)) return []
 
@@ -326,6 +283,13 @@ function mapVideo(doc) {
     recencyScore: computeRecencyScore(createdAtMs, engagementScore),
     hotScore: d.hotScore ?? computeHotScore(createdAtMs, engagementScore),
   }
+}
+
+function shouldIndexVideo(video) {
+  return Boolean(video.videoURL) &&
+    video.visibility === 'public' &&
+    video.moderationStatus !== 'hidden' &&
+    video.moderationStatus !== 'blocked'
 }
 
 // ─── Backfill ───────────────────────────────────────────────
@@ -393,12 +357,7 @@ async function backfill() {
 
   const videoDocs = videosSnap.docs
     .map(mapVideo)
-    .filter(
-      (video) =>
-        video.videoURL &&
-        video.moderationStatus !== 'hidden' &&
-        video.moderationStatus !== 'blocked',
-    )
+    .filter(shouldIndexVideo)
 
   if (videoDocs.length) {
     await ts
@@ -432,19 +391,6 @@ function startListeners() {
       const { doc, type } = change
 
       if (type === 'added' || type === 'modified') {
-        // Check if only counters changed → buffer instead of full upsert
-        if (type === 'modified' && hasCounterChanges(change.doc, doc)) {
-          const counterData = {}
-          for (const field of COUNTER_FIELDS) {
-            if (doc.data()[field] !== undefined) {
-              counterData[field] = doc.data()[field]
-            }
-          }
-          counterBuffer.set(`users/${doc.id}`, { id: doc.id, collection: 'users', data: counterData })
-          continue
-        }
-
-        // Full upsert
         ts.collections('users').documents().upsert(mapUser(doc)).catch((err) => {
           console.warn(`⚠ Users upsert failed for ${doc.id}:`, err?.message ?? err)
         })
@@ -463,23 +409,11 @@ function startListeners() {
       if (type === 'added' || type === 'modified') {
         const videoCount = data.videoCount ?? 0
 
-        // Delete if videoCount <= 0
         if (videoCount <= 0) {
           ts.collections('hashtags').documents(doc.id).delete().catch(() => {})
           continue
         }
 
-        // Check if only counters changed → buffer
-        if (type === 'modified' && hasCounterChanges(change.doc, doc)) {
-          counterBuffer.set(`hashtags/${doc.id}`, {
-            id: doc.id,
-            collection: 'hashtags',
-            data: { videoCount: data.videoCount ?? 0, trendingScore: data.trendingScore ?? 0 },
-          })
-          continue
-        }
-
-        // Full upsert
         ts.collections('hashtags').documents().upsert(mapHashtag(doc)).catch((err) => {
           console.warn(`⚠ Hashtags upsert failed for ${doc.id}:`, err?.message ?? err)
         })
@@ -493,24 +427,8 @@ function startListeners() {
   db.collection('posts').onSnapshot((snap) => {
     for (const change of snap.docChanges()) {
       const { doc, type } = change
-      const data = doc.data()
 
       if (type === 'added' || type === 'modified') {
-        // Check if only counters changed → buffer
-        if (type === 'modified' && hasCounterChanges(change.doc, doc)) {
-          counterBuffer.set(`posts/${doc.id}`, {
-            id: doc.id,
-            collection: 'posts',
-            data: {
-              likeCount: data.likes ?? data.likeCount ?? 0,
-              commentCount: data.commentCount ?? data.comments ?? 0,
-              viewCount: data.viewCount ?? data.views ?? 0,
-            },
-          })
-          continue
-        }
-
-        // Full upsert
         ts.collections('posts').documents().upsert(mapPost(doc)).catch((err) => {
           console.warn(`⚠ Posts upsert failed for ${doc.id}:`, err?.message ?? err)
         })
@@ -537,11 +455,7 @@ function startListeners() {
       if (type === 'added' || type === 'modified') {
         const mapped = mapVideo(doc)
 
-        if (
-          !mapped.videoURL ||
-          mapped.moderationStatus === 'hidden' ||
-          mapped.moderationStatus === 'blocked'
-        ) {
+        if (!shouldIndexVideo(mapped)) {
           ts
             .collections('videos')
             .documents(doc.id)
@@ -581,7 +495,6 @@ async function main() {
 // Graceful shutdown
 process.on('SIGINT', async () => {
   console.log('\n🛑 Shutting down...')
-  flushCounterBuffer()
   await new Promise((r) => setTimeout(r, 500))
   process.exit(0)
 })

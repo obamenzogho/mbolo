@@ -43,18 +43,22 @@ export interface PostResult {
 
 export interface VideoResult {
   id: string
+  text?: string
   description?: string
   userName?: string
   userId?: string
   userPhoto?: string
   hashtags?: string[]
+  soundId?: string
   videoURL?: string
   thumbnailURL?: string
   type?: string
-  likes?: number
-  comments?: number
-  shares?: number
-  views?: number
+  mediaType?: PostMediaType
+  likeCount?: number
+  commentCount?: number
+  shareCount?: number
+  saveCount?: number
+  viewCount?: number
   createdAt?: number
 }
 
@@ -148,24 +152,48 @@ export function mapPostHit(h: any): PostResult {
 }
 
 export function mapVideoHit(hit: any): VideoResult {
-  const data = hit.document
+  const data = hit.document ?? hit
 
   return {
-    id: String(data.id),
-    description: String(data.description ?? ''),
+    id: String(data.id ?? ''),
+    text: String(data.text ?? data.description ?? ''),
+    description: String(
+      data.description ?? data.text ?? '',
+    ),
     userName: String(data.userName ?? ''),
     userId: String(data.userId ?? ''),
     userPhoto: String(data.userPhoto ?? ''),
     hashtags: Array.isArray(data.hashtags)
-      ? data.hashtags
+      ? data.hashtags.map(String)
       : [],
-    videoURL: String(data.videoURL ?? ''),
-    thumbnailURL: String(data.thumbnailURL ?? ''),
-    type: String(data.type ?? 'video'),
-    likes: Number(data.likes ?? 0),
-    comments: Number(data.comments ?? 0),
-    shares: Number(data.shares ?? 0),
-    views: Number(data.views ?? 0),
+    soundId: String(data.soundId ?? ''),
+    videoURL: String(
+      data.videoURL ?? data.videoUrl ?? '',
+    ),
+    thumbnailURL: String(
+      data.thumbnailUrl ??
+        data.thumbnailURL ??
+        '',
+    ),
+    type: String(
+      data.mediaType ?? data.type ?? 'video',
+    ),
+    mediaType: 'video',
+    likeCount: Number(
+      data.likeCount ?? data.likes ?? 0,
+    ),
+    commentCount: Number(
+      data.commentCount ?? data.comments ?? 0,
+    ),
+    shareCount: Number(
+      data.shareCount ?? data.shares ?? 0,
+    ),
+    saveCount: Number(
+      data.saveCount ?? data.saves ?? 0,
+    ),
+    viewCount: Number(
+      data.viewCount ?? data.views ?? 0,
+    ),
     createdAt: Number(data.createdAt ?? 0),
   }
 }
@@ -183,28 +211,129 @@ function filterBlockedVideos(
   })
 }
 
-export async function searchPosts(term: string, max = 8): Promise<PostResult[]> {
+export async function searchPosts(
+  term: string,
+  max = 8,
+): Promise<PostResult[]> {
   const q = term.trim().replace(/^#/, '')
-  if (!q) return []
+
+  if (!q) {
+    return []
+  }
+
   try {
-    const res = await searchClient.collections('posts').documents().search({
-      q,
-      query_by: 'text,userName',
-      query_by_weights: '2,1',
-      sort_by: '_text_match:desc,recencyScore:desc',
-      num_typos: 2,
-      per_page: max,
-      filter_by: SEARCH_FILTER_BY,
-    })
-    return (res.hits ?? []).map(mapPostHit)
-  } catch (e) {
-    captureException(e instanceof Error ? e : new Error(String(e)), { context: 'searchPosts' })
+    const blockedIds = await getBlockedUserIds()
+
+    const result = await withTypesenseRetry(
+      () =>
+        searchClient
+          .collections('posts')
+          .documents()
+          .search({
+            q,
+            query_by: 'text,userName,hashtags,soundId,city',
+            query_by_weights: '4,3,2,1,1',
+            sort_by:
+              '_text_match:desc,recencyScore:desc,createdAt:desc',
+            num_typos: 2,
+            per_page: Math.min(max * 2, 40),
+            filter_by: SEARCH_FILTER_BY,
+          }),
+      {
+        context: 'searchPosts',
+      },
+    )
+
+    return (result.data?.hits ?? [])
+      .filter((hit: any) => {
+        const userId = String(
+          hit.document?.userId ?? '',
+        )
+
+        return !blockedIds.has(userId)
+      })
+      .slice(0, max)
+      .map(mapPostHit)
+  } catch (error) {
+    captureException(
+      error instanceof Error
+        ? error
+        : new Error(String(error)),
+      { context: 'searchPosts' },
+    )
+
     return []
   }
 }
 
-export async function searchVideos(term: string, max = 8): Promise<PostResult[]> {
-  return searchPostsByType(term, ['video', 'video_share'], max)
+async function searchVideosByText(
+  term: string,
+  max: number,
+): Promise<VideoResult[]> {
+  const q = term.trim().replace(/^#/, '')
+
+  if (!q) {
+    return []
+  }
+
+  const blockedIds = await getBlockedUserIds()
+
+  const result = await withTypesenseRetry(
+    () =>
+      searchClient
+        .collections('videos')
+        .documents()
+        .search({
+          q,
+          query_by:
+            'text,description,userName,hashtags,soundId,city',
+          query_by_weights: '5,4,3,2,1,1',
+          sort_by:
+            '_text_match:desc,hotScore:desc,createdAt:desc',
+          num_typos: 2,
+          per_page: Math.min(max * 2, 40),
+          filter_by:
+            'visibility:=public && ' +
+            'moderationStatus:!=hidden && ' +
+            'moderationStatus:!=blocked',
+        }),
+    {
+      context: 'searchVideosByText',
+    },
+  )
+
+  return (result.data?.hits ?? [])
+    .filter((hit: any) => {
+      const userId = String(
+        hit.document?.userId ?? '',
+      )
+
+      return !blockedIds.has(userId)
+    })
+    .slice(0, max)
+    .map(mapVideoHit)
+}
+
+export async function searchVideos(
+  term: string,
+  max = 8,
+): Promise<PostResult[]> {
+  const videos = await searchVideosByText(term, max)
+
+  return videos.map((video) => ({
+    id: video.id,
+    description: video.description,
+    text: video.text,
+    thumbnailUrl: video.thumbnailURL,
+    mediaUrl: video.videoURL,
+    userName: video.userName,
+    userPhoto: video.userPhoto,
+    likeCount: video.likeCount,
+    commentCount: video.commentCount,
+    viewCount: video.viewCount,
+    mediaType: 'video',
+    createdAt: video.createdAt,
+  }))
 }
 
 export async function searchPostsByType(
@@ -304,7 +433,12 @@ export async function searchMulti(
   }
 
   const blockedIds = await getBlockedUserIds()
-  const cacheKey = `searchMulti:${q}`
+  const cacheKey = [
+    'searchMulti',
+    q,
+    auth.currentUser?.uid ?? 'anonymous',
+    [...blockedIds].sort().join(','),
+  ].join(':')
 
   const cached = getCached<MultiSearchResult>(cacheKey)
 
@@ -376,14 +510,16 @@ export async function searchMulti(
           .search({
             q,
             query_by:
-              'description,userName,hashtags,soundId',
-            query_by_weights: '4,3,2,1',
+              'text,description,userName,hashtags,soundId,city',
+            query_by_weights: '4,3,2,1,1',
             sort_by:
               '_text_match:desc,hotScore:desc,createdAt:desc',
             num_typos: 2,
             per_page: 30,
             filter_by:
-              'moderationStatus:!=hidden && moderationStatus:!=blocked',
+              'visibility:=public && ' +
+              'moderationStatus:!=hidden && ' +
+              'moderationStatus:!=blocked',
           }),
       { context: 'searchMulti.videos' },
     ),
@@ -551,17 +687,39 @@ export function normalizeAndMerge(
           hit.document.userPhoto ?? '',
         ),
         thumbnailUrl: String(
-          hit.document.thumbnailURL ?? '',
+          hit.document.thumbnailUrl ??
+            hit.document.thumbnailURL ??
+            '',
         ),
         mediaUrl: String(
           hit.document.videoURL ?? '',
         ),
         mediaType: 'video',
-        likeCount: Number(hit.document.likes ?? 0),
-        commentCount: Number(
-          hit.document.comments ?? 0,
+        likeCount: Number(
+          hit.document.likeCount ??
+            hit.document.likes ??
+            0,
         ),
-        viewCount: Number(hit.document.views ?? 0),
+        commentCount: Number(
+          hit.document.commentCount ??
+            hit.document.comments ??
+            0,
+        ),
+        shareCount: Number(
+          hit.document.shareCount ??
+            hit.document.shares ??
+            0,
+        ),
+        saveCount: Number(
+          hit.document.saveCount ??
+            hit.document.saves ??
+            0,
+        ),
+        viewCount: Number(
+          hit.document.viewCount ??
+            hit.document.views ??
+            0,
+        ),
         createdAt: Number(
           hit.document.createdAt ?? 0,
         ),
