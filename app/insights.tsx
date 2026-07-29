@@ -22,9 +22,11 @@ export default function Insights() {
 
   if (loading || !insights) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center' }}>
-        <OrbitLoader />
-      </SafeAreaView>
+      <PageWrapper type="stack" swipeBack backTo="/(tabs)/feed">
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center' }}>
+          <OrbitLoader />
+        </SafeAreaView>
+      </PageWrapper>
     )
   }
 

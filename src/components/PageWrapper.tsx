@@ -2,6 +2,7 @@ import React from 'react'
 import { StyleSheet } from 'react-native'
 import Animated from 'react-native-reanimated'
 import { usePageAnimation } from '@/hooks/usePageAnimation'
+import { useIsStackEntry } from '@/hooks/useIsStackEntry'
 import SwipeBackView from '@/components/SwipeBackView'
 import { HAS_NATIVE_SWIPE_BACK } from '@/navigation/transitions'
 import { colors } from '@/lib/theme'
@@ -10,20 +11,23 @@ interface PageWrapperProps {
   children: React.ReactNode
   type?: 'fadeSlide' | 'fade' | 'scale' | 'slideRight' | 'stack'
   style?: object
-  /** Active le retour par glissement (no-op sur iOS : le native-stack le fait déjà). */
+  /** Active le retour par glissement. */
   swipeBack?: boolean
-  /** Limite le geste au bord gauche. Indispensable si la page contient un scroll/pager horizontal. */
+  /** Limite le geste au bord gauche. Indispensable si la page a un scroll/pager horizontal. */
   swipeBackEdgeOnly?: boolean
   /** Route de repli quand la stack est vide. */
   backTo?: string
-  /** Désactive temporairement le geste (enregistrement caméra, formulaire modifié, etc.). */
+  /** Désactive temporairement le geste (enregistrement caméra, formulaire modifié...). */
   swipeBackEnabled?: boolean
 }
 
 /**
- * Conteneur d'animation d'entrée de page + retour par glissement optionnel.
- * Le fond `colors.background` couvre toute la surface pour éviter les bordures
- * claires pendant les transitions.
+ * Conteneur d'animation d'entrée de page + retour par glissement.
+ *
+ * `type="stack"` s'adapte à la position de l'écran :
+ * - poussé sur la Stack -> aucune animation JS (le natif la fait)
+ * - premier écran de la Stack (atteint par un jump d'onglet) -> slide JS,
+ *   car le Tabs navigator n'anime rien et le geste natif est inerte à index 0.
  */
 const PageWrapper: React.FC<PageWrapperProps> = ({
   children,
@@ -34,14 +38,19 @@ const PageWrapper: React.FC<PageWrapperProps> = ({
   swipeBackEnabled = true,
   backTo,
 }) => {
-  const animatedStyle = usePageAnimation(type)
+  const isStackEntry = useIsStackEntry()
+  const resolvedType = type === 'stack' && isStackEntry ? 'stackEntry' : type
+  const animatedStyle = usePageAnimation(resolvedType)
 
   const content = (
     <Animated.View style={[styles.container, animatedStyle, style]}>{children}</Animated.View>
   )
 
-  // Sur iOS, le geste natif gère déjà le pop : ne pas empiler deux gestes.
-  if (!swipeBack || HAS_NATIVE_SWIPE_BACK) return content
+  // Le geste JS est nécessaire quand le natif ne peut pas popper :
+  // - Android / Web : pas de geste natif fiable
+  // - iOS mais premier écran de la Stack : rien à popper
+  const needsJsGesture = swipeBack && (!HAS_NATIVE_SWIPE_BACK || isStackEntry)
+  if (!needsJsGesture) return content
 
   return (
     <SwipeBackView

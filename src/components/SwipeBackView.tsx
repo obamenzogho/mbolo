@@ -12,11 +12,11 @@ interface SwipeBackViewProps extends UseSwipeBackOptions {
 
 /**
  * Retour par glissement horizontal, indépendant du navigateur.
- * Utilisé sur Android et Web, où le geste natif de native-stack est
- * respectivement peu fiable et inexistant.
+ * Utilisé sur Android, Web, et sur iOS pour le premier écran d'une Stack
+ * (où le geste natif n'a rien à popper).
  */
 const SwipeBackView: React.FC<SwipeBackViewProps> = ({ children, style, ...options }) => {
-  const { gesture, pageStyle, scrimStyle, underlayStyle } = useSwipeBack(options)
+  const { gesture, pageStyle, edgeShadowStyle, scrimStyle, underlayStyle } = useSwipeBack(options)
 
   return (
     <View style={styles.root}>
@@ -25,7 +25,10 @@ const SwipeBackView: React.FC<SwipeBackViewProps> = ({ children, style, ...optio
       </Animated.View>
 
       <GestureDetector gesture={gesture}>
-        <Animated.View style={[styles.page, pageStyle, style]}>{children}</Animated.View>
+        <Animated.View style={[styles.page, pageStyle, style]}>
+          <Animated.View pointerEvents="none" style={[styles.edgeShadow, edgeShadowStyle]} />
+          {children}
+        </Animated.View>
       </GestureDetector>
     </View>
   )
@@ -35,13 +38,14 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background, overflow: 'hidden' },
   underlay: { ...StyleSheet.absoluteFillObject },
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: '#000' },
-  page: {
-    flex: 1,
-    backgroundColor: colors.background,
-    shadowColor: '#000',
-    shadowOffset: { width: -4, height: 0 },
-    shadowRadius: 12,
-    elevation: 12,
+  page: { flex: 1, backgroundColor: colors.background },
+  edgeShadow: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: -14,
+    width: 14,
+    backgroundColor: 'rgba(0,0,0,0.55)',
   },
 })
 

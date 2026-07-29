@@ -1,5 +1,5 @@
-import { useCallback, useContext, useMemo } from 'react'
-import { Dimensions } from 'react-native'
+import { useCallback, useMemo } from 'react'
+import { useWindowDimensions } from 'react-native'
 import { Gesture } from 'react-native-gesture-handler'
 import {
   Easing,
@@ -12,23 +12,18 @@ import {
   withTiming,
 } from 'react-native-reanimated'
 import { useFocusEffect } from 'expo-router'
-import { NavigationHistoryContext } from '@/providers/NavigationHistoryProvider'
+import { useGoBack } from '@/hooks/useGoBack'
 import { useAppliedAccessibility } from '@/features/settings/appliedStore'
 
-const SCREEN_WIDTH = Dimensions.get('window').width
 const EDGE_WIDTH = 44
 const DISMISS_RATIO = 0.32
 const VELOCITY_THRESHOLD = 650
 const CLOSE_DURATION = 220
 
 export interface UseSwipeBackOptions {
-  /** Désactive le geste (ex: page plein écran caméra en cours d'enregistrement). */
   enabled?: boolean
-  /** Le geste ne démarre que depuis le bord gauche. Obligatoire si la page a un scroll horizontal. */
   edgeOnly?: boolean
-  /** Route de repli si la stack est vide. */
   backTo?: string
-  /** Override du retour (ex: fermer un mode édition avant de quitter). */
   onBack?: () => void
 }
 
@@ -39,7 +34,9 @@ export function useSwipeBack({
   onBack,
 }: UseSwipeBackOptions = {}) {
   const reduceMotion = useAppliedAccessibility((s) => s.reduceMotion)
-  const { goBack } = useContext(NavigationHistoryContext)
+  const { goBack } = useGoBack()
+  // useWindowDimensions : suit la rotation et le redimensionnement du navigateur.
+  const { width } = useWindowDimensions()
 
   const translateX = useSharedValue(0)
   const closing = useSharedValue(false)
@@ -52,7 +49,6 @@ export function useSwipeBack({
     goBack(backTo)
   }, [onBack, goBack, backTo])
 
-  // Si l'utilisateur revient sur la page (retour arrière), on remet la position à zéro.
   useFocusEffect(
     useCallback(() => {
       translateX.value = 0
@@ -63,6 +59,7 @@ export function useSwipeBack({
   const gesture = useMemo(() => {
     const pan = Gesture.Pan()
       .enabled(enabled)
+      // Valeur positive : n'active le geste que sur un drag vers la droite.
       .activeOffsetX(12)
       .failOffsetY([-16, 16])
       .onUpdate((e) => {
@@ -72,12 +69,12 @@ export function useSwipeBack({
       .onEnd((e) => {
         if (closing.value) return
         const shouldClose =
-          e.translationX > SCREEN_WIDTH * DISMISS_RATIO || e.velocityX > VELOCITY_THRESHOLD
+          e.translationX > width * DISMISS_RATIO || e.velocityX > VELOCITY_THRESHOLD
 
         if (shouldClose) {
           closing.value = true
           translateX.value = withTiming(
-            SCREEN_WIDTH,
+            width,
             { duration: reduceMotion ? 0 : CLOSE_DURATION, easing: Easing.out(Easing.cubic) },
             (finished) => {
               if (finished) runOnJS(handleBack)()
@@ -93,25 +90,29 @@ export function useSwipeBack({
       })
 
     return edgeOnly ? pan.hitSlop({ left: 0, width: EDGE_WIDTH }) : pan
-  }, [enabled, edgeOnly, reduceMotion, handleBack])
+  }, [enabled, edgeOnly, reduceMotion, handleBack, width])
 
-  /** Page courante : glisse vers la droite + ombre portée sur son bord gauche. */
+  /** Page courante : uniquement transform, seule propriété animable partout (web inclus). */
   const pageStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.value }],
-    shadowOpacity: interpolate(translateX.value, [0, 24], [0, 0.28], Extrapolation.CLAMP),
   }))
 
-  /** Écran précédent (simulé) : un voile sombre qui s'éclaircit pendant le drag. */
+  /** Ombre du bord gauche : un calque dédié, car shadowOpacity n'est pas animable sur web. */
+  const edgeShadowStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(translateX.value, [0, 32], [0, 1], Extrapolation.CLAMP),
+  }))
+
+  /** Écran précédent simulé : voile sombre qui s'éclaircit pendant le drag. */
   const scrimStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(translateX.value, [0, SCREEN_WIDTH], [1, 0], Extrapolation.CLAMP),
+    opacity: interpolate(translateX.value, [0, width], [1, 0], Extrapolation.CLAMP),
   }))
 
-  /** Léger parallaxe de l'arrière-plan, comme iOS. */
+  /** Parallaxe de l'arrière-plan, comme iOS. */
   const underlayStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateX: interpolate(translateX.value, [0, SCREEN_WIDTH], [-SCREEN_WIDTH * 0.25, 0], Extrapolation.CLAMP) },
+      { translateX: interpolate(translateX.value, [0, width], [-width * 0.25, 0], Extrapolation.CLAMP) },
     ],
   }))
 
-  return { gesture, pageStyle, scrimStyle, underlayStyle, translateX }
+  return { gesture, pageStyle, edgeShadowStyle, scrimStyle, underlayStyle, translateX }
 }

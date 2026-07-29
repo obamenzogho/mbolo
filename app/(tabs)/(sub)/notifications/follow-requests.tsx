@@ -7,6 +7,7 @@ import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/
 import * as Haptics from 'expo-haptics'
 import { auth, db } from '@/lib/firebase'
 import { colors } from '@/lib/theme'
+import { captureException } from '@/lib/sentry'
 import { Avatar } from '@/components/ui/Avatar'
 import OrbitLoader from '@/components/OrbitLoader'
 import { useFollow } from '@/hooks/useFollow'
@@ -50,7 +51,9 @@ export default function FollowRequests() {
         })
       }
       setUsers(batch)
-    } catch {}
+    } catch (e: any) {
+      captureException(e)
+    }
   }, [userId])
 
   useEffect(() => {
@@ -81,7 +84,7 @@ export default function FollowRequests() {
     if (!userId) return
     const conv = await getOrCreateConversation(userId, otherUserId)
     router.push({
-      pathname: '/conversation/[id]',
+      pathname: '/messages/conversation/[id]',
       params: { id: conv.id },
     })
   }, [userId])
