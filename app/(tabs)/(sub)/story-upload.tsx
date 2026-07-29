@@ -120,7 +120,7 @@ export default function StoryUploadScreen() {
   // STEP 1: SELECT
   if (step === 'select') {
     return (
-      <PageWrapper type="stack" swipeBack backTo="/(tabs)/feed">
+      <PageWrapper type="stack" swipeBack swipeBackEdgeOnly backTo="/(tabs)/feed">
       <SafeAreaView style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
         <BackButton style={{ position: 'absolute', top: 50, left: 20 }} />
 
@@ -161,7 +161,7 @@ export default function StoryUploadScreen() {
   // STEP 2: TEXT EDIT
   if (step === 'edit' && storyMode === 'text') {
     return (
-      <PageWrapper type="stack" swipeBack backTo="/(tabs)/feed">
+      <PageWrapper type="stack" swipeBack swipeBackEdgeOnly backTo="/(tabs)/feed">
       <View style={{ flex: 1 }}>
         <LinearGradient
           colors={selectedBg.colors as [string, string]}
@@ -235,7 +235,7 @@ export default function StoryUploadScreen() {
   // STEP 2: MEDIA EDIT
   if (step === 'edit' && mediaUri) {
     return (
-      <PageWrapper type="stack" swipeBack backTo="/(tabs)/feed">
+      <PageWrapper type="stack" swipeBack swipeBackEdgeOnly backTo="/(tabs)/feed">
       <View style={{ flex: 1, backgroundColor: '#000' }}>
         {/* MEDIA */}
         {mediaType === 'video' ? (

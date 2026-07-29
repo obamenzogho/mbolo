@@ -216,7 +216,7 @@ export default function UserProfile() {
 
   if (!ready) {
     return (
-      <PageWrapper type="stack" swipeBack backTo="/(tabs)/profile">
+    <PageWrapper type="stack" swipeBack swipeBackEdgeOnly backTo="/(tabs)/profile">
       <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
         <ProfileSkeleton />
       </SafeAreaView>
@@ -225,7 +225,7 @@ export default function UserProfile() {
   }
 
   return (
-    <PageWrapper type="stack" swipeBack backTo="/(tabs)/profile">
+    <PageWrapper type="stack" swipeBack swipeBackEdgeOnly backTo="/(tabs)/profile">
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
       <GestureDetector gesture={swipeGesture}>
         <VideoGrid
