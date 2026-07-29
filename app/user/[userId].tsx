@@ -15,19 +15,20 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useLocalSearchParams, router, Redirect } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { doc, onSnapshot } from 'firebase/firestore'
-import { auth, db } from '../../src/lib/firebase'
-import { batchFetchUsers } from '../../src/lib/firestore'
-import { Avatar } from '../../src/components/ui/Avatar'
-import { colors } from '../../src/lib/theme'
-import { captureException } from '../../src/lib/sentry'
-import type { User as UserType, ProfileTab } from '../../src/types'
-import { useFollow } from '../../src/hooks/useFollow'
-import { useGoBack } from '../../src/hooks/useGoBack'
-import FollowButton from '../../src/components/FollowButton'
-import BottomSheet from '../../src/components/ui/BottomSheet'
+import { auth, db } from '@/lib/firebase'
+import { batchFetchUsers } from '@/lib/firestore'
+import { Avatar } from '@/components/ui/Avatar'
+import { colors } from '@/lib/theme'
+import { captureException } from '@/lib/sentry'
+import type { User as UserType, ProfileTab } from '@/types'
+import { useFollow } from '@/hooks/useFollow'
+import { useGoBack } from '@/hooks/useGoBack'
+import FollowButton from '@/components/FollowButton'
+import BottomSheet from '@/components/ui/BottomSheet'
 import { getOrCreateConversation } from '@/features/chat/services/chatService'
 import { useProfileTabs } from '@/hooks/useProfileTabs'
 import { ProfileTabBar } from '@/components/ProfileTabBar'
+import PageWrapper from '@/components/PageWrapper'
 import { VideoGrid } from '@/components/VideoGrid'
 import { ProfileVideoViewer } from '@/features/feed/profile-viewer/ProfileVideoViewer'
 import { RichText } from '@/components/RichText'
@@ -35,7 +36,7 @@ import { VerifiedBadge } from '@/components/VerifiedBadge'
 import { AvatarViewer } from '@/components/AvatarViewer'
 import { ContentActionsSheet } from '@/components/ContentActionsSheet'
 import { StatsCards } from '@/components/profile/StatsCards'
-import { ProfileSkeleton, FollowListSkeleton } from '../../src/features/news/components/Skeletons'
+import { ProfileSkeleton, FollowListSkeleton } from '@/features/news/components/Skeletons'
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 
@@ -215,13 +216,16 @@ export default function UserProfile() {
 
   if (!ready) {
     return (
+      <PageWrapper type="stack" swipeBack backTo="/(tabs)/profile">
       <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
         <ProfileSkeleton />
       </SafeAreaView>
+      </PageWrapper>
     )
   }
 
   return (
+    <PageWrapper type="stack" swipeBack backTo="/(tabs)/profile">
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
       <GestureDetector gesture={swipeGesture}>
         <VideoGrid
@@ -534,5 +538,6 @@ export default function UserProfile() {
         onClose={() => setActionsOpen(false)}
       />
     </SafeAreaView>
+    </PageWrapper>
   )
 }

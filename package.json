@@ -2,6 +2,9 @@
   "name": "mbolo",
   "version": "1.0.0",
   "main": "expo-router/entry",
+  "bin": {
+    "graphify": "./scripts/graphify-cli.js"
+  },
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",

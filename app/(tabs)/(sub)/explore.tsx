@@ -26,6 +26,7 @@ import type {
 } from '@/services/searchService'
 import { auth } from '@/lib/firebase'
 import { captureException } from '@/lib/sentry'
+import PageWrapper from '@/components/PageWrapper'
 import { SearchTabs } from '@/features/search/components/SearchTabs'
 import { SearchAutocomplete } from '@/features/search/components/SearchAutocomplete'
 import { useRecentSearches } from '@/features/search/hooks/useRecentSearches'
@@ -186,6 +187,7 @@ export default function Explore() {
       (!loading && (merged.length > 0 || users.length > 0 || hashtags.length > 0 || posts.length > 0 || videos.length > 0)))
 
   return (
+    <PageWrapper type="stack" swipeBack swipeBackEdgeOnly>
     <SafeAreaView style={styles.screen} edges={['top']}>
       <View style={styles.header}>
         <BackButton icon="chevron-back" onPress={handleBack} style={styles.backBtn} />
@@ -348,7 +350,8 @@ export default function Explore() {
      </TouchableOpacity>
    </Modal>
       ) : null}
- </SafeAreaView>
+  </SafeAreaView>
+    </PageWrapper>
   )
 }
 

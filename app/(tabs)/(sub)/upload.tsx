@@ -4,12 +4,13 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { collection, addDoc, doc, increment, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore'
-import { auth, db } from '../../src/lib/firebase'
-import { uploadVideo as uploadToStorage } from '../../src/lib/storage'
-import { generateThumbnailURL } from '../../src/lib/cloudinary'
-import { extractHashtags } from '../../src/lib/hashtags'
-import { colors } from '../../src/lib/theme'
-import { TagPeopleSelector, type TaggableUser } from '../../src/components/TagPeopleSelector'
+import { auth, db } from '@/lib/firebase'
+import { uploadVideo as uploadToStorage } from '@/lib/storage'
+import { generateThumbnailURL } from '@/lib/cloudinary'
+import { extractHashtags } from '@/lib/hashtags'
+import { colors } from '@/lib/theme'
+import { TagPeopleSelector, type TaggableUser } from '@/components/TagPeopleSelector'
+import PageWrapper from '@/components/PageWrapper'
 
 export default function Upload() {
   const [video, setVideo] = useState<any>(null)
@@ -92,6 +93,7 @@ export default function Upload() {
   }
 
   return (
+    <PageWrapper type="stack" swipeBack backTo="/(tabs)/feed">
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
         <Text
@@ -217,5 +219,6 @@ export default function Upload() {
         onChange={setTagged}
       />
     </SafeAreaView>
+    </PageWrapper>
   )
 }

@@ -8,6 +8,7 @@ import { colors } from '../../src/lib/theme'
 import { db } from '../../src/lib/firebase'
 import OrbitLoader from '../../src/components/OrbitLoader'
 import { BackButton } from '../../src/components/ui/BackButton'
+import PageWrapper from '../../src/components/PageWrapper'
 
 const { width } = Dimensions.get('window')
 const COL = 3
@@ -36,44 +37,46 @@ export default function PlacePage() {
   }, [id])
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 }}>
-        <BackButton icon="arrow-back" size={24} color={colors.textPrimary} />
-        <View>
-          <Text style={{ color: colors.textPrimary, fontSize: 20, fontWeight: '700' }}>{id}</Text>
-          <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
-            {videos.length} vidéo{videos.length !== 1 ? 's' : ''}
-          </Text>
-        </View>
-      </View>
-
-      {loading ? (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <OrbitLoader />
-        </View>
-      ) : (
-        <FlatList
-          data={videos}
-          numColumns={COL}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              onPress={() => router.push({ pathname: '/post', params: { id: item.id } })}
-              style={{ width: SIZE, height: SIZE * 1.4 }}
-            >
-              <Image
-                source={{ uri: item.thumbnailURL || item.videoURL }}
-                style={{ flex: 1, margin: 1, backgroundColor: colors.surface }}
-              />
-            </TouchableOpacity>
-          )}
-          ListEmptyComponent={
-            <Text style={{ color: colors.textSecondary, textAlign: 'center', marginTop: 40 }}>
-              Aucune vidéo pour {id} pour l'instant
+    <PageWrapper type="stack" swipeBack backTo="/(tabs)/feed">
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 }}>
+          <BackButton icon="arrow-back" size={24} color={colors.textPrimary} />
+          <View>
+            <Text style={{ color: colors.textPrimary, fontSize: 20, fontWeight: '700' }}>{id}</Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
+              {videos.length} vidéo{videos.length !== 1 ? 's' : ''}
             </Text>
-          }
-        />
-      )}
-    </SafeAreaView>
+          </View>
+        </View>
+
+        {loading ? (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <OrbitLoader />
+          </View>
+        ) : (
+          <FlatList
+            data={videos}
+            numColumns={COL}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                onPress={() => router.push({ pathname: '/post', params: { id: item.id } })}
+                style={{ width: SIZE, height: SIZE * 1.4 }}
+              >
+                <Image
+                  source={{ uri: item.thumbnailURL || item.videoURL }}
+                  style={{ flex: 1, margin: 1, backgroundColor: colors.surface }}
+                />
+              </TouchableOpacity>
+            )}
+            ListEmptyComponent={
+              <Text style={{ color: colors.textSecondary, textAlign: 'center', marginTop: 40 }}>
+                Aucune vidéo pour {id} pour l'instant
+              </Text>
+            }
+          />
+        )}
+      </SafeAreaView>
+    </PageWrapper>
   )
 }

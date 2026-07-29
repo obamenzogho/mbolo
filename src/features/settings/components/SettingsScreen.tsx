@@ -17,7 +17,7 @@ interface SettingsScreenProps {
  */
 export function SettingsScreen({ title, children, footer }: SettingsScreenProps) {
   return (
-    <PageWrapper type="slideRight">
+    <PageWrapper type="stack" swipeBack backTo="/(tabs)/settings">
       <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
         <View
           style={{

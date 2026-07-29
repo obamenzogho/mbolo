@@ -6,6 +6,7 @@ import { db } from '../../src/lib/firebase'
 import { colors } from '../../src/lib/theme'
 import OrbitLoader from '../../src/components/OrbitLoader'
 import { Ionicons } from '@expo/vector-icons'
+import PageWrapper from '../../src/components/PageWrapper'
 
 export default function PseudoResolver() {
   const { pseudo } = useLocalSearchParams<{ pseudo: string }>()
@@ -36,8 +37,10 @@ export default function PseudoResolver() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
-      <OrbitLoader size={80} />
-    </View>
+    <PageWrapper type="stack" swipeBack backTo="/(tabs)/feed">
+      <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
+        <OrbitLoader size={80} />
+      </View>
+    </PageWrapper>
   )
 }

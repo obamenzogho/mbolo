@@ -3,7 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../src/lib/theme'
 import { router } from 'expo-router'
-import PageWrapper from '../../src/components/PageWrapper'
+import PageWrapper from '@/components/PageWrapper'
 import { BackButton } from '../../src/components/ui/BackButton'
 
 interface HubItem {
@@ -27,7 +27,7 @@ const CATEGORIES: HubItem[] = [
 
 export default function Settings() {
   return (
-    <PageWrapper type="slideRight">
+    <PageWrapper type="stack" swipeBack backTo="/(tabs)/profile">
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: '#222' }}>
           <BackButton icon="chevron-back" style={{ width: 36, height: 36, justifyContent: 'center' }} />

@@ -29,11 +29,15 @@ Stack
 │   ├── feed         → Tab "Accueil" (home icon)
 │   ├── notifications → Tab "Notifications" (notifications icon)
 │   └── profile      → Tab "Profil" (person icon)
-│   └── [hidden routes] explore, upload, edit-profile, user/[userId],
-│                       highlight/[highlightId], story-upload, reel-upload,
-│                       camera, video-editor
-├── post             → Modal (presentation: 'modal')
-└── create-modal     → Modal (presentation: 'modal') — masque la tab bar
+│   └── (sub)         → Stack (animations slideRight/slideUpFast)
+│       ├── camera, upload, story-upload, reel-upload, video-editor (slideUpFast)
+│       ├── edit-profile, discover, explore (slideRightEdgeOnly)
+│       ├── user/[userId], messages/conversation/[id]
+│       └── notifications/follow-requests
+├── post             → Modal (presentation: 'modal', slideUpFast)
+├── settings         → Stack (slideRight, avec sous-routes)
+└── autres flat routes : search, insights, hashtag/[tag], u/[pseudo],
+    news-compose, post-detail, place/[id], legal/*
 ```
 
 ### Notification deep-links (app/_layout.tsx:22-44)
@@ -53,7 +57,8 @@ Architecture : **expo-router `<Tabs>` + custom `tabBar` component** (plus stacka
 ```
 app/(tabs)/_layout.tsx
   └── <Tabs> (expo-router)
-       ├── screens × 14 (5 visibles + 9 cachés)
+       ├── screens × 6 (5 visibles + 1 groupe (sub))
+       │   └── (sub) → <Stack> (native-stack, 11 sous-écrans)
        └── tabBar → BottomTabBar (custom)
             ├── TabItem (React.memo) × 5
             │   ├── Ionicons (26px / 32px pour Feed)
@@ -92,8 +97,8 @@ app/(tabs)/_layout.tsx
 | 3 | notifications | `notifications` | Notifications | 26px |
 | 4 | profile | `person` | Profil | 26px |
 
-#### Routes cachées (href: null)
-`explore`, `upload`, `edit-profile`, `user/[userId]`, `highlight/[highlightId]`, `story-upload`, `reel-upload`, `camera`, `video-editor`
+#### Groupe `(sub)` (href: null, Stack natif)
+`camera`, `upload`, `story-upload`, `reel-upload`, `video-editor`, `edit-profile`, `discover`, `explore`, `user/[userId]`, `messages/conversation/[id]`, `notifications/follow-requests`
 
 #### Dépendances ajoutées
 - `expo-haptics` → retour haptique `ImpactFeedbackStyle.Light` au changement d'onglet
@@ -161,7 +166,7 @@ Variants :
 | `hooks/useHighlights.ts` | `getHighlights` (userId + createdAt desc) |
 | `app/(tabs)/notifications.tsx` | `onSnapshot` avec callback `onError` + banner + retry |
 | `app/(tabs)/profile.tsx` | `loadVideos`, `loadSaved`, `loadLiked`, `checkStories` — banners par section |
-| `app/(tabs)/user/[userId].tsx` | `loadVideos` — banner avec retry |
+| `app/(tabs)/(sub)/user/[userId].tsx` | `loadVideos` — banner avec retry |
 
 ---
 
@@ -300,7 +305,7 @@ Usage: lookup rapide pseudo → email au login (login.tsx:52)
 - Mode caching preserve scroll position + données lors du switch pourtoi/suivi
 
 ### 3. Camera & Capture
-**Fichiers**: app/(tabs)/camera.tsx
+**Fichiers**: app/(tabs)/(sub)/camera.tsx
 **Hooks**: useCamera (127 lignes), useVisionCamera (253 lignes)
 **Lib**: config/modules.js (dynamic module loading with mocks dev)
 **Dépendances**: expo-camera, expo-media-library, expo-image-picker, react-native-vision-camera
@@ -310,7 +315,7 @@ Usage: lookup rapide pseudo → email au login (login.tsx:52)
 - Galerie: sélection multiple (max 5), albums
 
 ### 4. Upload & Editing
-**Fichiers**: app/(tabs)/upload.tsx, reel-upload.tsx, story-upload.tsx, video-editor.tsx, post.tsx
+**Fichiers**: app/(tabs)/(sub)/upload.tsx, reel-upload.tsx, story-upload.tsx, video-editor.tsx, post.tsx
 **Hooks**: useGallery (245 lignes)
 **Lib**: cloudinary.ts (uploadToCloudinary), storage.ts (uploadVideo)
 **Utils**: ffmpeg.ts (18 fonctions d'édition), filters.ts (8 filtres)
@@ -323,7 +328,7 @@ Usage: lookup rapide pseudo → email au login (login.tsx:52)
 - Filtres video: normal, gabon, libreville, nuit, vintage, noir, chaud, froid
 
 ### 5. Stories & Highlights
-**Fichiers**: app/(tabs)/stories.tsx, highlight/[highlightId].tsx
+**Fichiers**: app/(tabs)/stories.tsx
 **Hooks**: useStories (200 lignes), useHighlights (230 lignes)
 **Components**: HighlightPickerModal
 **Firestore**: stories, highlights (indexés par userId)
@@ -333,7 +338,7 @@ Usage: lookup rapide pseudo → email au login (login.tsx:52)
 - Cover upload via Cloudinary
 
 ### 6. Profile & Users
-**Fichiers**: app/(tabs)/profile.tsx, edit-profile.tsx, user/[userId].tsx
+**Fichiers**: app/(tabs)/profile.tsx, app/(tabs)/(sub)/edit-profile.tsx, app/(tabs)/(sub)/user/[userId].tsx
 **Hooks**: useFollow (91 lignes), useSuggestions (43 lignes)
 **Components**: FollowButton
 **Firestore**: users (followers/following arrays, arrayUnion/arrayRemove)
@@ -445,7 +450,7 @@ Usage: lookup rapide pseudo → email au login (login.tsx:52)
 - **`searchMulti`** lance les 3 en parallèle avec `Promise.all` + retry `withTypesenseRetry` (429/503/504). Cache LRU 30s (`src/lib/searchCache.ts`).
 - **Filtre de sécurité** : `SEARCH_FILTER_BY = 'visibility:=public && moderationStatus:!=blocked'` appliqué à toutes les requêtes `posts`.
 - **Cloud Functions** : `syncUserToSearch`, `syncHashtagToSearch`, `syncPostToSearch` (triggers onDocumentWritten) ; `initSearchSchema` (admin, crée les 3 collections) ; `backfillSearch` (admin, import users + hashtags + posts publics).
-- **UI** : `app/(tabs)/explore.tsx` orchestre ; `SearchTabs` (5 onglets : Tout / Comptes / Posts / Vidéos / Tags) ; `SearchAutocomplete` (sections groupées) ; `PostResultCard` (badge icône colorée par type) ; `VideoResultCard` (badge play UNIQUEMENT si `mediaType='video'` ou `'video_share'`).
+- **UI** : `app/(tabs)/(sub)/explore.tsx` orchestre ; `SearchTabs` (5 onglets : Tout / Comptes / Posts / Vidéos / Tags) ; `SearchAutocomplete` (sections groupées) ; `PostResultCard` (badge icône colorée par type) ; `VideoResultCard` (badge play UNIQUEMENT si `mediaType='video'` ou `'video_share'`).
 - **Limites connues** : cache `memoryLocalCache` uniquement (perdu au restart) ; pas de NetInfo ; pas de fallback offline sur les résultats de recherche.
 
 ---
@@ -793,7 +798,7 @@ Usage: lookup rapide pseudo → email au login (login.tsx:52)
 **Fichiers :**
 - `patches/react-native+0.81.5.patch`
 - `package.json` — `postinstall` enrichi avec `patch-package`
-- `app/(tabs)/stories.tsx`, `app/(tabs)/explore.tsx`, `app/news-compose.tsx` — conversion en `{condition && <Modal>}`
+- `app/(tabs)/stories.tsx`, `app/(tabs)/(sub)/explore.tsx`, `app/news-compose.tsx` — conversion en `{condition && <Modal>}`
 
 ---
 
@@ -810,7 +815,7 @@ Usage: lookup rapide pseudo → email au login (login.tsx:52)
 
 **Fichiers modifiés :**
 - `src/services/searchService.ts` — `mapPostHit` exporté pour réutilisation
-- `app/(tabs)/explore.tsx` — suppression de la duplication (utilise `mapPostHit`)
+- `app/(tabs)/(sub)/explore.tsx` — suppression de la duplication (utilise `mapPostHit`)
 - `src/features/search/components/VideoResultCard.tsx` — garde `isVideo`
 - `functions/src/search.ts` — ajout `syncPostToSearch` + backfill posts + import `POSTS_SCHEMA` partagé
 - `functions/tsconfig.json` — include `"../src/lib/typesense-schemas.ts"`
@@ -822,4 +827,46 @@ Usage: lookup rapide pseudo → email au login (login.tsx:52)
 - Le filtrage par type se fait au niveau Typesense (`searchPostsByType`) et côté client (`filterPostsByType`) pour le merge unifié.
 - Aucun nouvel index Firestore requis (les requêtes restent sur `posts` côté client).
 - **Action manuelle requise après déploiement** : `initSearchSchema` doit être appelé une fois pour créer la collection `posts` dans Typesense Cloud ; puis `backfillSearch` pour importer les posts existants.
+
+---
+
+## ADR 2026-07-29: Refonte swipe-back — Stack natif dans `(tabs)/(sub)` + fallback JS
+
+**Problème :** Le swipe-back ne fonctionnait pas car les sous-pages (edit-profile, explore, camera…) étaient déclarées comme des onglets (`Tabs.Screen` avec `href: null`) au lieu d'être dans une vraie Stack. `router.push()` vers ces routes changeait d'onglet sans animation ni geste de retour.
+
+**Solution :**
+1. **Nouveau groupe `(sub)`** dans `app/(tabs)/(sub)/` avec un `<Stack>` natif Expo Router. Toutes les sous-pages y sont déplacées.
+2. **`app/(tabs)/_layout.tsx`** simplifié : 5 onglets visibles + 1 groupe `(sub)` en `href: null`.
+3. **`app/_layout.tsx`** simplifié : seuls `(auth)`, `(tabs)`, `post`, `settings` restent dans le Stack racine. Les autres flat routes (search, insights…) héritent des `screenOptions` par défaut.
+4. **Fallback JS `useSwipeBack`** : Pan gesture Reanimated pour Android/Web où le geste natif de native-stack est absent ou capricieux.
+5. **`SwipeBackView`** : wrapper avec underlay (parallaxe) + scrim (voile) + ombre.
+6. **`PageWrapper`** enrichi : prop `swipeBack` activable, `swipeBackEdgeOnly` pour pages avec scroll horizontal, `swipeBackEnabled` pour désactiver temporairement.
+7. **`usePageAnimation`** : nouveau type `stack` (pas d'animation d'entrée, la transition est déjà assurée par le native-stack).
+
+**Fichiers créés :**
+- `src/hooks/useSwipeBack.ts` — hook Pan gesture + Reanimated
+- `src/components/SwipeBackView.tsx` — wrapper avec underlay/scrim
+- `app/(tabs)/(sub)/_layout.tsx` — Stack du sous-groupe
+
+**Fichiers modifiés :**
+- `src/navigation/transitions.ts` — `HAS_NATIVE_SWIPE_BACK`, `slideRightEdgeOnly`
+- `src/components/PageWrapper.tsx` — props `swipeBack*`, type `stack`
+- `src/hooks/usePageAnimation.ts` — type `stack`
+- `app/(tabs)/_layout.tsx` — suppression des href:null, ajout `(sub)`
+- `app/_layout.tsx` — simplification du Stack racine
+- `app/(tabs)/(sub)/*.tsx` (8 fichiers) — ajout PageWrapper avec swipeBack
+- `app/(tabs)/stories.tsx` — ajout PageWrapper avec swipeBackEdgeOnly
+- `app/settings/index.tsx` — migration type="stack" + swipeBack
+
+**Fichiers déplacés (git mv) :**
+- `app/(tabs)/camera.tsx, discover.tsx, upload.tsx, story-upload.tsx, reel-upload.tsx, video-editor.tsx` → `app/(tabs)/(sub)/`
+- `app/explore.tsx, edit-profile.tsx` → `app/(tabs)/(sub)/`
+- `app/user/[userId].tsx` → `app/(tabs)/(sub)/user/`
+- `app/conversation/[id].tsx` → `app/(tabs)/(sub)/messages/conversation/`
+- `app/follow-requests.tsx` → `app/(tabs)/(sub)/notifications/`
+
+**Conséquences :**
+- iOS : swipe-back natif via `fullScreenGestureEnabled` + `animationMatchesGesture`
+- Android/Web : fallback JS via `useSwipeBack` (Pan gesture + Reanimated)
+- `dist-ios/` retiré du suivi git (déjà dans `.gitignore`)
 

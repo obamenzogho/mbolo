@@ -6,17 +6,18 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { doc, getDoc, runTransaction, updateDoc } from 'firebase/firestore'
-import { auth, db } from '../src/lib/firebase'
-import { colors } from '../src/lib/theme'
+import { auth, db } from '@/lib/firebase'
+import { colors } from '@/lib/theme'
 import { router } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
-import OrbitLoader from '../src/components/OrbitLoader'
-import { uploadToCloudinary } from '../src/lib/cloudinary'
-import { captureException } from '../src/lib/sentry'
-import { useUsernameCheck } from '../src/hooks/useUsernameCheck'
-import { CollapsibleSection } from '../src/components/profile/CollapsibleSection'
-import { FieldWithCounter } from '../src/components/profile/FieldWithCounter'
-import { ProfilePreview } from '../src/components/profile/ProfilePreview'
+import OrbitLoader from '@/components/OrbitLoader'
+import { uploadToCloudinary } from '@/lib/cloudinary'
+import { captureException } from '@/lib/sentry'
+import { useUsernameCheck } from '@/hooks/useUsernameCheck'
+import { CollapsibleSection } from '@/components/profile/CollapsibleSection'
+import { FieldWithCounter } from '@/components/profile/FieldWithCounter'
+import { ProfilePreview } from '@/components/profile/ProfilePreview'
+import PageWrapper from '@/components/PageWrapper'
 
 export default function EditProfile() {
   const user = auth.currentUser
@@ -174,13 +175,16 @@ export default function EditProfile() {
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
-        <OrbitLoader size={80} />
-      </SafeAreaView>
+      <PageWrapper type="stack" swipeBack backTo="/(tabs)/profile">
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
+          <OrbitLoader size={80} />
+        </SafeAreaView>
+      </PageWrapper>
     )
   }
 
   return (
+    <PageWrapper type="stack" swipeBack backTo="/(tabs)/profile">
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
       {/* HEADER */}
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: '#222' }}>
@@ -348,5 +352,6 @@ export default function EditProfile() {
           </CollapsibleSection>
         </ScrollView>
     </SafeAreaView>
+    </PageWrapper>
   )
 }

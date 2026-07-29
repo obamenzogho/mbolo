@@ -8,13 +8,14 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { collection, addDoc, doc, increment, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore'
-import { extractHashtags } from '../../src/lib/hashtags'
-import { auth, db } from '../../src/lib/firebase'
-import { uploadToCloudinary, generateThumbnailURL } from '../../src/lib/cloudinary'
-import { captureException } from '../../src/lib/sentry'
-import OrbitLoader from '../../src/components/OrbitLoader'
-import { BackButton } from '../../src/components/ui/BackButton'
-import { colors } from '../../src/lib/theme'
+import { extractHashtags } from '@/lib/hashtags'
+import { auth, db } from '@/lib/firebase'
+import { uploadToCloudinary, generateThumbnailURL } from '@/lib/cloudinary'
+import { captureException } from '@/lib/sentry'
+import OrbitLoader from '@/components/OrbitLoader'
+import { BackButton } from '@/components/ui/BackButton'
+import PageWrapper from '@/components/PageWrapper'
+import { colors } from '@/lib/theme'
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window')
 
@@ -120,6 +121,7 @@ export default function ReelUploadScreen() {
   // STEP 1: SELECT
   if (step === 'select') {
     return (
+      <PageWrapper type="stack" swipeBack backTo="/(tabs)/feed">
       <SafeAreaView style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
         <BackButton fallbackRoute="/(tabs)/feed" style={{ position: 'absolute', top: 50, left: 20 }} />
 
@@ -151,12 +153,14 @@ export default function ReelUploadScreen() {
           </TouchableOpacity>
         </View>
       </SafeAreaView>
+      </PageWrapper>
     )
   }
 
   // STEP 2: EDIT
   if (step === 'edit' && videoUri) {
     return (
+      <PageWrapper type="stack" swipeBack backTo="/(tabs)/feed">
       <View style={{ flex: 1, backgroundColor: '#000' }}>
         {/* VIDEO PREVIEW */}
         <View style={{ width: '100%', height: SCREEN_HEIGHT * 0.55, backgroundColor: '#111', justifyContent: 'center', alignItems: 'center' }}>
@@ -197,6 +201,7 @@ export default function ReelUploadScreen() {
           </View>
         </View>
       </View>
+      </PageWrapper>
     )
   }
 

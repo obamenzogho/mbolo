@@ -10,13 +10,14 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { Video as AVVideo } from 'expo-av'
-import { auth } from '../../src/lib/firebase'
-import OrbitLoader from '../../src/components/OrbitLoader'
-import { BackButton } from '../../src/components/ui/BackButton'
-import { colors } from '../../src/lib/theme'
-import { useStories } from '../../src/hooks/useStories'
-import { STORY_BACKGROUNDS } from '../../src/features/stories/constants'
-import HighlightPickerModal from '../../src/components/HighlightPickerModal'
+import { auth } from '@/lib/firebase'
+import OrbitLoader from '@/components/OrbitLoader'
+import { BackButton } from '@/components/ui/BackButton'
+import PageWrapper from '@/components/PageWrapper'
+import { colors } from '@/lib/theme'
+import { useStories } from '@/hooks/useStories'
+import { STORY_BACKGROUNDS } from '@/features/stories/constants'
+import HighlightPickerModal from '@/components/HighlightPickerModal'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
 const SCREEN_HEIGHT = Dimensions.get('window').height
@@ -119,6 +120,7 @@ export default function StoryUploadScreen() {
   // STEP 1: SELECT
   if (step === 'select') {
     return (
+      <PageWrapper type="stack" swipeBack backTo="/(tabs)/feed">
       <SafeAreaView style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
         <BackButton style={{ position: 'absolute', top: 50, left: 20 }} />
 
@@ -152,12 +154,14 @@ export default function StoryUploadScreen() {
           </TouchableOpacity>
         </View>
       </SafeAreaView>
+      </PageWrapper>
     )
   }
 
   // STEP 2: TEXT EDIT
   if (step === 'edit' && storyMode === 'text') {
     return (
+      <PageWrapper type="stack" swipeBack backTo="/(tabs)/feed">
       <View style={{ flex: 1 }}>
         <LinearGradient
           colors={selectedBg.colors as [string, string]}
@@ -224,12 +228,14 @@ export default function StoryUploadScreen() {
           </SafeAreaView>
         </LinearGradient>
       </View>
+      </PageWrapper>
     )
   }
 
   // STEP 2: MEDIA EDIT
   if (step === 'edit' && mediaUri) {
     return (
+      <PageWrapper type="stack" swipeBack backTo="/(tabs)/feed">
       <View style={{ flex: 1, backgroundColor: '#000' }}>
         {/* MEDIA */}
         {mediaType === 'video' ? (
@@ -315,6 +321,7 @@ export default function StoryUploadScreen() {
           coverUri={mediaUri || undefined}
         />
       </View>
+      </PageWrapper>
     )
   }
 

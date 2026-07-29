@@ -5,6 +5,7 @@ import { useCreatorInsights } from '../src/hooks/useCreatorInsights'
 import { colors } from '../src/lib/theme'
 import OrbitLoader from '../src/components/OrbitLoader'
 import { BackButton } from '../src/components/ui/BackButton'
+import PageWrapper from '../src/components/PageWrapper'
 
 const StatCard = ({ label, value }: { label: string; value: number }) => (
   <View style={{ flex: 1, backgroundColor: colors.surface, borderRadius: 12, padding: 16, alignItems: 'center' }}>
@@ -28,36 +29,38 @@ export default function Insights() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 }}>
-        <BackButton />
-        <Text style={{ color: colors.textPrimary, fontSize: 20, fontWeight: '700' }}>Statistiques</Text>
-      </View>
-
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
-        <View style={{ flexDirection: 'row', gap: 12 }}>
-          <StatCard label="Vues" value={insights.totalViews} />
-          <StatCard label="J'aime" value={insights.totalLikes} />
-        </View>
-        <View style={{ flexDirection: 'row', gap: 12 }}>
-          <StatCard label="Commentaires" value={insights.totalComments} />
-          <StatCard label="Partages" value={insights.totalShares} />
+    <PageWrapper type="stack" swipeBack backTo="/(tabs)/feed">
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 }}>
+          <BackButton />
+          <Text style={{ color: colors.textPrimary, fontSize: 20, fontWeight: '700' }}>Statistiques</Text>
         </View>
 
-        <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700', marginTop: 16 }}>
-          Tes vidéos les plus vues
-        </Text>
-        {insights.topVideos.map((v, i) => (
-          <View key={v.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface, borderRadius: 12, padding: 10 }}>
-            <Text style={{ color: colors.textSecondary, fontWeight: '700', width: 20 }}>{i + 1}</Text>
-            <Image source={{ uri: v.thumbnailURL }} style={{ width: 44, height: 60, borderRadius: 6, backgroundColor: colors.surfaceElevated }} />
-            <View>
-              <Text style={{ color: colors.textPrimary }}>{v.views.toLocaleString()} vues</Text>
-              <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{v.likes.toLocaleString()} j'aime</Text>
-            </View>
+        <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <StatCard label="Vues" value={insights.totalViews} />
+            <StatCard label="J'aime" value={insights.totalLikes} />
           </View>
-        ))}
-      </ScrollView>
-    </SafeAreaView>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <StatCard label="Commentaires" value={insights.totalComments} />
+            <StatCard label="Partages" value={insights.totalShares} />
+          </View>
+
+          <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700', marginTop: 16 }}>
+            Tes vidéos les plus vues
+          </Text>
+          {insights.topVideos.map((v, i) => (
+            <View key={v.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface, borderRadius: 12, padding: 10 }}>
+              <Text style={{ color: colors.textSecondary, fontWeight: '700', width: 20 }}>{i + 1}</Text>
+              <Image source={{ uri: v.thumbnailURL }} style={{ width: 44, height: 60, borderRadius: 6, backgroundColor: colors.surfaceElevated }} />
+              <View>
+                <Text style={{ color: colors.textPrimary }}>{v.views.toLocaleString()} vues</Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{v.likes.toLocaleString()} j'aime</Text>
+              </View>
+            </View>
+          ))}
+        </ScrollView>
+      </SafeAreaView>
+    </PageWrapper>
   )
 }

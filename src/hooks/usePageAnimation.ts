@@ -52,6 +52,8 @@ export const usePageAnimation = (type = 'fadeSlide') => {
       opacity: opacity.value,
       transform: [{ translateX: translateX.value }],
     })),
+    /** Aucune animation d'entrée : la transition est déjà assurée par le native-stack. */
+    stack: useAnimatedStyle(() => ({})),
   };
 
   return animations[type as keyof typeof animations] || animations.fadeSlide;

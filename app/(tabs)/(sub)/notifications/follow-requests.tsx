@@ -5,13 +5,14 @@ import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore'
 import * as Haptics from 'expo-haptics'
-import { auth, db } from '../src/lib/firebase'
-import { colors } from '../src/lib/theme'
-import { Avatar } from '../src/components/ui/Avatar'
-import OrbitLoader from '../src/components/OrbitLoader'
-import { useFollow } from '../src/hooks/useFollow'
-import { useGoBack } from '../src/hooks/useGoBack'
-import { getOrCreateConversation } from '../src/features/chat/services/chatService'
+import { auth, db } from '@/lib/firebase'
+import { colors } from '@/lib/theme'
+import { Avatar } from '@/components/ui/Avatar'
+import OrbitLoader from '@/components/OrbitLoader'
+import { useFollow } from '@/hooks/useFollow'
+import { useGoBack } from '@/hooks/useGoBack'
+import { getOrCreateConversation } from '@/features/chat/services/chatService'
+import PageWrapper from '@/components/PageWrapper'
 
 interface PendingUser {
   id: string
@@ -87,13 +88,16 @@ export default function FollowRequests() {
 
   if (loading) {
     return (
+      <PageWrapper type="stack" swipeBack backTo="/(tabs)/profile">
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
         <OrbitLoader size={80} />
       </SafeAreaView>
+      </PageWrapper>
     )
   }
 
   return (
+    <PageWrapper type="stack" swipeBack backTo="/(tabs)/profile">
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -208,5 +212,6 @@ export default function FollowRequests() {
         }}
       />
     </SafeAreaView>
+    </PageWrapper>
   )
 }

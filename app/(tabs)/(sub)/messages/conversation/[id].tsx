@@ -15,6 +15,7 @@ import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 import { useConversation } from '@/features/chat/hooks/useConversation'
 import { useTypingIndicator } from '@/features/chat/hooks/useTypingIndicator'
 import { useDraft } from '@/features/chat/hooks/useDraft'
+import PageWrapper from '@/components/PageWrapper'
 import {
   sendMessage, markConversationAsRead,
   acceptConversation, blockConversation, deleteMessage,
@@ -156,13 +157,16 @@ export default function ConversationDetail() {
 
   if (loading || !conversation) {
     return (
+      <PageWrapper type="stack" swipeBack backTo="/(tabs)/profile">
       <SafeAreaView style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
         <OrbitLoader size={80} />
       </SafeAreaView>
+      </PageWrapper>
     )
   }
 
   return (
+    <PageWrapper type="stack" swipeBack backTo="/(tabs)/profile">
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: '#222' }}>
         <TouchableOpacity onPress={goBack} style={{ width: 36, height: 36, justifyContent: 'center', marginRight: 4 }}>
@@ -300,5 +304,6 @@ export default function ConversationDetail() {
       )}
       </KeyboardAvoidingView>
     </SafeAreaView>
+    </PageWrapper>
   )
 }

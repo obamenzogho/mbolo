@@ -24,7 +24,7 @@ import { I18nProvider } from '../src/i18n/index'
 import { DataSaverProvider } from '../src/contexts/DataSaverContext'
 import { SettingsProvider } from '../src/features/settings/SettingsProvider'
 import { colors } from '../src/lib/theme'
-import { slideRight, slideUp } from '../src/navigation/transitions'
+      import { slideRight, slideUpFast, none } from '@/navigation/transitions'
 
 import notificationService from '../src/services/notificationService'
 import { usePresence } from '../src/hooks/usePresence'
@@ -110,7 +110,11 @@ function RootContent() {
 
   return (
     <Stack
-      screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: colors.background },
+        ...slideRight,
+      }}
       screenListeners={{
         state: (e: any) => {
           if (useStartupStore.getState().phase !== 'ready') return
@@ -131,24 +135,16 @@ function RootContent() {
         },
       }}
     >
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="explore" options={{ ...slideRight, headerShown: false }} />
-      <Stack.Screen name="edit-profile" options={{ ...slideRight, headerShown: false }} />
-      <Stack.Screen name="conversation/[id]" options={{ ...slideRight, headerShown: false }} />
-      <Stack.Screen name="follow-requests" options={{ ...slideRight, headerShown: false }} />
-      <Stack.Screen name="user/[userId]" options={{ ...slideRight, headerShown: false }} />
-      <Stack.Screen name="post" options={{ headerShown: false, presentation: 'modal' }} />
-      <Stack.Screen name="news-compose" options={{ headerShown: false, presentation: 'modal' }} />
-      <Stack.Screen name="search" options={{ ...slideUp, headerShown: false }} />
-      <Stack.Screen name="insights" options={{ ...slideUp, headerShown: false }} />
-      <Stack.Screen name="hashtag/[tag]" options={{ ...slideRight, headerShown: false }} />
-      <Stack.Screen name="u/[pseudo]" options={{ ...slideRight, headerShown: false }} />
-      <Stack.Screen name="settings" options={{ ...slideRight, headerShown: false }} />
-      <Stack.Screen name="legal/terms" options={{ ...slideRight, headerShown: false }} />
-      <Stack.Screen name="legal/privacy" options={{ ...slideRight, headerShown: false }} />
-      <Stack.Screen name="place/[id]" options={{ ...slideUp, headerShown: false }} />
-      <Stack.Screen name="post-detail" options={{ ...slideRight, headerShown: false }} />
+      <Stack.Screen name="(auth)" options={none} />
+      <Stack.Screen name="(tabs)" options={none} />
+      <Stack.Screen name="post" options={{ ...slideUpFast, presentation: 'modal' }} />
+      <Stack.Screen name="settings" options={slideRight} />
+      <Stack.Screen name="post-detail" options={slideRight} />
+      <Stack.Screen name="insights" options={slideRight} />
+      <Stack.Screen name="news-compose" options={slideRight} />
+      <Stack.Screen name="hashtag/[tag]" options={slideRight} />
+      <Stack.Screen name="u/[pseudo]" options={slideRight} />
+      <Stack.Screen name="place/[id]" options={slideRight} />
     </Stack>
   )
 }

@@ -17,6 +17,7 @@ import { ContentActionsSheet } from '@/components/ContentActionsSheet'
 import OrbitLoader from '@/components/OrbitLoader'
 import { BackButton } from '@/components/ui/BackButton'
 import type { NewsPost } from '@/features/news/types'
+import PageWrapper from '@/components/PageWrapper'
 
 export default function PostDetailScreen() {
   const { postId } = useLocalSearchParams<{ postId: string }>()
@@ -81,45 +82,47 @@ export default function PostDetailScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.screen}>
-      <BackButton />
+    <PageWrapper type="stack" swipeBack backTo="/(tabs)/feed">
+      <SafeAreaView style={styles.screen}>
+        <BackButton />
 
-      <ScrollView>
-        <PostCard
-          post={post}
-          currentUserId={uid}
-          onComment={setCommentPost}
-          onEdit={(p) => router.push({ pathname: '/news-compose', params: { editPostId: p.id } })}
-          onDelete={async () => {
-            if (!post) return
-            const ok = await deletePost(post.id, uid)
-            if (ok) router.back()
-          }}
-          onMore={setActionsPost}
+        <ScrollView>
+          <PostCard
+            post={post}
+            currentUserId={uid}
+            onComment={setCommentPost}
+            onEdit={(p) => router.push({ pathname: '/news-compose', params: { editPostId: p.id } })}
+            onDelete={async () => {
+              if (!post) return
+              const ok = await deletePost(post.id, uid)
+              if (ok) router.back()
+            }}
+            onMore={setActionsPost}
+          />
+        </ScrollView>
+
+        <NewsCommentsModal
+          post={commentPost}
+          visible={commentPost !== null}
+          onClose={() => setCommentPost(null)}
         />
-      </ScrollView>
 
-      <NewsCommentsModal
-        post={commentPost}
-        visible={commentPost !== null}
-        onClose={() => setCommentPost(null)}
-      />
-
-      {actionsPost && (
-        <ContentActionsSheet
-          visible
-          targetType="post"
-          targetId={actionsPost.id}
-          contentOwnerId={actionsPost.userId}
-          contentOwnerName={actionsPost.userName}
-          onClose={() => setActionsPost(null)}
-          onBlocked={() => {
-            setActionsPost(null)
-            router.back()
-          }}
-        />
-      )}
-    </SafeAreaView>
+        {actionsPost && (
+          <ContentActionsSheet
+            visible
+            targetType="post"
+            targetId={actionsPost.id}
+            contentOwnerId={actionsPost.userId}
+            contentOwnerName={actionsPost.userName}
+            onClose={() => setActionsPost(null)}
+            onBlocked={() => {
+              setActionsPost(null)
+              router.back()
+            }}
+          />
+        )}
+      </SafeAreaView>
+    </PageWrapper>
   )
 }
 

@@ -19,8 +19,8 @@ import Animated, {
   withSequence,
   Easing,
 } from 'react-native-reanimated'
-import { colors } from '../../src/lib/theme'
-import { BackButton } from '../../src/components/ui/BackButton'
+import { colors } from '@/lib/theme'
+import { BackButton } from '@/components/ui/BackButton'
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 

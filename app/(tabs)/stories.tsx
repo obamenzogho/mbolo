@@ -28,6 +28,7 @@ import { StoryCard, CreateStoryCard } from '@/features/stories/components/StoryC
 import { StoryCardSkeleton, PostCardSkeleton } from '@/features/news/components/Skeletons'
 import { useStories } from '@/hooks/useStories'
 import type { NewsPost } from '@/features/news/types'
+import PageWrapper from '@/components/PageWrapper'
 
 export default function ActusScreen() {
   const uid = auth.currentUser?.uid ?? ''
@@ -177,6 +178,7 @@ const handleLoadMore = useCallback(() => {
   )
 
   return (
+    <PageWrapper type="stack" swipeBack swipeBackEdgeOnly>
     <SafeAreaView style={styles.screen} edges={['top']}>
       <View style={styles.topBar}>
         <Text style={styles.title}>Actus</Text>
@@ -297,6 +299,7 @@ const handleLoadMore = useCallback(() => {
         </Modal>
       )}
     </SafeAreaView>
+    </PageWrapper>
   )
 }
 

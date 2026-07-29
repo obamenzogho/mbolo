@@ -42,6 +42,7 @@ import type {
   NewsMood,
   NewsPoll,
 } from '@/features/news/types'
+import PageWrapper from '@/components/PageWrapper'
 
 interface SelectedMedia {
   uri: string
@@ -373,305 +374,307 @@ export default function NewsComposeScreen() {
   const visibilityIcon = visibility === 'public' ? 'earth' : visibility === 'followers' ? 'people' : 'lock-closed'
 
   return (
-    <SafeAreaView style={styles.screen}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} hitSlop={12} style={styles.headerButton}>
-            <Ionicons name="close" size={28} color="#fff" />
-          </Pressable>
+    <PageWrapper type="stack" swipeBack backTo="/(tabs)/feed">
+      <SafeAreaView style={styles.screen}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={styles.header}>
+            <Pressable onPress={() => router.back()} hitSlop={12} style={styles.headerButton}>
+              <Ionicons name="close" size={28} color="#fff" />
+            </Pressable>
 
-          <Text style={styles.title}>
-            {editing ? 'Modifier la publication' : 'Créer une publication'}
-          </Text>
+            <Text style={styles.title}>
+              {editing ? 'Modifier la publication' : 'Créer une publication'}
+            </Text>
 
-          <Pressable
-            onPress={publish}
-            disabled={!canPublish}
-            style={[styles.publishButton, !canPublish && styles.publishButtonDisabled]}
-          >
-            {publishing ? (
-              <OrbitLoader size={20} />
-            ) : (
-              <Text style={styles.publishText}>{editing ? 'Enregistrer' : 'Publier'}</Text>
-            )}
-          </Pressable>
-        </View>
+            <Pressable
+              onPress={publish}
+              disabled={!canPublish}
+              style={[styles.publishButton, !canPublish && styles.publishButtonDisabled]}
+            >
+              {publishing ? (
+                <OrbitLoader size={20} />
+              ) : (
+                <Text style={styles.publishText}>{editing ? 'Enregistrer' : 'Publier'}</Text>
+              )}
+            </Pressable>
+          </View>
 
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
-          <View style={styles.authorRow}>
-            {auth.currentUser?.photoURL ? (
-              <Image source={{ uri: auth.currentUser.photoURL }} style={styles.avatar} />
-            ) : (
-              <View style={[styles.avatar, styles.avatarFallback]}>
-                <Ionicons name="person" size={22} color="#777" />
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
+            <View style={styles.authorRow}>
+              {auth.currentUser?.photoURL ? (
+                <Image source={{ uri: auth.currentUser.photoURL }} style={styles.avatar} />
+              ) : (
+                <View style={[styles.avatar, styles.avatarFallback]}>
+                  <Ionicons name="person" size={22} color="#777" />
+                </View>
+              )}
+
+              <View>
+                <Text style={styles.authorName}>
+                  {auth.currentUser?.displayName || 'Vous'}
+                </Text>
+
+                <Pressable onPress={cycleVisibility} style={styles.visibility}>
+                  <Ionicons name={visibilityIcon} size={13} color="#DDD" />
+                  <Text style={styles.visibilityText}>{visibilityLabel}</Text>
+                  <Ionicons name="chevron-down" size={13} color="#DDD" />
+                </Pressable>
+              </View>
+            </View>
+
+            {(mood || location) && (
+              <View style={styles.contextRow}>
+                {mood && <Text style={styles.contextText}>se sent {mood.emoji} {mood.label}</Text>}
+                {location && <Text style={styles.contextText}>📍 {location.name}</Text>}
               </View>
             )}
 
-            <View>
-              <Text style={styles.authorName}>
-                {auth.currentUser?.displayName || 'Vous'}
-              </Text>
-
-              <Pressable onPress={cycleVisibility} style={styles.visibility}>
-                <Ionicons name={visibilityIcon} size={13} color="#DDD" />
-                <Text style={styles.visibilityText}>{visibilityLabel}</Text>
-                <Ionicons name="chevron-down" size={13} color="#DDD" />
-              </Pressable>
-            </View>
-          </View>
-
-          {(mood || location) && (
-            <View style={styles.contextRow}>
-              {mood && <Text style={styles.contextText}>se sent {mood.emoji} {mood.label}</Text>}
-              {location && <Text style={styles.contextText}>📍 {location.name}</Text>}
-            </View>
-          )}
-
-          {background !== 'none' && canUseBackground ? (
-            <LinearGradient colors={activeBg.colors} style={styles.bgInputWrap}>
+            {background !== 'none' && canUseBackground ? (
+              <LinearGradient colors={activeBg.colors} style={styles.bgInputWrap}>
+                <TextInput
+                  value={text}
+                  onChangeText={setText}
+                  placeholder="Quoi de neuf ?"
+                  placeholderTextColor="rgba(255,255,255,0.7)"
+                  multiline
+                  maxLength={280}
+                  autoFocus
+                  style={styles.bgInput}
+                />
+              </LinearGradient>
+            ) : (
               <TextInput
                 value={text}
                 onChangeText={setText}
                 placeholder="Quoi de neuf ?"
-                placeholderTextColor="rgba(255,255,255,0.7)"
+                placeholderTextColor="#777"
                 multiline
-                maxLength={280}
+                maxLength={3000}
                 autoFocus
-                style={styles.bgInput}
+                style={styles.input}
               />
-            </LinearGradient>
-          ) : (
-            <TextInput
-              value={text}
-              onChangeText={setText}
-              placeholder="Quoi de neuf ?"
-              placeholderTextColor="#777"
-              multiline
-              maxLength={3000}
-              autoFocus
-              style={styles.input}
-            />
-          )}
+            )}
 
-          {/* Article Mode */}
-          {articleMode && (
-            <View style={{ paddingHorizontal: 14, paddingTop: 8, gap: 8 }}>
-              <TextInput
-                value={articleTitle}
-                onChangeText={setArticleTitle}
-                placeholder="Titre de l'article"
-                placeholderTextColor="#555"
-                maxLength={200}
-                style={{ color: '#fff', fontSize: 18, fontWeight: '700', borderBottomWidth: 0.5, borderBottomColor: '#333', paddingBottom: 8 }}
-              />
-              <TextInput
-                value={articleBody}
-                onChangeText={setArticleBody}
-                placeholder="Corps de l'article..."
-                placeholderTextColor="#555"
-                multiline
-                maxLength={5000}
-                style={{ color: '#DDD', fontSize: 15, minHeight: 150, lineHeight: 22 }}
-              />
-              <Pressable
-                onPress={() => { setArticleMode(false); setArticleTitle(''); setArticleBody(''); setArticleCoverImage(null) }}
-                style={{ alignSelf: 'flex-end', paddingVertical: 6 }}
-              >
-                <Text style={{ color: '#888', fontSize: 13 }}>Annuler l'article</Text>
-              </Pressable>
-            </View>
-          )}
-
-          {/* Video Share Mode */}
-          {videoShareMode && (
-            <View style={{ paddingHorizontal: 14, paddingTop: 8 }}>
-              <View style={{ backgroundColor: '#1A1A1A', borderRadius: 10, padding: 14, borderWidth: 1, borderColor: '#333' }}>
-                <Text style={{ color: '#888', fontSize: 13, marginBottom: 8 }}>Sélectionne une de tes vidéos à partager :</Text>
-                <Text style={{ color: '#555', fontSize: 12 }}>La sélection des vidéos arrive prochainement. Pour l'instant, tu peux écrire un texte pour ta publication.</Text>
-              </View>
-              <Pressable
-                onPress={() => { setVideoShareMode(false); setSelectedVideoId(null) }}
-                style={{ alignSelf: 'flex-end', paddingVertical: 6 }}
-              >
-                <Text style={{ color: '#888', fontSize: 13 }}>Annuler le partage</Text>
-              </Pressable>
-            </View>
-          )}
-
-          {canUseBackground && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.bgPicker} contentContainerStyle={{ paddingHorizontal: 12, gap: 8 }}>
-              {POST_BACKGROUNDS.map((bg) => (
-                <Pressable key={bg.id} onPress={() => setBackground(bg.id)}>
-                  <LinearGradient
-                    colors={bg.colors}
-                    style={[styles.bgSwatch, background === bg.id && styles.bgSwatchActive]}
-                  >
-                    {bg.id === 'none' && <Ionicons name="text" size={18} color="#888" />}
-                  </LinearGradient>
+            {/* Article Mode */}
+            {articleMode && (
+              <View style={{ paddingHorizontal: 14, paddingTop: 8, gap: 8 }}>
+                <TextInput
+                  value={articleTitle}
+                  onChangeText={setArticleTitle}
+                  placeholder="Titre de l'article"
+                  placeholderTextColor="#555"
+                  maxLength={200}
+                  style={{ color: '#fff', fontSize: 18, fontWeight: '700', borderBottomWidth: 0.5, borderBottomColor: '#333', paddingBottom: 8 }}
+                />
+                <TextInput
+                  value={articleBody}
+                  onChangeText={setArticleBody}
+                  placeholder="Corps de l'article..."
+                  placeholderTextColor="#555"
+                  multiline
+                  maxLength={5000}
+                  style={{ color: '#DDD', fontSize: 15, minHeight: 150, lineHeight: 22 }}
+                />
+                <Pressable
+                  onPress={() => { setArticleMode(false); setArticleTitle(''); setArticleBody(''); setArticleCoverImage(null) }}
+                  style={{ alignSelf: 'flex-end', paddingVertical: 6 }}
+                >
+                  <Text style={{ color: '#888', fontSize: 13 }}>Annuler l'article</Text>
                 </Pressable>
-              ))}
-            </ScrollView>
-          )}
+              </View>
+            )}
 
-          {media.length > 0 && (
-            <View style={styles.mediaGrid}>
-              {media.map((item, index) => (
-                <View key={`${item.uri}-${index}`} style={[styles.preview, media.length === 1 && styles.previewSingle]}>
-                  <Image source={{ uri: item.uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            {/* Video Share Mode */}
+            {videoShareMode && (
+              <View style={{ paddingHorizontal: 14, paddingTop: 8 }}>
+                <View style={{ backgroundColor: '#1A1A1A', borderRadius: 10, padding: 14, borderWidth: 1, borderColor: '#333' }}>
+                  <Text style={{ color: '#888', fontSize: 13, marginBottom: 8 }}>Sélectionne une de tes vidéos à partager :</Text>
+                  <Text style={{ color: '#555', fontSize: 12 }}>La sélection des vidéos arrive prochainement. Pour l'instant, tu peux écrire un texte pour ta publication.</Text>
+                </View>
+                <Pressable
+                  onPress={() => { setVideoShareMode(false); setSelectedVideoId(null) }}
+                  style={{ alignSelf: 'flex-end', paddingVertical: 6 }}
+                >
+                  <Text style={{ color: '#888', fontSize: 13 }}>Annuler le partage</Text>
+                </Pressable>
+              </View>
+            )}
 
-                  {item.type === 'video' && (
-                    <View style={styles.videoBadge}>
-                      <Ionicons name="videocam" size={18} color="#fff" />
-                      <Text style={styles.videoBadgeText}>Vidéo</Text>
-                    </View>
-                  )}
+            {canUseBackground && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.bgPicker} contentContainerStyle={{ paddingHorizontal: 12, gap: 8 }}>
+                {POST_BACKGROUNDS.map((bg) => (
+                  <Pressable key={bg.id} onPress={() => setBackground(bg.id)}>
+                    <LinearGradient
+                      colors={bg.colors}
+                      style={[styles.bgSwatch, background === bg.id && styles.bgSwatchActive]}
+                    >
+                      {bg.id === 'none' && <Ionicons name="text" size={18} color="#888" />}
+                    </LinearGradient>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            )}
 
-                  <Pressable onPress={() => removeMedia(index)} style={styles.remove}>
-                    <Ionicons name="close" size={18} color="#fff" />
+            {media.length > 0 && (
+              <View style={styles.mediaGrid}>
+                {media.map((item, index) => (
+                  <View key={`${item.uri}-${index}`} style={[styles.preview, media.length === 1 && styles.previewSingle]}>
+                    <Image source={{ uri: item.uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+
+                    {item.type === 'video' && (
+                      <View style={styles.videoBadge}>
+                        <Ionicons name="videocam" size={18} color="#fff" />
+                        <Text style={styles.videoBadgeText}>Vidéo</Text>
+                      </View>
+                    )}
+
+                    <Pressable onPress={() => removeMedia(index)} style={styles.remove}>
+                      <Ionicons name="close" size={18} color="#fff" />
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {poll && (
+              <View style={styles.pollCard}>
+                <View style={styles.pollHeader}>
+                  <Text style={styles.pollTitle}>Sondage</Text>
+                  <Pressable onPress={() => setPoll(null)} hitSlop={10}>
+                    <Ionicons name="close-circle" size={22} color="#888" />
                   </Pressable>
                 </View>
-              ))}
-            </View>
-          )}
-
-          {poll && (
-            <View style={styles.pollCard}>
-              <View style={styles.pollHeader}>
-                <Text style={styles.pollTitle}>Sondage</Text>
-                <Pressable onPress={() => setPoll(null)} hitSlop={10}>
-                  <Ionicons name="close-circle" size={22} color="#888" />
-                </Pressable>
-              </View>
-              <TextInput
-                value={poll.question}
-                onChangeText={(q) => setPoll((p) => p ? { ...p, question: q } : p)}
-                placeholder="Posez votre question…"
-                placeholderTextColor="#777"
-                style={styles.pollQuestion}
-                maxLength={200}
-              />
-              {poll.options.map((opt, i) => (
                 <TextInput
-                  key={opt.id}
-                  value={opt.text}
-                  onChangeText={(t) => updatePollOption(opt.id, t)}
-                  placeholder={`Option ${i + 1}`}
+                  value={poll.question}
+                  onChangeText={(q) => setPoll((p) => p ? { ...p, question: q } : p)}
+                  placeholder="Posez votre question…"
                   placeholderTextColor="#777"
-                  style={styles.pollOption}
-                  maxLength={80}
+                  style={styles.pollQuestion}
+                  maxLength={200}
                 />
-              ))}
-              {poll.options.length < 4 && (
-                <Pressable onPress={addPollOption} style={styles.pollAdd}>
-                  <Ionicons name="add-circle-outline" size={20} color={colors.primary} />
-                  <Text style={styles.pollAddText}>Ajouter une option</Text>
+                {poll.options.map((opt, i) => (
+                  <TextInput
+                    key={opt.id}
+                    value={opt.text}
+                    onChangeText={(t) => updatePollOption(opt.id, t)}
+                    placeholder={`Option ${i + 1}`}
+                    placeholderTextColor="#777"
+                    style={styles.pollOption}
+                    maxLength={80}
+                  />
+                ))}
+                {poll.options.length < 4 && (
+                  <Pressable onPress={addPollOption} style={styles.pollAdd}>
+                    <Ionicons name="add-circle-outline" size={20} color={colors.primary} />
+                    <Text style={styles.pollAddText}>Ajouter une option</Text>
+                  </Pressable>
+                )}
+              </View>
+            )}
+
+            <View style={styles.optionsCard}>
+              <Text style={styles.optionsTitle}>Ajouter à votre publication</Text>
+
+              {!editing && (
+                <>
+                  <Pressable onPress={pickMedia} style={styles.optionButton}>
+                    <View style={styles.optionIcon}>
+                      <Ionicons name="images" size={23} color="#45BD62" />
+                    </View>
+                    <Text style={styles.optionText}>Photo ou vidéo</Text>
+                    <Ionicons name="chevron-forward" size={20} color="#777" />
+                  </Pressable>
+
+                  <Pressable onPress={() => setMoodPickerOpen(true)} style={styles.optionButton}>
+                    <View style={styles.optionIcon}>
+                      <Ionicons name="happy-outline" size={23} color="#F7B928" />
+                    </View>
+                    <Text style={styles.optionText}>{mood ? `Humeur : ${mood.emoji}` : 'Humeur / activité'}</Text>
+                    <Ionicons name="chevron-forward" size={20} color="#777" />
+                  </Pressable>
+
+                  <Pressable onPress={location ? () => setLocation(null) : detectLocation} style={styles.optionButton}>
+                    <View style={styles.optionIcon}>
+                      <Ionicons name="location-outline" size={23} color="#EB5757" />
+                    </View>
+                    <Text style={styles.optionText}>{location ? location.name : 'Localisation'}</Text>
+                    <Ionicons name={location ? 'close' : 'chevron-forward'} size={20} color="#777" />
+                  </Pressable>
+
+                  {!poll && (
+                    <Pressable onPress={addPoll} style={styles.optionButton}>
+                      <View style={styles.optionIcon}>
+                        <Ionicons name="bar-chart-outline" size={23} color="#2D9CDB" />
+                      </View>
+                      <Text style={styles.optionText}>Sondage</Text>
+                      <Ionicons name="chevron-forward" size={20} color="#777" />
+                    </Pressable>
+                  )}
+
+                  {!articleMode && (
+                    <Pressable onPress={() => setArticleMode(true)} style={styles.optionButton}>
+                      <View style={styles.optionIcon}>
+                        <Ionicons name="document-text" size={23} color="#2D9CDB" />
+                      </View>
+                      <Text style={styles.optionText}>Article long</Text>
+                      <Ionicons name="chevron-forward" size={20} color="#777" />
+                    </Pressable>
+                  )}
+
+                  {!videoShareMode && !articleMode && (
+                    <Pressable onPress={() => setVideoShareMode(true)} style={styles.optionButton}>
+                      <View style={styles.optionIcon}>
+                        <Ionicons name="logo-youtube" size={23} color="#EB5757" />
+                      </View>
+                      <Text style={styles.optionText}>Partager une vidéo</Text>
+                      <Ionicons name="chevron-forward" size={20} color="#777" />
+                    </Pressable>
+                  )}
+                </>
+              )}
+
+              <Pressable onPress={() => setCommentsEnabled((value) => !value)} style={styles.optionButton}>
+                <View style={styles.optionIcon}>
+                  <Ionicons name="chatbubble-ellipses" size={22} color="#F7B928" />
+                </View>
+                <Text style={styles.optionText}>Commentaires</Text>
+                <Ionicons name={commentsEnabled ? 'toggle' : 'toggle-outline'} size={30} color={commentsEnabled ? colors.primary : '#666'} />
+              </Pressable>
+            </View>
+
+            {publishing && (
+              <View style={styles.progressCard}>
+                <View style={styles.progressTrack}>
+                  <View style={[styles.progressFill, { width: `${progress}%` }]} />
+                </View>
+                <Text style={styles.progressText}>Publication en cours, {progress} %</Text>
+              </View>
+            )}
+          </ScrollView>
+        </KeyboardAvoidingView>
+
+        {moodPickerOpen && <Modal transparent animationType="slide" onRequestClose={() => setMoodPickerOpen(false)}>
+          <Pressable style={styles.moodBackdrop} onPress={() => setMoodPickerOpen(false)}>
+            <Pressable style={styles.moodSheet}>
+              <Text style={styles.moodTitle}>Comment te sens-tu ?</Text>
+              <View style={styles.moodGrid}>
+                {MOODS.map((m) => (
+                  <Pressable key={m.label} onPress={() => { setMood(m); setMoodPickerOpen(false) }} style={styles.moodItem}>
+                    <Text style={{ fontSize: 30 }}>{m.emoji}</Text>
+                    <Text style={styles.moodLabel}>{m.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              {mood && (
+                <Pressable onPress={() => { setMood(null); setMoodPickerOpen(false) }} style={styles.moodClear}>
+                  <Text style={styles.moodClearText}>Retirer l'humeur</Text>
                 </Pressable>
               )}
-            </View>
-          )}
-
-          <View style={styles.optionsCard}>
-            <Text style={styles.optionsTitle}>Ajouter à votre publication</Text>
-
-            {!editing && (
-              <>
-                <Pressable onPress={pickMedia} style={styles.optionButton}>
-                  <View style={styles.optionIcon}>
-                    <Ionicons name="images" size={23} color="#45BD62" />
-                  </View>
-                  <Text style={styles.optionText}>Photo ou vidéo</Text>
-                  <Ionicons name="chevron-forward" size={20} color="#777" />
-                </Pressable>
-
-                <Pressable onPress={() => setMoodPickerOpen(true)} style={styles.optionButton}>
-                  <View style={styles.optionIcon}>
-                    <Ionicons name="happy-outline" size={23} color="#F7B928" />
-                  </View>
-                  <Text style={styles.optionText}>{mood ? `Humeur : ${mood.emoji}` : 'Humeur / activité'}</Text>
-                  <Ionicons name="chevron-forward" size={20} color="#777" />
-                </Pressable>
-
-                <Pressable onPress={location ? () => setLocation(null) : detectLocation} style={styles.optionButton}>
-                  <View style={styles.optionIcon}>
-                    <Ionicons name="location-outline" size={23} color="#EB5757" />
-                  </View>
-                  <Text style={styles.optionText}>{location ? location.name : 'Localisation'}</Text>
-                  <Ionicons name={location ? 'close' : 'chevron-forward'} size={20} color="#777" />
-                </Pressable>
-
-                {!poll && (
-                  <Pressable onPress={addPoll} style={styles.optionButton}>
-                    <View style={styles.optionIcon}>
-                      <Ionicons name="bar-chart-outline" size={23} color="#2D9CDB" />
-                    </View>
-                    <Text style={styles.optionText}>Sondage</Text>
-                    <Ionicons name="chevron-forward" size={20} color="#777" />
-                  </Pressable>
-                )}
-
-                {!articleMode && (
-                  <Pressable onPress={() => setArticleMode(true)} style={styles.optionButton}>
-                    <View style={styles.optionIcon}>
-                      <Ionicons name="document-text" size={23} color="#2D9CDB" />
-                    </View>
-                    <Text style={styles.optionText}>Article long</Text>
-                    <Ionicons name="chevron-forward" size={20} color="#777" />
-                  </Pressable>
-                )}
-
-                {!videoShareMode && !articleMode && (
-                  <Pressable onPress={() => setVideoShareMode(true)} style={styles.optionButton}>
-                    <View style={styles.optionIcon}>
-                      <Ionicons name="logo-youtube" size={23} color="#EB5757" />
-                    </View>
-                    <Text style={styles.optionText}>Partager une vidéo</Text>
-                    <Ionicons name="chevron-forward" size={20} color="#777" />
-                  </Pressable>
-                )}
-              </>
-            )}
-
-            <Pressable onPress={() => setCommentsEnabled((value) => !value)} style={styles.optionButton}>
-              <View style={styles.optionIcon}>
-                <Ionicons name="chatbubble-ellipses" size={22} color="#F7B928" />
-              </View>
-              <Text style={styles.optionText}>Commentaires</Text>
-              <Ionicons name={commentsEnabled ? 'toggle' : 'toggle-outline'} size={30} color={commentsEnabled ? colors.primary : '#666'} />
             </Pressable>
-          </View>
-
-          {publishing && (
-            <View style={styles.progressCard}>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: `${progress}%` }]} />
-              </View>
-              <Text style={styles.progressText}>Publication en cours, {progress} %</Text>
-            </View>
-          )}
-        </ScrollView>
-      </KeyboardAvoidingView>
-
-      {moodPickerOpen && <Modal transparent animationType="slide" onRequestClose={() => setMoodPickerOpen(false)}>
-        <Pressable style={styles.moodBackdrop} onPress={() => setMoodPickerOpen(false)}>
-          <Pressable style={styles.moodSheet}>
-            <Text style={styles.moodTitle}>Comment te sens-tu ?</Text>
-            <View style={styles.moodGrid}>
-              {MOODS.map((m) => (
-                <Pressable key={m.label} onPress={() => { setMood(m); setMoodPickerOpen(false) }} style={styles.moodItem}>
-                  <Text style={{ fontSize: 30 }}>{m.emoji}</Text>
-                  <Text style={styles.moodLabel}>{m.label}</Text>
-                </Pressable>
-              ))}
-            </View>
-            {mood && (
-              <Pressable onPress={() => { setMood(null); setMoodPickerOpen(false) }} style={styles.moodClear}>
-                <Text style={styles.moodClearText}>Retirer l'humeur</Text>
-              </Pressable>
-            )}
           </Pressable>
-        </Pressable>
-      </Modal>}
-    </SafeAreaView>
+        </Modal>}
+      </SafeAreaView>
+    </PageWrapper>
   )
 }
 
