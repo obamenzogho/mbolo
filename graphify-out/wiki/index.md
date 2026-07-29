@@ -594,10 +594,10 @@ Usage: lookup rapide pseudo → email au login (login.tsx:52)
   - `notifications CREATE` : `if request.auth != null` → `if request.resource.data.fromUserId == request.auth.uid`
   - `highlights WRITE` : `if request.auth != null` → restreint au propriétaire (create/update/delete)
 - **`app/(tabs)/profile.tsx`** : fix `ReferenceError: Property 'pending' doesn't exist` — déclaration `const pending` déplacée hors du bloc `try`
-- **`app/(tabs)/profile.tsx`** et **`app/(tabs)/user/[userId].tsx`** : fix event pooling React (`onLayout` → extraction synchrone des valeurs)
-- **`app/(tabs)/profile.tsx`** et **`app/(tabs)/user/[userId].tsx`** : `tabLayouts` passe de `useRef` à `useState` pour mise à jour réactive de l'indicateur de tab
-- **`app/(tabs)/profile.tsx`** et **`app/(tabs)/user/[userId].tsx`** : indicateur de tab suit le swipe en temps réel via `onScroll` + interpolation `indicatorLeft`
-- **`app/(tabs)/profile.tsx`** et **`app/(tabs)/user/[userId].tsx`** : ajout drag handle (barre horizontale) sur la modale followers/following
+- **`app/(tabs)/profile.tsx`** et **`app/(tabs)/(sub)/user/[userId].tsx`** : fix event pooling React (`onLayout` → extraction synchrone des valeurs)
+- **`app/(tabs)/profile.tsx`** et **`app/(tabs)/(sub)/user/[userId].tsx`** : `tabLayouts` passe de `useRef` à `useState` pour mise à jour réactive de l'indicateur de tab
+- **`app/(tabs)/profile.tsx`** et **`app/(tabs)/(sub)/user/[userId].tsx`** : indicateur de tab suit le swipe en temps réel via `onScroll` + interpolation `indicatorLeft`
+- **`app/(tabs)/profile.tsx`** et **`app/(tabs)/(sub)/user/[userId].tsx`** : ajout drag handle (barre horizontale) sur la modale followers/following
 - **Cache Metro vidé** : suppression de `/tmp/metro-cache/*`
 
 ---

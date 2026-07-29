@@ -20,7 +20,7 @@
 6. `scripts/enrich-graphify-roles.js` - 87 edges
 7. `utils/ffmpeg.ts` - 81 edges
 8. `src/features/feed/hooks/useFollowingFeedData.ts` - 79 edges
-9. `app/user/[userId].tsx` - 78 edges
+9. `app/(tabs)/(sub)/user/[userId].tsx` - 78 edges
 10. `app/(tabs)/messages.tsx` - 76 edges
 11. `src/services/searchService.ts` - 76 edges
 12. `functions/lib/index.js` - 68 edges
