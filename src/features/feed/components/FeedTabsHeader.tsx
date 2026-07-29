@@ -147,7 +147,7 @@ export default function FeedTabsHeader({
       </LinearGradient>
 
       <TouchableOpacity
-        onPress={() => router.push({ pathname: '/(tabs)/explore', params: { from: '/(tabs)/feed' } })}
+        onPress={() => router.push({ pathname: '/explore', params: { from: '/(tabs)/feed' } })}
         activeOpacity={0.7}
         style={{
           position: 'absolute',

@@ -1,12 +1,16 @@
-/* useNewsFeedData — pagination du fil d'actualité.
-   Branche le newsFeedStore sur newsFeedSource.
-   Pattern identique à useFeedData.ts. */
-
-import { useCallback, useEffect, useRef } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+} from 'react'
 import { useStore } from 'zustand'
 import type { StoreApi } from 'zustand'
-import { newsFeedSource } from '../services/newsFeedSource'
-import type { NewsFeedState } from '../store/newsFeedStore'
+import {
+  newsFeedSource,
+} from '../services/newsFeedSource'
+import type {
+  NewsFeedState,
+} from '../store/newsFeedStore'
 
 export function useNewsFeedData({
   store,
@@ -18,14 +22,40 @@ export function useNewsFeedData({
 
   const posts = useStore(store, (state) => state.posts)
   const loading = useStore(store, (state) => state.loading)
-  const loadingMore = useStore(store, (state) => state.loadingMore)
+  const refreshing = useStore(
+    store,
+    (state) => state.refreshing,
+  )
+  const loadingMore = useStore(
+    store,
+    (state) => state.loadingMore,
+  )
   const hasMore = useStore(store, (state) => state.hasMore)
 
-  const setPosts = useStore(store, (state) => state.setPosts)
-  const appendPosts = useStore(store, (state) => state.appendPosts)
-  const setLoading = useStore(store, (state) => state.setLoading)
-  const setLoadingMore = useStore(store, (state) => state.setLoadingMore)
-  const setHasMore = useStore(store, (state) => state.setHasMore)
+  const setPosts = useStore(
+    store,
+    (state) => state.setPosts,
+  )
+  const appendPosts = useStore(
+    store,
+    (state) => state.appendPosts,
+  )
+  const setLoading = useStore(
+    store,
+    (state) => state.setLoading,
+  )
+  const setRefreshing = useStore(
+    store,
+    (state) => state.setRefreshing,
+  )
+  const setLoadingMore = useStore(
+    store,
+    (state) => state.setLoadingMore,
+  )
+  const setHasMore = useStore(
+    store,
+    (state) => state.setHasMore,
+  )
 
   useEffect(() => {
     mountedRef.current = true
@@ -46,32 +76,47 @@ export function useNewsFeedData({
       }
 
       if (isRefresh) {
+        setRefreshing(true)
         setLoading(true)
       } else {
         setLoadingMore(true)
       }
 
-      const page = await newsFeedSource.fetchNext()
+      try {
+        const page =
+          await newsFeedSource.fetchNext()
 
-      if (!mountedRef.current) {
-        return
+        if (!mountedRef.current) {
+          return
+        }
+
+        if (!page) {
+          setLoading(false)
+          setRefreshing(false)
+          setLoadingMore(false)
+          return
+        }
+
+        if (page.isFirst || isRefresh) {
+          setPosts(page.posts)
+        } else if (page.posts.length > 0) {
+          appendPosts(page.posts)
+        }
+
+        setHasMore(page.hasMore)
+      } catch {
+        if (mountedRef.current) {
+          setLoading(false)
+          setRefreshing(false)
+          setLoadingMore(false)
+        }
+      } finally {
+        if (mountedRef.current) {
+          setLoading(false)
+          setRefreshing(false)
+          setLoadingMore(false)
+        }
       }
-
-      if (!page) {
-        setLoading(false)
-        setLoadingMore(false)
-        return
-      }
-
-      if (page.isFirst || isRefresh) {
-        setPosts(page.posts)
-      } else if (page.posts.length > 0) {
-        appendPosts(page.posts)
-      }
-
-      setHasMore(page.hasMore)
-      setLoading(false)
-      setLoadingMore(false)
     },
     [
       appendPosts,
@@ -80,6 +125,7 @@ export function useNewsFeedData({
       setLoading,
       setLoadingMore,
       setPosts,
+      setRefreshing,
     ],
   )
 
@@ -93,12 +139,17 @@ export function useNewsFeedData({
   }, [fetchPosts])
 
   const loadMore = useCallback(() => {
-    if (loadingMore || loading || !hasMore) {
+    if (loading || loadingMore || !hasMore) {
       return
     }
 
-    void fetchPosts()
-  }, [fetchPosts, hasMore, loading, loadingMore])
+    void fetchPosts(false)
+  }, [
+    fetchPosts,
+    hasMore,
+    loading,
+    loadingMore,
+  ])
 
   const refresh = useCallback(() => {
     newsFeedSource.reset()
@@ -110,6 +161,7 @@ export function useNewsFeedData({
   return {
     posts,
     loading,
+    refreshing,
     loadingMore,
     hasMore,
     isEmpty: !loading && posts.length === 0,

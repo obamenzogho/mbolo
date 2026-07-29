@@ -14,12 +14,12 @@ export default function RichPostText({ text, style }: Props) {
   const handlePress = useCallback((token: string) => {
     if (token.startsWith('#')) {
       router.push({
-        pathname: '/(tabs)/explore',
+        pathname: '/explore',
         params: { search: token },
       })
     } else if (token.startsWith('@')) {
       router.push({
-        pathname: '/(tabs)/explore',
+        pathname: '/explore',
         params: { search: token.slice(1) },
       })
     }

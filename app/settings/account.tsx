@@ -64,14 +64,14 @@ export default function AccountSettings() {
           label="Modifier le profil"
           description="Photo, nom, bio, liens"
           kind="action"
-          onPress={() => router.push('/(tabs)/edit-profile')}
+          onPress={() => router.push('/edit-profile')}
           divider
         />
         <SettingsRow
           icon="at-outline"
           label="Nom d'utilisateur"
           kind="action"
-          onPress={() => router.push('/(tabs)/edit-profile')}
+          onPress={() => router.push('/edit-profile')}
         />
       </SettingsSection>
 

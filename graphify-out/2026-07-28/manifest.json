@@ -1560,8 +1560,8 @@
     "semantic_hash": ""
   },
   "src/features/news/hooks/useNewsFeedData.ts": {
-    "mtime": 1785067725.5166159,
-    "ast_hash": "ea4479b5cd485d261aade9b03d3223dd",
+    "mtime": 1785202312.3292916,
+    "ast_hash": "c07c892195da63e5852c1e7fed43c987",
     "semantic_hash": ""
   },
   "src/features/news/hooks/useReactions.ts": {

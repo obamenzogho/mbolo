@@ -59,18 +59,36 @@ function MediaVideoPreview({
   media: NewsPostMedia
   onPress: () => void
 }) {
-  const thumbnail = media.thumbnailUrl ?? media.url
+  const thumbnail = getFeedImageUrl(
+    media.thumbnailUrl ?? media.url,
+    720,
+  )
 
   return (
-    <Pressable onPress={onPress} style={styles.videoPreview}>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel="Lire la vidéo"
+      style={styles.videoPreview}
+    >
       <Image
-        source={{ uri: getFeedImageUrl(thumbnail, 720) }}
-        style={StyleSheet.absoluteFill}
+        source={
+          thumbnail
+            ? { uri: thumbnail }
+            : undefined
+        }
+        style={StyleSheet.absoluteFillObject}
         resizeMode="cover"
       />
 
       <View style={styles.videoOverlay}>
-        <Ionicons name="play" size={34} color="#fff" />
+        <View style={styles.playButton}>
+          <Ionicons
+            name="play"
+            size={28}
+            color="#F5F5F5"
+          />
+        </View>
       </View>
     </Pressable>
   )
@@ -80,17 +98,29 @@ function MediaGrid({ media, onImagePress, onVideoPress }: { media: NewsPostMedia
   const { width } = useWindowDimensions()
   const availableWidth = Math.min(width, 720)
 
-  if (media.length === 0) return null
+  if (media.length === 0) {
+  return null
+}
 
-  if (media[0].type === 'video') {
-    return <MediaVideoPreview media={media[0]} onPress={() => onVideoPress?.()} />
-  }
+if (media[0].type === 'video') {
+  return (
+    <MediaVideoPreview
+      media={media[0]}
+      onPress={onVideoPress ?? (() => {})}
+    />
+  )
+}
 
   if (media.length === 1) {
     return (
       <Pressable onPress={() => onImagePress?.(0)}>
         <Image
-          source={{ uri: getFeedImageUrl(media[0].url, 720) }}
+          source={{
+            uri: getFeedImageUrl(
+              media[0].thumbnailUrl ?? media[0].url,
+              720,
+            ),
+          }}
           style={{
             width: availableWidth,
             height: Math.min(availableWidth * 1.05, 620),
@@ -130,7 +160,12 @@ function MediaGrid({ media, onImagePress, onVideoPress }: { media: NewsPostMedia
             }}
           >
             <Image
-              source={{ uri: getFeedImageUrl(item.url, 720) }}
+              source={{
+                uri: getFeedImageUrl(
+                  item.thumbnailUrl ?? item.url,
+                  720,
+                ),
+              }}
               style={StyleSheet.absoluteFill}
               resizeMode="cover"
             />
@@ -247,6 +282,12 @@ function PostCardComponent({
 
         <Pressable
           hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel={
+            isOwner
+              ? 'Options de ma publication'
+              : 'Options de la publication'
+          }
           style={styles.moreButton}
           onPress={() => {
             if (isOwner) {
@@ -360,7 +401,13 @@ function PostCardComponent({
 
       <View style={styles.actions}>
         <Pressable
-          onPress={() => toggleReaction()}
+          accessibilityRole="button"
+          accessibilityLabel={
+            myReaction
+              ? 'Modifier ma réaction'
+              : "J'aime cette publication"
+          }
+          onPress={() => void toggleReaction()}
           onLongPress={() => setShowReactionPicker(true)}
           style={[styles.action, !!myReaction && styles.actionActive]}
         >
@@ -391,6 +438,8 @@ function PostCardComponent({
 
         {post.commentsEnabled && (
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Commenter la publication"
             onPress={() => onComment(post)}
             style={styles.action}
           >
@@ -404,7 +453,13 @@ function PostCardComponent({
         )}
 
         <Pressable
-          onPress={handleSave}
+          accessibilityRole="button"
+          accessibilityLabel={
+            saved
+              ? 'Retirer des enregistrements'
+              : 'Enregistrer la publication'
+          }
+          onPress={() => void handleSave()}
           style={styles.action}
         >
           <Ionicons
@@ -422,7 +477,12 @@ function PostCardComponent({
           </Text>
         </Pressable>
 
-        <Pressable onPress={handleShare} style={styles.action}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Partager la publication"
+          onPress={() => void handleShare()}
+          style={styles.action}
+        >
           <Ionicons
             name="arrow-redo-outline"
             size={22}
@@ -503,11 +563,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
     overflow: 'hidden',
   },
+  playButton: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: 'rgba(8, 9, 10, 0.72)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingLeft: 3,
+  },
+
   videoOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.25)',
+    backgroundColor: 'rgba(8, 9, 10, 0.18)',
   },
   moreOverlay: {
     ...StyleSheet.absoluteFillObject,

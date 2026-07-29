@@ -1,6 +1,3 @@
-/* newsFeedStore — Zustand factory pour le fil d'actualité MBolo.
-   Pattern identique à feedStore.ts : une instance singleton pour l'onglet Actus. */
-
 import { createStore, useStore } from 'zustand'
 import type { StoreApi } from 'zustand'
 import type { NewsPost } from '../types'
@@ -14,11 +11,14 @@ export interface NewsFeedState {
 
   setPosts: (posts: NewsPost[]) => void
   appendPosts: (posts: NewsPost[]) => void
-  updatePost: (postId: string, updates: Partial<NewsPost>) => void
+  updatePost: (
+    postId: string,
+    updates: Partial<NewsPost>,
+  ) => void
   removePost: (postId: string) => void
   setLoading: (loading: boolean) => void
   setRefreshing: (refreshing: boolean) => void
-  setLoadingMore: (loadingMore: boolean) => void
+  setLoadingMore: (loading: boolean) => void
   setHasMore: (hasMore: boolean) => void
 }
 
@@ -30,34 +30,63 @@ function createNewsFeedStore() {
     loadingMore: false,
     hasMore: true,
 
-    setPosts: (posts) => set({ posts, loading: false, refreshing: false, loadingMore: false }),
+    setPosts: (posts) =>
+      set({
+        posts,
+        loading: false,
+        refreshing: false,
+        loadingMore: false,
+      }),
 
     appendPosts: (newPosts) =>
       set((state) => {
-        const ids = new Set(state.posts.map((p) => p.id))
-        const filtered = newPosts.filter((p) => !ids.has(p.id))
-        return { posts: [...state.posts, ...filtered], loadingMore: false }
+        const existingIds = new Set(
+          state.posts.map((post) => post.id),
+        )
+
+        const uniquePosts = newPosts.filter(
+          (post) => !existingIds.has(post.id),
+        )
+
+        return {
+          posts: [...state.posts, ...uniquePosts],
+          loadingMore: false,
+        }
       }),
 
     updatePost: (postId, updates) =>
       set((state) => ({
-        posts: state.posts.map((p) => (p.id === postId ? { ...p, ...updates } : p)),
+        posts: state.posts.map((post) =>
+          post.id === postId
+            ? { ...post, ...updates }
+            : post,
+        ),
       })),
 
     removePost: (postId) =>
-      set((state) => ({ posts: state.posts.filter((p) => p.id !== postId) })),
+      set((state) => ({
+        posts: state.posts.filter(
+          (post) => post.id !== postId,
+        ),
+      })),
 
     setLoading: (loading) => set({ loading }),
-    setRefreshing: (refreshing) => set({ refreshing }),
-    setLoadingMore: (loadingMore) => set({ loadingMore }),
+
+    setRefreshing: (refreshing) =>
+      set({ refreshing }),
+
+    setLoadingMore: (loadingMore) =>
+      set({ loadingMore }),
+
     setHasMore: (hasMore) => set({ hasMore }),
   }))
 }
 
-// Instance singleton pour l'onglet Actus
 export const newsFeedStore = createNewsFeedStore()
 
-export function useNewsFeedStore<T>(selector: (s: NewsFeedState) => T): T {
+export function useNewsFeedStore<T>(
+  selector: (state: NewsFeedState) => T,
+): T {
   return useStore(newsFeedStore, selector)
 }
 

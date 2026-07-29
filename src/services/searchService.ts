@@ -36,6 +36,8 @@ export interface PostResult {
   userPhoto?: string
   likeCount?: number
   commentCount?: number
+  shareCount?: number
+  saveCount?: number
   viewCount?: number
   mediaType?: PostMediaType
   createdAt?: number
@@ -549,12 +551,17 @@ export async function searchMulti(
     blockedIds,
   ).slice(0, 20)
 
+  const hashtags = hashtagsResult.data?.hits ?? []
+
   const result: MultiSearchResult = {
     users: {
       ...(usersResult.data ?? emptyResult.users),
       hits: users,
     },
-    hashtags: hashtagsResult.data ?? emptyResult.hashtags,
+    hashtags: {
+      ...(hashtagsResult.data ?? emptyResult.hashtags),
+      hits: hashtags,
+    },
     posts: {
       ...(postsResult.data ?? emptyResult.posts),
       hits: posts,

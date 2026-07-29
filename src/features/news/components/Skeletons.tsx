@@ -3,9 +3,8 @@ import { View, StyleSheet } from 'react-native'
 import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, Easing } from 'react-native-reanimated'
 
 const SKELETON_COLOR = '#1A1B1E'
-const SKELETON_SHIMMER = '#25272A'
 
-function ShimmerBlock({ style }: { style?: any }) {
+export function ShimmerBlock({ style, color }: { style?: any; color?: string }) {
   const opacity = useSharedValue(0.4)
 
   useEffect(() => {
@@ -18,7 +17,7 @@ function ShimmerBlock({ style }: { style?: any }) {
 
   const animStyle = useAnimatedStyle(() => ({ opacity: opacity.value }))
 
-  return <Animated.View style={[{ backgroundColor: SKELETON_SHIMMER }, style, animStyle]} />
+  return <Animated.View style={[{ backgroundColor: color ?? '#25272A' }, style, animStyle]} />
 }
 
 export function StoryCardSkeleton() {
@@ -248,6 +247,75 @@ const cs = StyleSheet.create({
   actions: { flexDirection: 'row', gap: 14, marginTop: 10 },
 })
 
+export function SearchResultsSkeleton() {
+  return (
+    <View style={sr.container}>
+      {Array.from({ length: 3 }).map((_, i) => (
+        <View key={`user-${i}`} style={sr.userRow}>
+          <ShimmerBlock style={sr.avatar} />
+          <View style={sr.userInfo}>
+            <ShimmerBlock style={{ width: '50%', height: 14, borderRadius: 7 }} />
+            <ShimmerBlock style={{ width: '30%', height: 11, borderRadius: 5 }} />
+          </View>
+        </View>
+      ))}
+      <View style={{ marginTop: 4 }}>
+        <ShimmerBlock style={{ width: '100%', height: 180, borderRadius: 12 }} />
+      </View>
+      {Array.from({ length: 2 }).map((_, i) => (
+        <View key={`post-${i}`} style={sr.userRow}>
+          <ShimmerBlock style={sr.avatar} />
+          <View style={sr.userInfo}>
+            <ShimmerBlock style={{ width: '50%', height: 14, borderRadius: 7 }} />
+            <ShimmerBlock style={{ width: '75%', height: 11, borderRadius: 5 }} />
+          </View>
+        </View>
+      ))}
+    </View>
+  )
+}
+
+export function TrendingHashtagsSkeleton() {
+  const widths = [70, 90, 60, 100, 75, 85, 65, 55, 95, 80]
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16 }}>
+      {widths.map((w, i) => (
+        <ShimmerBlock key={i} style={{ width: w, height: 32, borderRadius: 16 }} />
+      ))}
+    </View>
+  )
+}
+
+export function InterestsSkeleton() {
+  const widths = [70, 90, 65, 85, 60, 80]
+  return (
+    <View style={is.card}>
+      <View style={is.header}>
+        <ShimmerBlock style={{ width: 16, height: 16, borderRadius: 8 }} />
+        <ShimmerBlock style={{ width: 140, height: 14, borderRadius: 7 }} />
+      </View>
+      <View style={is.chipRow}>
+        {widths.map((w, i) => (
+          <ShimmerBlock key={i} style={{ width: w, height: 28, borderRadius: 14 }} />
+        ))}
+      </View>
+    </View>
+  )
+}
+
+const sr = StyleSheet.create({
+  container: { padding: 16, gap: 14 },
+  userRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  avatar: { width: 44, height: 44, borderRadius: 22 },
+  userInfo: { flex: 1, gap: 6 },
+})
+
+const is = StyleSheet.create({
+  card: { marginHorizontal: 16, marginBottom: 20, backgroundColor: '#111214', borderRadius: 12, padding: 14 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+})
+
 const s = StyleSheet.create({
   card: {
     width: 108,
@@ -272,7 +340,7 @@ const s = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 18,
-    backgroundColor: SKELETON_SHIMMER,
+    backgroundColor: '#25272A',
   },
   nameLine: {
     position: 'absolute',

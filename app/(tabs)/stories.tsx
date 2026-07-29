@@ -33,12 +33,30 @@ export default function ActusScreen() {
   const uid = auth.currentUser?.uid ?? ''
   const { markAsViewed } = useStories()
 
-  const feedData = useNewsFeedData({ store: newsFeedStore })
-  const posts = useNewsFeedStore((s) => s.posts)
-  const loading = useNewsFeedStore((s) => s.loading)
-  const refreshing = useNewsFeedStore((s) => s.refreshing)
-  const loadingMore = useNewsFeedStore((s) => s.loadingMore)
-  const hasMore = useNewsFeedStore((s) => s.hasMore)
+  const {
+    refresh: refreshFeed,
+    loadMore: loadMoreFeed,
+  } = useNewsFeedData({ store: newsFeedStore })
+
+  const posts = useNewsFeedStore(
+    (state) => state.posts,
+  )
+
+  const loading = useNewsFeedStore(
+    (state) => state.loading,
+  )
+
+  const refreshing = useNewsFeedStore(
+    (state) => state.refreshing,
+  )
+
+  const loadingMore = useNewsFeedStore(
+    (state) => state.loadingMore,
+  )
+
+  const hasMore = useNewsFeedStore(
+    (state) => state.hasMore,
+  )
 
   const [followingIds, setFollowingIds] = useState<string[]>([])
   const [userPhotoURL, setUserPhotoURL] = useState<string | null>(null)
@@ -67,49 +85,63 @@ export default function ActusScreen() {
   const [actionsPost, setActionsPost] = useState<NewsPost | null>(null)
 
   const handleRefresh = useCallback(() => {
-    void feedData.refresh()
-  }, [feedData])
+  void refreshFeed()
+}, [refreshFeed])
 
-  const loadMore = useCallback(() => {
-    void feedData.loadMore()
-  }, [feedData])
+const handleLoadMore = useCallback(() => {
+  void loadMoreFeed()
+}, [loadMoreFeed])
 
   const renderPostItem = useCallback(
-    ({ item }: { item: NewsPost }) => (
-      <PostCard
-        post={item}
-        currentUserId={uid}
-        onComment={setCommentPost}
-        onEdit={(post) =>
-          router.push({
-            pathname: '/news-compose',
-            params: { editPostId: post.id },
-          })
-        }
-        onDelete={(post) => {
-          Alert.alert('Supprimer ?', 'Cette action est définitive.', [
-            { text: 'Annuler', style: 'cancel' },
+  ({ item }: { item: NewsPost }) => (
+    <PostCard
+      post={item}
+      currentUserId={uid}
+      onComment={setCommentPost}
+      onEdit={(post) =>
+        router.push({
+          pathname: '/news-compose',
+          params: {
+            editPostId: post.id,
+          },
+        })
+      }
+      onDelete={(post) => {
+        Alert.alert(
+          'Supprimer ?',
+          'Cette action est définitive.',
+          [
+            {
+              text: 'Annuler',
+              style: 'cancel',
+            },
             {
               text: 'Supprimer',
               style: 'destructive',
               onPress: async () => {
-                newsFeedStore.getState().removePost(post.id)
+                newsFeedStore
+                  .getState()
+                  .removePost(post.id)
+
                 await deletePost(post.id, uid)
               },
             },
-          ])
-        }}
-        onMore={setActionsPost}
-        onPress={(post) =>
-          router.push({
-            pathname: '/post-detail',
-            params: { postId: post.id },
-          })
-        }
-      />
-    ),
-    [uid],
-  )
+          ],
+        )
+      }}
+      onMore={setActionsPost}
+      onPress={(post) =>
+        router.push({
+          pathname: '/post-detail',
+          params: {
+            postId: post.id,
+          },
+        })
+      }
+    />
+  ),
+  [uid],
+)
 
   const header = (
     <>
@@ -156,7 +188,7 @@ export default function ActusScreen() {
           >
             <Ionicons name="add-circle" size={24} color={colors.primary} />
          </Pressable>
-          <Pressable onPress={() => router.push({ pathname: '/(tabs)/explore', params: { from: '/(tabs)/stories' } })} style={styles.iconBtn}>
+          <Pressable onPress={() => router.push({ pathname: '/explore', params: { from: '/(tabs)/stories' } })} style={styles.iconBtn}>
             <Ionicons name="search" size={22} color="#fff" />
          </Pressable>
        </View>
@@ -167,40 +199,64 @@ export default function ActusScreen() {
         keyExtractor={(item) => item.id}
         renderItem={renderPostItem}
         ListHeaderComponent={header}
+        ListHeaderComponentStyle={{
+          backgroundColor: '#111214',
+        }}
         refreshing={refreshing}
         onRefresh={handleRefresh}
-        onEndReached={hasMore ? loadMore : undefined}
+        onEndReached={
+          hasMore ? handleLoadMore : undefined
+        }
         onEndReachedThreshold={0.7}
         showsVerticalScrollIndicator={false}
         initialNumToRender={4}
         maxToRenderPerBatch={4}
-        windowSize={5}
         updateCellsBatchingPeriod={50}
-        removeClippedSubviews={true}
+        windowSize={5}
+        removeClippedSubviews
         maintainVisibleContentPosition={{
           minIndexForVisible: 0,
         }}
         ListEmptyComponent={
           loading ? (
-            <View style={{ paddingTop: 8 }}>
-              <PostCardSkeleton />
+            <View>
               <PostCardSkeleton />
               <PostCardSkeleton />
             </View>
           ) : (
             <View style={styles.empty}>
-              <Ionicons name="newspaper-outline" size={48} color="#555" />
-              <Text style={styles.emptyTitle}>Aucune publication</Text>
-              <Text style={styles.emptyText}>Publiez la première actualité.</Text>
-              <Pressable onPress={() => router.push('/news-compose')} style={styles.emptyBtn}>
-                <Text style={styles.emptyBtnText}>Créer une publication</Text>
+              <Ionicons
+                name="newspaper-outline"
+                size={42}
+                color={colors.textMuted}
+              />
+
+              <Text style={styles.emptyTitle}>
+                Aucune publication
+              </Text>
+
+              <Text style={styles.emptyText}>
+                Publiez la première actualité.
+              </Text>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Créer une publication"
+                onPress={() =>
+                  router.push('/news-compose')
+                }
+                style={styles.emptyBtn}
+              >
+                <Text style={styles.emptyBtnText}>
+                  Créer une publication
+                </Text>
               </Pressable>
             </View>
           )
         }
         ListFooterComponent={
           loadingMore ? (
-            <View style={{ alignItems: 'center', marginVertical: 20 }}>
+            <View style={styles.footerLoader}>
               <PostCardSkeleton />
             </View>
           ) : null
@@ -263,9 +319,44 @@ const styles = StyleSheet.create({
 
   storiesRow: { paddingHorizontal: 14, paddingVertical: 12, backgroundColor: '#111214' },
 
-  empty: { minHeight: 300, paddingHorizontal: 32, alignItems: 'center', justifyContent: 'center' },
-  emptyTitle: { color: '#fff', fontSize: 18, fontWeight: '700', marginTop: 12 },
-  emptyText: { color: '#888', fontSize: 13, marginTop: 5, textAlign: 'center' },
-  emptyBtn: { marginTop: 16, height: 40, paddingHorizontal: 18, borderRadius: 20, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  emptyBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  footerLoader: {
+    paddingBottom: 24,
+  },
+
+  empty: {
+    minHeight: 300,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  emptyTitle: {
+    color: colors.textPrimary,
+    fontSize: 18,
+    fontWeight: '700',
+    marginTop: 12,
+  },
+
+  emptyText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    marginTop: 6,
+    textAlign: 'center',
+  },
+
+  emptyBtn: {
+    marginTop: 18,
+    minHeight: 44,
+    paddingHorizontal: 20,
+    borderRadius: 22,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  emptyBtnText: {
+    color: colors.textPrimary,
+    fontWeight: '700',
+    fontSize: 14,
+  },
 })

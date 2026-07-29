@@ -5,13 +5,13 @@ import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore'
 import * as Haptics from 'expo-haptics'
-import { auth, db } from '../../../src/lib/firebase'
-import { colors } from '../../../src/lib/theme'
-import { Avatar } from '../../../src/components/ui/Avatar'
-import OrbitLoader from '../../../src/components/OrbitLoader'
-import { useFollow } from '../../../src/hooks/useFollow'
-import { useGoBack } from '../../../src/hooks/useGoBack'
-import { getOrCreateConversation } from '../../../src/features/chat/services/chatService'
+import { auth, db } from '../src/lib/firebase'
+import { colors } from '../src/lib/theme'
+import { Avatar } from '../src/components/ui/Avatar'
+import OrbitLoader from '../src/components/OrbitLoader'
+import { useFollow } from '../src/hooks/useFollow'
+import { useGoBack } from '../src/hooks/useGoBack'
+import { getOrCreateConversation } from '../src/features/chat/services/chatService'
 
 interface PendingUser {
   id: string
@@ -80,7 +80,7 @@ export default function FollowRequests() {
     if (!userId) return
     const conv = await getOrCreateConversation(userId, otherUserId)
     router.push({
-      pathname: '/(tabs)/messages/conversation/[id]',
+      pathname: '/conversation/[id]',
       params: { id: conv.id },
     })
   }, [userId])

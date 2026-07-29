@@ -132,7 +132,7 @@ export default function UserProfile() {
     const isSpam = isFollowing && !isFriend
     const conv = await getOrCreateConversation(auth.currentUser.uid, userId, isSpam)
     router.push({
-      pathname: '/(tabs)/messages/conversation/[id]',
+      pathname: '/conversation/[id]',
       params: { id: conv.id },
     })
   }, [userId, isFollowing, isFriend])
@@ -157,9 +157,14 @@ export default function UserProfile() {
   }, [setActiveTab, activeTab])
 
   const swipeGesture = Gesture.Pan()
-    .minDistance(10)
     .activeOffsetX([-10, 10])
     .failOffsetY([-5, 5])
+    .onTouchesDown((e, mgr) => {
+      'worklet'
+      if (e.changedTouches[0].absoluteX < 30) {
+        mgr.fail()
+      }
+    })
     .onUpdate((e) => {
       translateX.value = e.translationX
     })

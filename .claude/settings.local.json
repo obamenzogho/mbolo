@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/dev/**)",
+      "Read(//Users/dev/.claude/projects/-Users-dev-workspace-59a938b9/memory/**)",
+      "Read(//Users/wwzz/Downloads/**)",
+      "Read(//home/bruneel/**)",
+      "Bash(awk '/performSearch/,/^  }/' \"app/\\(tabs\\)/explore.tsx\")",
+      "Bash(awk '/match \\\\/users\\\\/{userId}/,/^    }/' firestore.rules)",
+      "Bash(npx tsc *)",
+      "Bash(node -e \"const m=require\\('firebase/firestore'\\); console.log\\(Object.keys\\(m\\).filter\\(k=>/Snapshot/.test\\(k\\)\\)\\)\")",
+      "Bash(node -e \"const m=require\\('firebase/firestore'\\); console.log\\(Object.keys\\(m\\).filter\\(k=>/^\\(start|end\\)/i.test\\(k\\)\\)\\)\")",
+      "Bash(node -e \"console.log\\(require.resolve\\('firebase/firestore'\\)\\)\")",
+      "Bash(node -e \"const p=require\\('./node_modules/firebase/package.json'\\); console.log\\(JSON.stringify\\(p.exports['./firestore'],null,1\\)\\)\")",
+      "Bash(git stash *)",
+      "Bash(npx firebase-tools *)",
+      "Bash(claude mcp *)",
+      "Bash(xargs sed -i 's/colors\\\\.surfaceLight/colors.surfaceElevated/g')",
+      "Bash(npx jest *)",
+      "mcp__plugin_playwright_playwright__browser_navigate",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(grep -n \"million\\\\|milliers\\\\|[0-9]\\\\{3,\\\\}\\\\|K+\\\\|M+\\\\|note\\\\|étoile\\\\|témoign\\\\|Stylist\\\\|AfroBeats\\\\|Libreville\\\\|Port-Gentil\\\\|Franceville\" src/components/sections/SocialProof.tsx)",
+      "Bash(rm /home/bruneel/Desktop/mbolo-website/src/app/press/page.tsx)",
+      "Bash(rmdir /home/bruneel/Desktop/mbolo-website/src/app/press)",
+      "Bash(npm view *)",
+      "Bash(curl -s \"https://api.github.com/repos/JamaisMagic/ffmpeg-kit-16KB/releases?per_page=30\")",
+      "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{try{const j=JSON.parse\\(d\\);console.log\\('total releases:',j.length\\);j.forEach\\(r=>console.log\\(' -',r.tag_name, '| assets:', \\(r.assets||[]\\).map\\(a=>a.name\\).join\\(', '\\)||'\\(none\\)'\\)\\)}catch\\(e\\){console.log\\('fail',e.message\\)}}\\)\")",
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('app.json','utf8'\\)\\);console.log\\('OK'\\)\")",
+      "Bash(node -e \"const p=require\\('./ffmpeg-kit-plugin.js'\\); const out=p\\({name:'x',slug:'x'}\\); console.log\\('plugin exécutable OK, type retour:', typeof out\\)\")",
+      "Bash(npx expo *)",
+      "Bash(grep -nA20 \"ffmpeg-kit-plugin. START\" android/build.gradle)",
+      "Bash(rm -rf /tmp/ffmpeg-fork.aar /tmp/fork_aar_extract)",
+      "Bash(git check-ignore *)",
+      "Bash(node -e \"const p=require\\('./package.json'\\);console.log\\('reanimated:',p.dependencies['react-native-reanimated']\\);console.log\\('react-native:',p.dependencies['react-native']\\);console.log\\('worklets:',p.dependencies['react-native-worklets']||'\\(absent\\)'\\)\")"
+    ]
+  }
+}

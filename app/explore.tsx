@@ -31,6 +31,7 @@ import { SearchAutocomplete } from '@/features/search/components/SearchAutocompl
 import { useRecentSearches } from '@/features/search/hooks/useRecentSearches'
 import { RecentSearches } from '@/features/search/components/RecentSearches'
 import OrbitLoader from '@/components/OrbitLoader'
+import { SearchResultsSkeleton, TrendingHashtagsSkeleton, InterestsSkeleton } from '@/features/news/components/Skeletons'
 import { BackButton } from '@/components/ui/BackButton'
 
 type SearchTab = 'tout' | 'comptes' | 'publications' | 'videos' | 'tags'
@@ -246,9 +247,7 @@ export default function Explore() {
           term={search}
         />
       ) : loading ? (
-        <View style={{ alignItems: 'center', paddingTop: 60 }}>
-          <OrbitLoader size={24} />
-     </View>
+        <SearchResultsSkeleton />
       ) : isSearching ? (
         <View style={styles.emptySearch}>
           <Ionicons name="search-outline" size={44} color="#555" />
@@ -271,7 +270,9 @@ export default function Explore() {
             />
           )}
 
-          {!interestsLoading && topCategories.length > 0 && (
+          {interestsLoading ? (
+            <InterestsSkeleton />
+          ) : topCategories.length > 0 && (
             <View style={styles.interestsCard}>
               <View style={styles.interestsHeader}>
                 <Ionicons name="sparkles" size={16} color={colors.primary} />
@@ -313,7 +314,7 @@ export default function Explore() {
             {cityLabel ? `Tendances à ${cityLabel}` : 'Tendances au Gabon'}
        </Text>
           {trendingLoading ? (
-            <View style={{ padding: 20 }}><OrbitLoader size={24} /></View>
+            <TrendingHashtagsSkeleton />
           ) : trendingTags.length > 0 ? (
             <View style={styles.tagCloud}>
               {trendingTags.map((t) => (

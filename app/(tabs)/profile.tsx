@@ -350,7 +350,7 @@ export default function Profile() {
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <Text style={{ color: colors.white, fontSize: 14, fontWeight: '700' }}>{profile?.nom || ''}</Text>
-                    <TouchableOpacity onPress={() => router.push('/(tabs)/edit-profile')} style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' }}>
+                    <TouchableOpacity onPress={() => router.push('/edit-profile')} style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' }}>
                       <Ionicons name="pencil" size={14} color={colors.textSecondary} />
                     </TouchableOpacity>
                   </View>

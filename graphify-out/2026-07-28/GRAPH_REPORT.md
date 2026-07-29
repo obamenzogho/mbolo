@@ -1,11 +1,11 @@
 # Graph Report - mbolo  (2026-07-28)
 
 ## Corpus Check
-- 342 files · ~594,837 words
+- 342 files · ~594,839 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 4033 nodes · 5069 edges · 2004 communities (103 shown, 1901 thin omitted)
+- 4032 nodes · 5069 edges · 2003 communities (103 shown, 1900 thin omitted)
 - Extraction: 82% EXTRACTED · 18% INFERRED · 0% AMBIGUOUS · INFERRED: 908 edges (avg confidence: 0.83)
 - Token cost: 0 input · 0 output
 
@@ -1976,7 +1976,6 @@
 - [[_COMMUNITY_cleanupTemp|cleanupTemp]]
 - [[_COMMUNITY_cmd|cmd]]
 - [[_COMMUNITY_cmd|cmd]]
-- [[_COMMUNITY_cmd|cmd]]
 - [[_COMMUNITY_compressVideo|compressVideo]]
 - [[_COMMUNITY_..configdevMode|../config/devMode]]
 - [[_COMMUNITY_convertToMp4|convertToMp4]]
@@ -2045,7 +2044,7 @@
 ## Import Cycles
 - 2-file cycle: `src/lib/firebase.ts -> src/lib/sentry.ts -> src/lib/firebase.ts`
 
-## Communities (2004 total, 1901 thin omitted)
+## Communities (2003 total, 1900 thin omitted)
 
 ### Community 1 - "app/(auth)/_layout.tsx"
 Cohesion: 0.13
@@ -2077,7 +2076,7 @@ Nodes (31): addCrossReferences(), createGraphBuilder(), crypto, explain(), extra
 
 ### Community 8 - "app/(tabs)/feed.tsx"
 Cohesion: 0.14
-Nodes (21): PostScreen(), SUGGESTED_HASHTAGS, Visibility, { height: SCREEN_HEIGHT }, ReelUploadScreen(), Upload(), Step, SUGGESTED_HASHTAGS (+13 more)
+Nodes (20): PostScreen(), SUGGESTED_HASHTAGS, Visibility, { height: SCREEN_HEIGHT }, ReelUploadScreen(), Step, SUGGESTED_HASHTAGS, VideoEditorScreen() (+12 more)
 
 ### Community 9 - "app/(tabs)/highlight/[highlightId].tsx"
 Cohesion: 0.05
@@ -2264,8 +2263,8 @@ Cohesion: 0.16
 Nodes (15): Feature: Comments & Sharing, Role: Comments & Sharing, generateMatrix(), isReserved(), QRCodeView(), QRCodeViewProps, src/components/QRCodeView.tsx, src/components/ShareModal.tsx (+7 more)
 
 ### Community 60 - "DataSaverContext.tsx"
-Cohesion: 0.23
-Nodes (7): Props, TaggableUser, TagPeopleSelector(), StorageProvider, uploadLocal(), UploadResult, uploadVideo()
+Cohesion: 0.21
+Nodes (8): Upload(), Props, TaggableUser, TagPeopleSelector(), StorageProvider, uploadLocal(), UploadResult, uploadVideo()
 
 ### Community 61 - "ErrorBoundary.tsx"
 Cohesion: 0.23
@@ -2457,9 +2456,9 @@ Cohesion: 0.33
 Nodes (6): Firestore: messages, Firestore: notifications, Firestore: stories, Firestore: usernames, Firestore: users, Firestore: videos
 
 ## Knowledge Gaps
-- **2617 isolated node(s):** `@opencode-ai/plugin`, `name`, `slug`, `version`, `orientation` (+2612 more)
+- **2616 isolated node(s):** `@opencode-ai/plugin`, `name`, `slug`, `version`, `orientation` (+2611 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **1901 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **1900 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
@@ -2475,6 +2474,6 @@ _Questions this graph is uniquely positioned to answer:_
 - **Are the 113 inferred relationships involving `Role: Miscellaneous` (e.g. with `AGENTS.md` and `discover.tsx`) actually correct?**
   _`Role: Miscellaneous` has 113 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `@opencode-ai/plugin`, `name`, `slug` to the rest of the system?**
-  _2617 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _2616 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `app/(auth)/_layout.tsx` be split into smaller, more focused modules?**
   _Cohesion score 0.12666666666666668 - nodes in this community are weakly interconnected._

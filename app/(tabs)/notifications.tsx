@@ -44,7 +44,7 @@ const handleNotifPress = (item: NotificationType) => {
       router.push({ pathname: '/user/[userId]', params: { userId: item.fromUserId } })
       break
     case 'follow_request':
-      router.push('/(tabs)/notifications/follow-requests')
+      router.push('/follow-requests')
       break
     case 'like':
     case 'comment':

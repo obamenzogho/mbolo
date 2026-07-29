@@ -6,7 +6,7 @@ import OrbitLoader from '@/components/OrbitLoader'
 
 export default function Discover() {
   useEffect(() => {
-    router.replace('/(tabs)/explore')
+    router.replace('/explore')
   }, [])
 
   return (

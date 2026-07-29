@@ -169,14 +169,14 @@ export default function Messages() {
     if (!userId) return
     const conv = await getOrCreateConversation(userId, otherUserId)
     router.push({
-      pathname: '/(tabs)/messages/conversation/[id]',
+      pathname: '/conversation/[id]',
       params: { id: conv.id },
     })
   }, [userId])
 
   const handleOpenConversation = useCallback((conversationId: string) => {
     router.push({
-      pathname: '/(tabs)/messages/conversation/[id]',
+      pathname: '/conversation/[id]',
       params: { id: conversationId },
     })
   }, [])

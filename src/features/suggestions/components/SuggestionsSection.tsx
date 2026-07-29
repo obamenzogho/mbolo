@@ -5,6 +5,7 @@ import {
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '@/lib/theme'
 import { SuggestedUserCard } from './SuggestedUserCard'
+import { ShimmerBlock } from '@/features/news/components/Skeletons'
 import type { FollowSuggestion } from '../types'
 
 interface SuggestionsSectionProps {
@@ -46,23 +47,47 @@ function SuggestionsSectionInner({
       </View>
 
       {loading && suggestions.length === 0 ? (
-        <View style={styles.skeletonContainer}>
-          {Array.from({ length: compact ? 3 : 2 }).map((_, i) => (
-            <View
-              key={i}
-              style={[
-                compact ? styles.skeletonCompact : styles.skeletonCard,
-                { opacity: 1 - i * 0.15 },
-              ]}
-            >
-              <View style={[styles.skeletonAvatar, compact && { width: 48, height: 48, borderRadius: 24 }]} />
-              <View style={{ gap: 4, flex: 1 }}>
-                <View style={[styles.skeletonLine, { width: '60%' }]} />
-                <View style={[styles.skeletonLine, { width: '40%' }]} />
+        carousel ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.carouselScroll}
+          >
+            {Array.from({ length: 2 }).map((_, i) => (
+              <View key={i} style={styles.skeletonCarousel}>
+                <ShimmerBlock style={{ width: 64, height: 64, borderRadius: 32 }} />
+                <ShimmerBlock style={{ width: 90, height: 12, borderRadius: 6 }} />
+                <ShimmerBlock style={{ width: 60, height: 10, borderRadius: 5 }} />
               </View>
-            </View>
-          ))}
-        </View>
+            ))}
+          </ScrollView>
+        ) : compact ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.compactScroll}
+          >
+            {Array.from({ length: 3 }).map((_, i) => (
+              <View key={i} style={styles.skeletonCompact}>
+                <ShimmerBlock style={{ width: 48, height: 48, borderRadius: 24 }} />
+                <ShimmerBlock style={{ width: 80, height: 10, borderRadius: 5 }} />
+                <ShimmerBlock style={{ width: 60, height: 10, borderRadius: 5 }} />
+              </View>
+            ))}
+          </ScrollView>
+        ) : (
+          <View style={styles.skeletonContainer}>
+            {Array.from({ length: 2 }).map((_, i) => (
+              <View key={i} style={styles.skeletonCard}>
+                <ShimmerBlock style={styles.skeletonAvatar} />
+                <View style={{ gap: 4, flex: 1 }}>
+                  <ShimmerBlock style={{ width: '60%', height: 10, borderRadius: 5 }} />
+                  <ShimmerBlock style={{ width: '40%', height: 10, borderRadius: 5 }} />
+                </View>
+              </View>
+            ))}
+          </View>
+        )
       ) : carousel ? (
         <ScrollView
           horizontal
@@ -182,16 +207,20 @@ const styles = StyleSheet.create({
     marginRight: 10,
     gap: 8,
   },
+  skeletonCarousel: {
+    width: 152,
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: 14,
+    paddingVertical: 20,
+    paddingHorizontal: 12,
+    marginRight: 12,
+    gap: 10,
+  },
   skeletonAvatar: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.surfaceElevated,
-  },
-  skeletonLine: {
-    height: 10,
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: 4,
   },
   errorContainer: {
     flexDirection: 'row',
