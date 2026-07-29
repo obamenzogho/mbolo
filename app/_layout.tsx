@@ -37,7 +37,7 @@ const handleNotificationNavigation = (router: ReturnType<typeof useRouter>, type
   switch (type) {
     case 'follow':
     case 'follow_request':
-      if (data.userId) router.push({ pathname: '/user/[userId]', params: { userId: data.userId } })
+      if (data.userId) router.push({ pathname: '/(tabs)/(sub)/user/[userId]', params: { userId: data.userId } })
       break
     case 'like':
     case 'comment':

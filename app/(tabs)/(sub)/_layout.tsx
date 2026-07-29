@@ -19,6 +19,7 @@ export default function SubStackLayout() {
       <Stack.Screen name="edit-profile" options={slideRight} />
       <Stack.Screen name="discover" options={slideRight} />
       <Stack.Screen name="explore" options={slideRightEdgeOnly} />
+      <Stack.Screen name="user/[userId]" options={slideRight} />
       <Stack.Screen name="messages/conversation/[id]" options={slideRight} />
       <Stack.Screen name="notifications/follow-requests" options={slideRight} />
     </Stack>

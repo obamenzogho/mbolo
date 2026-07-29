@@ -41,7 +41,7 @@ const handleNotifPress = (item: NotificationType) => {
   switch (item.type) {
     case 'follow':
     case 'follow_accept':
-      router.push({ pathname: '/user/[userId]', params: { userId: item.fromUserId } })
+      router.push({ pathname: '/(tabs)/(sub)/user/[userId]', params: { userId: item.fromUserId } })
       break
     case 'follow_request':
       router.push('/follow-requests')
@@ -212,7 +212,7 @@ export default function Notifications() {
               actorName={actor.name}
               actorAvatar={actor.avatar}
               videoThumb={vidId ? videoThumbs[vidId] : undefined}
-              onPressActor={() => router.push({ pathname: '/user/[userId]', params: { userId: item.fromUserId } })}
+              onPressActor={() => router.push({ pathname: '/(tabs)/(sub)/user/[userId]', params: { userId: item.fromUserId } })}
               onPress={() => handleNotifPress(item)}
             />
           )

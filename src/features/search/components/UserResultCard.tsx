@@ -17,7 +17,7 @@ interface UserResultCardProps {
 export const UserResultCard = memo(function UserResultCard({ user, onPress, term }: UserResultCardProps) {
   return (
     <TouchableOpacity
-      onPress={() => { onPress?.(); router.push({ pathname: '/user/[userId]', params: { userId: user.id } }) }}
+      onPress={() => { onPress?.(); router.push({ pathname: '/(tabs)/(sub)/user/[userId]', params: { userId: user.id } }) }}
       style={styles.card}
       activeOpacity={0.7}
     >

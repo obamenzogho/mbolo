@@ -452,7 +452,7 @@ export default function UserProfile() {
                     onPress={() => {
                       if (!isMe) {
                         closeFollowModal()
-                        setTimeout(() => router.push({ pathname: '/user/[userId]', params: { userId: item.id } }), 300)
+                        setTimeout(() => router.push({ pathname: '/(tabs)/(sub)/user/[userId]', params: { userId: item.id } }), 300)
                       }
                     }}
                     style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 12 }}
@@ -494,7 +494,7 @@ export default function UserProfile() {
                     onPress={() => {
                       if (!isMe) {
                         closeFollowModal()
-                        setTimeout(() => router.push({ pathname: '/user/[userId]', params: { userId: item.id } }), 300)
+                        setTimeout(() => router.push({ pathname: '/(tabs)/(sub)/user/[userId]', params: { userId: item.id } }), 300)
                       }
                     }}
                     style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 12 }}
