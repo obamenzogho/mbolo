@@ -133,7 +133,7 @@ export default function UserProfile() {
     const isSpam = isFollowing && !isFriend
     const conv = await getOrCreateConversation(auth.currentUser.uid, userId, isSpam)
     router.push({
-      pathname: '/conversation/[id]',
+      pathname: '/messages/conversation/[id]',
       params: { id: conv.id },
     })
   }, [userId, isFollowing, isFriend])
