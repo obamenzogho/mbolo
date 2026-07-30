@@ -14,8 +14,10 @@ import type {
 
 export function useNewsFeedData({
   store,
+  enabled = true,
 }: {
   store: StoreApi<NewsFeedState>
+  enabled?: boolean
 }) {
   const firstFetchStarted = useRef(false)
   const mountedRef = useRef(true)
@@ -130,13 +132,13 @@ export function useNewsFeedData({
   )
 
   useEffect(() => {
-    if (firstFetchStarted.current) {
+    if (!enabled || firstFetchStarted.current) {
       return
     }
 
     firstFetchStarted.current = true
     void fetchPosts()
-  }, [fetchPosts])
+  }, [enabled, fetchPosts])
 
   const loadMore = useCallback(() => {
     if (loading || loadingMore || !hasMore) {

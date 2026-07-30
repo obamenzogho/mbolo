@@ -1,14 +1,14 @@
-/* FeedTabsHeader — header flottant "[Ville] / Pour toi / Suivi".
-   Rôle : affiche les trois onglets avec indicateur animé synchronisé au geste
-   via scrollPosition (0 → ville, 1 → pour toi, 2 → suivi). Le 1er onglet porte
-   comme libellé la ville actuelle de l'utilisateur (ou « À proximité » tant que
-   la localisation n'est pas connue). Positionné en absolute top, centré. */
+/* FeedTabsHeader — header flottant "Ville / Pour toi / Suivi / Actus".
+   Rôle : affiche les 4 onglets avec indicateur animé synchronisé au geste
+   via scrollPosition. Le 1er onglet porte comme libellé la ville actuelle.
+   Positionné en absolute top, centré. */
 
 import { useMemo, useState, useCallback } from 'react'
 import {
   Animated,
   TouchableOpacity,
   View,
+  StyleSheet,
   type LayoutChangeEvent,
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -17,9 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useCreateModal } from '../../../contexts/CreateModalContext'
 import { router } from 'expo-router'
 
-const TAB_GAP = 20
-
-type TabIndex = 0 | 1 | 2
+type TabIndex = 0 | 1 | 2 | 3
 
 interface FeedTabsHeaderProps {
   scrollPosition: Animated.Value
@@ -29,47 +27,65 @@ interface FeedTabsHeaderProps {
   onRequestLocation: () => void
 }
 
+const TAB_COUNT = 4
+const TAB_GAP = 24
+
+const labels = ['Ville', 'Pour toi', 'Suivi', 'Actus'] as const
+
 export default function FeedTabsHeader({
   scrollPosition, onTabPress, cityLabel, locationGranted, onRequestLocation,
 }: FeedTabsHeaderProps) {
   const insets = useSafeAreaInsets()
   const { openCreateModal } = useCreateModal()
 
-  // Layout (x + largeur) de chaque libellé, mesuré à la volée.
-  const [widths, setWidths] = useState<[number, number, number]>([0, 0, 0])
-  const [positions, setPositions] = useState<[number, number, number]>([0, 0, 0])
+  const [tabLayouts, setTabLayouts] = useState(
+    Array.from({ length: TAB_COUNT }, () => ({ x: 0, width: 0 })),
+  )
 
-  const onLayoutFor = useCallback((i: TabIndex) => (e: LayoutChangeEvent) => {
-    const { x, width } = e.nativeEvent.layout
-    setWidths((prev) => { const n = [...prev] as [number, number, number]; n[i] = width; return n })
-    setPositions((prev) => { const n = [...prev] as [number, number, number]; n[i] = x; return n })
-  }, [])
+  const handleTabLayout = useCallback(
+    (index: number) => (event: LayoutChangeEvent) => {
+      const { x, width } = event.nativeEvent.layout
+      setTabLayouts((previous) => {
+        const next = [...previous]
+        next[index] = { x, width }
+        return next
+      })
+    },
+    [],
+  )
 
   const indicatorX = useMemo(
     () => scrollPosition.interpolate({
-      inputRange: [0, 1, 2],
-      outputRange: [positions[0], positions[1], positions[2]],
+      inputRange: [0, 1, 2, 3],
+      outputRange: tabLayouts.map((tab) => tab.x),
+      extrapolate: 'clamp',
     }),
-    [scrollPosition, positions],
+    [scrollPosition, tabLayouts],
   )
 
   const indicatorWidth = useMemo(
     () => scrollPosition.interpolate({
-      inputRange: [0, 1, 2],
-      outputRange: [widths[0] || 40, widths[1] || 40, widths[2] || 40],
+      inputRange: [0, 1, 2, 3],
+      outputRange: tabLayouts.map((tab) => tab.width || 40),
+      extrapolate: 'clamp',
     }),
-    [scrollPosition, widths],
+    [scrollPosition, tabLayouts],
   )
 
-  // Opacité de chaque onglet : plein quand sélectionné, atténué sinon.
-  const opacityFor = useCallback((i: TabIndex) => scrollPosition.interpolate({
-    inputRange: [0, 1, 2],
-    outputRange: [i === 0 ? 1 : 0.5, i === 1 ? 1 : 0.5, i === 2 ? 1 : 0.5],
-  }), [scrollPosition])
+  const opacityFor = useCallback(
+    (index: number) => scrollPosition.interpolate({
+      inputRange: [
+        Math.max(0, index - 1),
+        index,
+        Math.min(TAB_COUNT - 1, index + 1),
+      ],
+      outputRange: [0.5, 1, 0.5],
+      extrapolate: 'clamp',
+    }),
+    [scrollPosition],
+  )
 
   const handleCityPress = useCallback(() => {
-    // Si la localisation n'est pas encore accordée, on la (re)demande ;
-    // sinon on bascule simplement sur l'onglet ville.
     if (!locationGranted) onRequestLocation()
     onTabPress(0)
   }, [locationGranted, onRequestLocation, onTabPress])
@@ -89,61 +105,43 @@ export default function FeedTabsHeader({
         }}
         pointerEvents="box-none"
       >
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'flex-start',
-            alignItems: 'center',
-            gap: TAB_GAP,
-            paddingLeft: 16,
-            // Réserve la zone des icônes recherche/créer (à droite) pour que les
-            // onglets ne passent jamais dessous.
-            paddingRight: 104,
-          }}
-        >
-          {/* Onglet ville */}
-          <TouchableOpacity onLayout={onLayoutFor(0)} onPress={handleCityPress} activeOpacity={0.7}>
-            <Animated.View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, opacity: opacityFor(0) }}>
-              <Ionicons name="location-sharp" size={13} color="#fff" />
-              <Animated.Text
-                numberOfLines={1}
-                style={{ color: '#fff', fontSize: 15, fontWeight: '700', letterSpacing: 0.3, maxWidth: 100 }}
+        <View style={styles.tabsRow}>
+          {labels.map((label, index) => {
+            const visibleLabel = index === 0 && cityLabel ? cityLabel : label
+            const onPress = index === 0 ? handleCityPress : () => onTabPress(index as TabIndex)
+
+            return (
+              <TouchableOpacity
+                key={label}
+                onLayout={handleTabLayout(index)}
+                onPress={onPress}
+                activeOpacity={0.7}
+                style={styles.tabButton}
               >
-                {cityLabel}
-              </Animated.Text>
-            </Animated.View>
-          </TouchableOpacity>
+                <Animated.Text
+                  numberOfLines={1}
+                  style={[
+                    styles.tabLabel,
+                    { opacity: opacityFor(index) },
+                  ]}
+                >
+                  {visibleLabel}
+                </Animated.Text>
+              </TouchableOpacity>
+            )
+          })}
 
-          {/* Onglet Pour toi */}
-          <TouchableOpacity onLayout={onLayoutFor(1)} onPress={() => onTabPress(1)} activeOpacity={0.7}>
-            <Animated.Text
-              style={{ color: '#fff', fontSize: 15, fontWeight: '700', letterSpacing: 0.3, opacity: opacityFor(1) }}
-            >
-              Pour toi
-            </Animated.Text>
-          </TouchableOpacity>
-
-          {/* Onglet Suivi */}
-          <TouchableOpacity onLayout={onLayoutFor(2)} onPress={() => onTabPress(2)} activeOpacity={0.7}>
-            <Animated.Text
-              style={{ color: '#fff', fontSize: 15, fontWeight: '700', letterSpacing: 0.3, opacity: opacityFor(2) }}
-            >
-              Suivi
-            </Animated.Text>
-          </TouchableOpacity>
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.indicator,
+              {
+                width: indicatorWidth,
+                transform: [{ translateX: indicatorX }],
+              },
+            ]}
+          />
         </View>
-        <Animated.View
-          style={{
-            position: 'absolute',
-            left: 0,
-            bottom: 0,
-            height: 2,
-            borderRadius: 2,
-            backgroundColor: '#00C853',
-            width: indicatorWidth,
-            transform: [{ translateX: indicatorX }],
-          }}
-        />
       </LinearGradient>
 
       <TouchableOpacity
@@ -186,3 +184,34 @@ export default function FeedTabsHeader({
     </>
   )
 }
+
+const styles = StyleSheet.create({
+  tabsRow: {
+    position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: TAB_GAP,
+    paddingLeft: 16,
+    paddingRight: 86,
+    paddingBottom: 8,
+  },
+  tabButton: {
+    paddingHorizontal: 2,
+    paddingVertical: 5,
+    maxWidth: 92,
+  },
+  tabLabel: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  indicator: {
+    position: 'absolute',
+    left: 0,
+    bottom: 0,
+    height: 2,
+    borderRadius: 2,
+    backgroundColor: '#00C853',
+  },
+})
