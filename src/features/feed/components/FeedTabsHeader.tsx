@@ -35,7 +35,7 @@ interface FeedTabsHeaderProps {
   headerTranslateY?: Animated.Value
 }
 
-const labels = ['Ville', 'Pour toi', 'Suivi', 'Actus'] as const
+const labels = ['Ville', 'Pour toi', 'Actus', 'Suivi'] as const
 const TAB_COUNT = labels.length
 
 export default function FeedTabsHeader({

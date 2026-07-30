@@ -118,7 +118,7 @@ export default function FeedTabsScreen({
 
   const handleNewsScrollDirection = useCallback(
     (direction: 'up' | 'down') => {
-      if (activeTab !== 3) return
+      if (activeTab !== 2) return
 
       Animated.timing(headerTranslateY, {
         toValue: direction === 'up' ? -120 : 0,
@@ -130,7 +130,7 @@ export default function FeedTabsScreen({
   )
 
   useEffect(() => {
-    if (activeTab !== 3) {
+    if (activeTab !== 2) {
       headerTranslateY.stopAnimation()
       headerTranslateY.setValue(0)
     }
@@ -139,8 +139,8 @@ export default function FeedTabsScreen({
   const stable = isTabFocused && !isSwiping
 
   const forYouActive = stable && activeTab === 1
-  const followingActive = stable && activeTab === 2
-  const newsActive = stable && activeTab === 3
+  const newsActive = stable && activeTab === 2
+  const followingActive = stable && activeTab === 3
 
   return (
     <View style={styles.container}>
@@ -162,17 +162,17 @@ export default function FeedTabsScreen({
           />
         </View>
 
-        <View key="following" style={styles.page}>
-          <FeedScreen
-            feedType="following"
-            isActive={followingActive}
-          />
-        </View>
-
         <View key="news" style={styles.page}>
           <NewsFeedScreen
             isActive={newsActive}
             onScrollDirection={handleNewsScrollDirection}
+          />
+        </View>
+
+        <View key="following" style={styles.page}>
+          <FeedScreen
+            feedType="following"
+            isActive={followingActive}
           />
         </View>
       </FeedPager>
@@ -183,7 +183,7 @@ export default function FeedTabsScreen({
         cityLabel={cityLabel}
         locationGranted={locationGranted}
         onRequestLocation={request}
-        isNewsActive={activeTab === 3}
+        isNewsActive={activeTab === 2}
         headerTranslateY={headerTranslateY}
       />
     </View>
