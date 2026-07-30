@@ -29,10 +29,13 @@ import { StoryCardSkeleton, PostCardSkeleton } from '@/features/news/components/
 import { useStories } from '@/hooks/useStories'
 import type { NewsPost } from '@/features/news/types'
 import PageWrapper from '@/components/PageWrapper'
+import CreateButton from '@/components/create/CreateButton'
+import { useCreateModal } from '@/contexts/CreateModalContext'
 
 export default function ActusScreen() {
   const uid = auth.currentUser?.uid ?? ''
   const { markAsViewed } = useStories()
+  const { openCreateModal } = useCreateModal()
 
   const {
     refresh: refreshFeed,
@@ -183,13 +186,7 @@ const handleLoadMore = useCallback(() => {
       <View style={styles.topBar}>
         <Text style={styles.title}>Actus</Text>
         <View style={{ flexDirection: 'row', gap: 8 }}>
-          <Pressable
-            onPress={() => router.push('/news-compose')}
-            hitSlop={8}
-            style={styles.iconBtn}
-          >
-            <Ionicons name="add-circle" size={24} color={colors.primary} />
-         </Pressable>
+          <CreateButton onPress={openCreateModal} size={38} />
           <Pressable onPress={() => router.push({ pathname: '/explore', params: { from: '/(tabs)/stories' } })} style={styles.iconBtn}>
             <Ionicons name="search" size={22} color="#fff" />
          </Pressable>

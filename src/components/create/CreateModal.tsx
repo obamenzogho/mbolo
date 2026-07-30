@@ -14,22 +14,12 @@ interface CreateModalProps {
 }
 
 const OPTIONS = [
-  {
-    icon: 'newspaper-outline',
-    label: 'Publication',
-    route: '/news-compose',
-  },
-  {
-    icon: 'videocam-outline',
-    label: 'Vidéo',
-    route: '/(tabs)/camera',
-  },
-  {
-    icon: 'time-outline',
-    label: 'Story',
-    route: '/story-upload',
-  },
-]
+  { icon: 'create-outline', label: 'Publication', route: '/news-compose' },
+  { icon: 'camera-outline', label: 'Vidéo', route: '/(tabs)/(sub)/camera' },
+  { icon: 'images-outline', label: 'Photo ou vidéo', route: '/(tabs)/(sub)/upload' },
+  { icon: 'time-outline', label: 'Story', route: '/(tabs)/(sub)/story-upload' },
+  { icon: 'document-text-outline', label: 'Brouillons', route: '/(tabs)/drafts' },
+] as const
 
 function CreateModalComponent({ onClose }: CreateModalProps) {
   const sheetRef = useRef<BottomSheet>(null)

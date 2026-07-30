@@ -350,6 +350,8 @@ export default function NewsComposeScreen() {
         shares: 0,
         saves: 0,
         savedBy: [],
+        reposts: 0,
+        repostedBy: [],
         moderationStatus: 'visible',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
