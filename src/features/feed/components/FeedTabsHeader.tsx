@@ -18,8 +18,8 @@ import {
   View,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useCreateModal } from '../../../contexts/CreateModalContext'
 import CreateButton from '../../../components/create/CreateButton'
 
@@ -47,20 +47,30 @@ export default function FeedTabsHeader({
   const { openCreateModal } = useCreateModal()
   const tabScrollRef = useRef<ScrollView>(null)
 
-  const [tabLayouts, setTabLayouts] = useState(
-    Array.from(
-      { length: TAB_COUNT },
-      () => ({ x: 0, width: 0 }),
-    ),
+  const [tabX, setTabX] = useState(
+    Array.from({ length: TAB_COUNT }, () => 0),
+  )
+
+  const [textWidth, setTextWidth] = useState(
+    Array.from({ length: TAB_COUNT }, () => 0),
   )
 
   const handleTabLayout = useCallback(
     (index: number) => (event: LayoutChangeEvent) => {
-      const { x, width } = event.nativeEvent.layout
-
-      setTabLayouts((previous) => {
+      setTabX((previous) => {
         const next = [...previous]
-        next[index] = { x, width }
+        next[index] = event.nativeEvent.layout.x
+        return next
+      })
+    },
+    [],
+  )
+
+  const handleTextLayout = useCallback(
+    (index: number) => (event: LayoutChangeEvent) => {
+      setTextWidth((previous) => {
+        const next = [...previous]
+        next[index] = event.nativeEvent.layout.width
         return next
       })
     },
@@ -71,22 +81,22 @@ export default function FeedTabsHeader({
     () =>
       scrollPosition.interpolate({
         inputRange: [0, 1, 2, 3],
-        outputRange: tabLayouts.map((tab) => tab.x),
+        outputRange: tabX.map(
+          (bx, i) => bx + (textWidth[i] > 0 ? 2 : 0),
+        ),
         extrapolate: 'clamp',
       }),
-    [scrollPosition, tabLayouts],
+    [scrollPosition, tabX, textWidth],
   )
 
   const indicatorWidth = useMemo(
     () =>
       scrollPosition.interpolate({
         inputRange: [0, 1, 2, 3],
-        outputRange: tabLayouts.map(
-          (tab) => tab.width || 40,
-        ),
+        outputRange: textWidth,
         extrapolate: 'clamp',
       }),
-    [scrollPosition, tabLayouts],
+    [scrollPosition, textWidth],
   )
 
   const opacityFor = useCallback(
@@ -106,12 +116,12 @@ export default function FeedTabsHeader({
   useEffect(() => {
     const listenerId = scrollPosition.addListener(({ value }) => {
       const activeIndex = Math.round(value)
-      const active = tabLayouts[activeIndex]
+      const active = tabX[activeIndex]
 
-      if (!active) return
+      if (active == null) return
 
       tabScrollRef.current?.scrollTo({
-        x: Math.max(0, active.x - 80),
+        x: Math.max(0, active - 80),
         animated: true,
       })
     })
@@ -119,7 +129,7 @@ export default function FeedTabsHeader({
     return () => {
       scrollPosition.removeListener(listenerId)
     }
-  }, [scrollPosition, tabLayouts])
+  }, [scrollPosition, tabX])
 
   const handleCityPress = useCallback(() => {
     if (!locationGranted) {
@@ -168,6 +178,7 @@ export default function FeedTabsHeader({
               >
                 <Animated.Text
                   numberOfLines={1}
+                  onLayout={handleTextLayout(index)}
                   style={[
                     styles.tabLabel,
                     { opacity: opacityFor(index) },
@@ -241,8 +252,6 @@ const styles = StyleSheet.create({
     gap: 24,
   },
   tabButton: {
-    minWidth: 54,
-    maxWidth: 120,
     paddingHorizontal: 2,
     paddingVertical: 6,
   },
