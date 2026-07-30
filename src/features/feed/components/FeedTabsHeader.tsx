@@ -117,6 +117,7 @@ export default function FeedTabsHeader({
                 onPress={onPress}
                 activeOpacity={0.7}
                 style={styles.tabButton}
+                accessibilityRole="tab"
               >
                 <Animated.Text
                   numberOfLines={1}

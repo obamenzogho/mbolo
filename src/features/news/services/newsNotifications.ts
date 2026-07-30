@@ -1,24 +1,29 @@
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
-import { db, auth } from '@/lib/firebase'
+import { auth, db } from '@/lib/firebase'
 import { captureException } from '@/lib/sentry'
 
-type NewsNotificationType = 'post_like' | 'post_comment'
+export type NewsNotificationType =
+  | 'post_like'
+  | 'post_comment'
+  | 'post_repost'
 
 export async function notifyPostOwner(params: {
   postOwnerId: string
   postId: string
   type: NewsNotificationType
   text?: string
-}) {
+}): Promise<void> {
   const uid = auth.currentUser?.uid
-  if (!uid || uid === params.postOwnerId) return
+
+  if (!uid || !params.postOwnerId || !params.postId) return
+  if (uid === params.postOwnerId) return
 
   try {
     await addDoc(collection(db, 'notifications'), {
       userId: params.postOwnerId,
-      type: params.type,
       fromUserId: uid,
       postId: params.postId,
+      type: params.type,
       text: params.text ?? '',
       read: false,
       createdAt: serverTimestamp(),
@@ -26,7 +31,11 @@ export async function notifyPostOwner(params: {
   } catch (error) {
     captureException(
       error instanceof Error ? error : new Error(String(error)),
-      { context: 'newsNotifications.notifyPostOwner', postId: params.postId },
+      {
+        context: 'news.notifyPostOwner',
+        type: params.type,
+        postId: params.postId,
+      },
     )
   }
 }

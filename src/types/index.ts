@@ -130,7 +130,7 @@ export interface Message {
 export interface Notification {
   id: string
   userId: string
-  type: 'like' | 'comment' | 'follow' | 'follow_request' | 'follow_accept' | 'message' | 'reply' | 'repost' | 'share' | 'tag' | 'mention' | 'post_like' | 'post_comment'
+  type: 'like' | 'comment' | 'follow' | 'follow_request' | 'follow_accept' | 'message' | 'reply' | 'repost' | 'share' | 'tag' | 'mention' | 'post_like' | 'post_comment' | 'post_repost'
   fromUserId: string
   postId?: string
   videoId?: string

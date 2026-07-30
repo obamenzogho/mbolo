@@ -25,6 +25,7 @@ const NOTIF_CATEGORY: Record<NotificationType['type'], keyof ReturnType<typeof u
   post_like: 'likes',
   comment: 'comments',
   post_comment: 'comments',
+  post_repost: 'reposts',
   reply: 'comments',
   follow: 'follows',
   follow_request: 'follows',

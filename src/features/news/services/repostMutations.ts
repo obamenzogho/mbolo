@@ -2,12 +2,12 @@ import {
   arrayRemove,
   arrayUnion,
   doc,
-  increment,
   runTransaction,
   serverTimestamp,
 } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
 import { captureException } from '@/lib/sentry'
+import { notifyPostOwner } from './newsNotifications'
 
 export interface RepostResult {
   reposted: boolean
@@ -25,11 +25,9 @@ export async function toggleRepost(
   const repostRef = doc(db, 'reposts', `${postId}_${user.uid}`)
 
   try {
-    return await runTransaction(db, async (transaction) => {
-      const [postSnapshot, repostSnapshot] = await Promise.all([
-        transaction.get(postRef),
-        transaction.get(repostRef),
-      ])
+    const result = await runTransaction(db, async (transaction) => {
+      const postSnapshot = await transaction.get(postRef)
+      const repostSnapshot = await transaction.get(repostRef)
 
       if (!postSnapshot.exists()) {
         throw new Error(`Post introuvable: ${postId}`)
@@ -38,37 +36,58 @@ export async function toggleRepost(
       const postData = postSnapshot.data()
       const alreadyReposted = repostSnapshot.exists()
       const currentReposts = Number(postData.reposts ?? 0)
+      const postOwnerId = String(postData.userId ?? '')
 
       if (alreadyReposted) {
+        const nextCount = Math.max(0, currentReposts - 1)
+
         transaction.delete(repostRef)
         transaction.update(postRef, {
-          reposts: Math.max(0, currentReposts - 1),
+          reposts: nextCount,
           repostedBy: arrayRemove(user.uid),
         })
 
         return {
           reposted: false,
-          reposts: Math.max(0, currentReposts - 1),
+          reposts: nextCount,
+          postOwnerId,
         }
       }
+
+      const nextCount = currentReposts + 1
 
       transaction.set(repostRef, {
         postId,
         userId: user.uid,
-        postOwnerId: postData.userId ?? '',
+        postOwnerId,
         createdAt: serverTimestamp(),
       })
 
       transaction.update(postRef, {
-        reposts: currentReposts + 1,
+        reposts: nextCount,
         repostedBy: arrayUnion(user.uid),
       })
 
       return {
         reposted: true,
-        reposts: currentReposts + 1,
+        reposts: nextCount,
+        postOwnerId,
       }
     })
+
+    if (result.reposted) {
+      void notifyPostOwner({
+        postOwnerId: result.postOwnerId,
+        postId,
+        type: 'post_repost',
+        text: 'a reposté votre publication',
+      })
+    }
+
+    return {
+      reposted: result.reposted,
+      reposts: result.reposts,
+    }
   } catch (error) {
     captureException(
       error instanceof Error ? error : new Error(String(error)),
