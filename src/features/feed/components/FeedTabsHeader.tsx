@@ -57,9 +57,10 @@ export default function FeedTabsHeader({
 
   const handleTabLayout = useCallback(
     (index: number) => (event: LayoutChangeEvent) => {
+      const { x } = event.nativeEvent.layout
       setTabX((previous) => {
         const next = [...previous]
-        next[index] = event.nativeEvent.layout.x
+        next[index] = x
         return next
       })
     },
@@ -68,9 +69,10 @@ export default function FeedTabsHeader({
 
   const handleTextLayout = useCallback(
     (index: number) => (event: LayoutChangeEvent) => {
+      const { width } = event.nativeEvent.layout
       setTextWidth((previous) => {
         const next = [...previous]
-        next[index] = event.nativeEvent.layout.width
+        next[index] = width
         return next
       })
     },
