@@ -15,6 +15,9 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
+    launchOptions: {
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    },
   },
   projects: [
     {
@@ -26,10 +29,10 @@ export default defineConfig({
       },
     },
   ],
-  webServer: {
+  webServer: process.env.CI ? {
     command: 'npx expo start --web --port 8081 --no-dev --minify',
     url: 'http://localhost:8081',
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
-  },
+  } : undefined,
 })

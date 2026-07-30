@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import {
-  waitForApp,
+  loginIfNeeded,
   navigateToTab,
   takeScreenshot,
 } from './helpers'
@@ -8,8 +8,16 @@ import {
 const REPOST_LABEL = /reposter la publication|retirer le repost/i
 
 async function openActus(page: Page) {
-  await page.goto('/')
-  await waitForApp(page)
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
+  await page.waitForTimeout(3000)
+
+  await loginIfNeeded(
+    page,
+    process.env.E2E_USER_EMAIL ?? '',
+    process.env.E2E_USER_PASSWORD ?? '',
+  )
+
+  await page.waitForTimeout(3000)
 
   await navigateToTab(page, 'Actus')
 
@@ -18,7 +26,7 @@ async function openActus(page: Page) {
     await actus.click()
   }
 
-  await page.waitForTimeout(3000)
+  await page.waitForTimeout(5000)
 }
 
 async function getRepostButton(page: Page) {
