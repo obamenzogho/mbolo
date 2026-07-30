@@ -214,10 +214,9 @@ service cloud.firestore {
 
     match /reposts/{repostId} {
       allow read: if isSignedIn();
-      // whoCanRepost : évalue les préférences de l'auteur de la vidéo repostée.
       allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid
-        && canInteract(videoAuthor(request.resource.data.postId), 'whoCanRepost');
+        && request.resource.data.postId is string;
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow update: if false;
     }
@@ -261,7 +260,8 @@ service cloud.firestore {
           request.resource.data.userId == resource.data.userId
         ) ||
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'likes', 'likedBy', 'comments', 'shares', 'saves', 'savedBy', 'reactionCounts'
+          'likes', 'likedBy', 'comments', 'shares', 'saves', 'savedBy', 'reactionCounts',
+          'reposts', 'repostedBy'
         ])
       );
 

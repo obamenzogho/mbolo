@@ -115,6 +115,8 @@ export interface NewsPost {
   location?: NewsLocation
   mood?: NewsMood
   poll?: NewsPoll
+  reposts: number
+  repostedBy: string[]
   // ── Nouveaux champs (Phase 0) ──
   reactionCounts?: ReactionCounts
   myReaction?: PostReactionType | null

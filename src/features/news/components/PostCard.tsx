@@ -16,6 +16,7 @@ import { db } from '@/lib/firebase'
 import { captureException } from '@/lib/sentry'
 import { colors } from '@/lib/theme'
 import { getAvatarImageUrl, getFeedImageUrl } from '@/lib/cloudinary'
+import { useNewsRepost } from '../hooks/useNewsRepost'
 import RichPostText from './RichPostText'
 import ImageGalleryModal from './ImageGalleryModal'
 import PollView from './PollView'
@@ -32,6 +33,7 @@ interface PostCardProps {
   onEdit: (post: NewsPost) => void
   onDelete: (post: NewsPost) => void
   onMore: (post: NewsPost) => void
+  onRepost?: (postId: string, reposted: boolean, count: number) => void
   onPress?: (post: NewsPost) => void
 }
 
@@ -193,6 +195,7 @@ function PostCardComponent({
   onEdit,
   onDelete,
   onMore,
+  onRepost,
   onPress,
 }: PostCardProps) {
   const { myReaction, toggleReaction } = useReactions(post.id, currentUserId)
@@ -202,6 +205,25 @@ function PostCardComponent({
   const [galleryIndex, setGalleryIndex] = useState<number | null>(null)
   const [expanded, setExpanded] = useState(false)
   const [showReactionPicker, setShowReactionPicker] = useState(false)
+
+  const {
+    reposted,
+    count: repostCount,
+    loading: repostLoading,
+    toggle: togglePostRepost,
+  } = useNewsRepost(
+    post.id,
+    post.repostedBy.includes(currentUserId),
+    post.reposts,
+  )
+
+  const handleRepost = useCallback(async () => {
+    const result = await togglePostRepost()
+
+    if (result) {
+      onRepost?.(post.id, result.reposted, result.reposts)
+    }
+  }, [onRepost, post.id, togglePostRepost])
 
   const handleSave = useCallback(async () => {
     if (!currentUserId) return
@@ -360,7 +382,7 @@ function PostCardComponent({
 
       {post.poll && <PollView poll={post.poll} postId={post.id} currentUserId={currentUserId} />}
 
-      {(post.reactionCounts?.total ?? post.likes) > 0 || post.comments > 0 || post.shares > 0 ? (
+      {(post.reactionCounts?.total ?? post.likes) > 0 || post.comments > 0 || post.shares > 0 || repostCount > 0 ? (
         <View style={styles.stats}>
           <View style={styles.likeStat}>
             {/* Top 3 reaction emojis */}
@@ -385,6 +407,12 @@ function PostCardComponent({
           </View>
 
           <View style={styles.statsRight}>
+            {repostCount > 0 && (
+              <Text style={styles.statText}>
+                {repostCount} repost{repostCount > 1 ? 's' : ''}
+              </Text>
+            )}
+
             {post.comments > 0 && (
               <Text style={styles.statText}>
                 {post.comments} commentaire{post.comments > 1 ? 's' : ''}
@@ -454,6 +482,28 @@ function PostCardComponent({
             <Text style={styles.actionText}>Commenter</Text>
           </Pressable>
         )}
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={reposted ? 'Retirer le repost' : 'Reposter la publication'}
+          onPress={() => void handleRepost()}
+          disabled={repostLoading}
+          style={[styles.action, reposted && styles.actionActive]}
+        >
+          <Ionicons
+            name="repeat-outline"
+            size={21}
+            color={reposted ? colors.primary : '#B5B5B5'}
+          />
+          <Text
+            style={[
+              styles.actionText,
+              reposted && { color: colors.primary },
+            ]}
+          >
+            Reposter
+          </Text>
+        </Pressable>
 
         <Pressable
           accessibilityRole="button"

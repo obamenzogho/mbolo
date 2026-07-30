@@ -57,6 +57,8 @@ export default function PostDetailScreen() {
         shares: data.shares ?? 0,
         saves: data.saves ?? 0,
         savedBy: Array.isArray(data.savedBy) ? data.savedBy : [],
+        reposts: data.reposts ?? 0,
+        repostedBy: Array.isArray(data.repostedBy) ? data.repostedBy : [],
         createdAt: toDate(data.createdAt),
         background: data.background || undefined,
         location: data.location || undefined,

@@ -64,6 +64,8 @@ function mapDocToPost(snapshot: PostSnapshot): NewsPost {
     shares: Number(data.shares ?? 0),
     saves: Number(data.saves ?? 0),
     savedBy: Array.isArray(data.savedBy) ? data.savedBy : [],
+    reposts: Number(data.reposts ?? 0),
+    repostedBy: Array.isArray(data.repostedBy) ? data.repostedBy : [],
     createdAt,
     updatedAt:
       typeof data.updatedAt?.toDate === 'function'

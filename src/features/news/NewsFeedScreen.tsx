@@ -45,6 +45,27 @@ export default function NewsFeedScreen({
     void postId
   }, [])
 
+  const handleRepost = useCallback((
+    postId: string,
+    reposted: boolean,
+    count: number,
+  ) => {
+    const post = newsFeedStore
+      .getState()
+      .posts.find((item) => item.id === postId)
+
+    if (!post) return
+
+    const updatedRepostedBy = reposted
+      ? Array.from(new Set([...post.repostedBy, currentUserId]))
+      : post.repostedBy.filter((id) => id !== currentUserId)
+
+    newsFeedStore.getState().updatePost(postId, {
+      reposts: count,
+      repostedBy: updatedRepostedBy,
+    })
+  }, [currentUserId])
+
   const handleEdit = useCallback((post: NewsPost) => {
     void post
   }, [])
@@ -76,6 +97,7 @@ export default function NewsFeedScreen({
             currentUserId={currentUserId}
             onComment={handleComment}
             onSave={handleSave}
+            onRepost={handleRepost}
             onEdit={handleEdit}
             onDelete={handleDelete}
             onMore={handleMore}
