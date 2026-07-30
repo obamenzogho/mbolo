@@ -1,21 +1,27 @@
-/* FeedTabsHeader — header flottant "Ville / Pour toi / Suivi / Actus".
-   Rôle : affiche les 4 onglets avec indicateur animé synchronisé au geste
-   via scrollPosition. Le 1er onglet porte comme libellé la ville actuelle.
-   Positionné en absolute top, centré. */
+/* FeedTabsHeader — barre d'onglets scrollable horizontalement,
+   avec indicateur animé synchronisé au geste et auto-scroll
+   sur l'onglet actif. */
 
-import { useMemo, useState, useCallback } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import {
   Animated,
-  TouchableOpacity,
-  View,
+  LayoutChangeEvent,
+  Pressable,
+  ScrollView,
   StyleSheet,
-  type LayoutChangeEvent,
+  View,
 } from 'react-native'
-import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { useCreateModal } from '../../../contexts/CreateModalContext'
 import { router } from 'expo-router'
+import { useCreateModal } from '../../../contexts/CreateModalContext'
+import CreateButton from '../../../components/create/CreateButton'
 
 type TabIndex = 0 | 1 | 2 | 3
 
@@ -27,24 +33,31 @@ interface FeedTabsHeaderProps {
   onRequestLocation: () => void
 }
 
-const TAB_COUNT = 4
-const TAB_GAP = 24
-
 const labels = ['Ville', 'Pour toi', 'Suivi', 'Actus'] as const
+const TAB_COUNT = labels.length
 
 export default function FeedTabsHeader({
-  scrollPosition, onTabPress, cityLabel, locationGranted, onRequestLocation,
+  scrollPosition,
+  onTabPress,
+  cityLabel,
+  locationGranted,
+  onRequestLocation,
 }: FeedTabsHeaderProps) {
   const insets = useSafeAreaInsets()
   const { openCreateModal } = useCreateModal()
+  const tabScrollRef = useRef<ScrollView>(null)
 
   const [tabLayouts, setTabLayouts] = useState(
-    Array.from({ length: TAB_COUNT }, () => ({ x: 0, width: 0 })),
+    Array.from(
+      { length: TAB_COUNT },
+      () => ({ x: 0, width: 0 }),
+    ),
   )
 
   const handleTabLayout = useCallback(
     (index: number) => (event: LayoutChangeEvent) => {
       const { x, width } = event.nativeEvent.layout
+
       setTabLayouts((previous) => {
         const next = [...previous]
         next[index] = { x, width }
@@ -55,69 +68,103 @@ export default function FeedTabsHeader({
   )
 
   const indicatorX = useMemo(
-    () => scrollPosition.interpolate({
-      inputRange: [0, 1, 2, 3],
-      outputRange: tabLayouts.map((tab) => tab.x),
-      extrapolate: 'clamp',
-    }),
+    () =>
+      scrollPosition.interpolate({
+        inputRange: [0, 1, 2, 3],
+        outputRange: tabLayouts.map((tab) => tab.x),
+        extrapolate: 'clamp',
+      }),
     [scrollPosition, tabLayouts],
   )
 
   const indicatorWidth = useMemo(
-    () => scrollPosition.interpolate({
-      inputRange: [0, 1, 2, 3],
-      outputRange: tabLayouts.map((tab) => tab.width || 40),
-      extrapolate: 'clamp',
-    }),
+    () =>
+      scrollPosition.interpolate({
+        inputRange: [0, 1, 2, 3],
+        outputRange: tabLayouts.map(
+          (tab) => tab.width || 40,
+        ),
+        extrapolate: 'clamp',
+      }),
     [scrollPosition, tabLayouts],
   )
 
   const opacityFor = useCallback(
-    (index: number) => scrollPosition.interpolate({
-      inputRange: [
-        Math.max(0, index - 1),
-        index,
-        Math.min(TAB_COUNT - 1, index + 1),
-      ],
-      outputRange: [0.5, 1, 0.5],
-      extrapolate: 'clamp',
-    }),
+    (index: number) =>
+      scrollPosition.interpolate({
+        inputRange: [
+          Math.max(0, index - 1),
+          index,
+          Math.min(TAB_COUNT - 1, index + 1),
+        ],
+        outputRange: [0.5, 1, 0.5],
+        extrapolate: 'clamp',
+      }),
     [scrollPosition],
   )
 
+  useEffect(() => {
+    const listenerId = scrollPosition.addListener(({ value }) => {
+      const activeIndex = Math.round(value)
+      const active = tabLayouts[activeIndex]
+
+      if (!active) return
+
+      tabScrollRef.current?.scrollTo({
+        x: Math.max(0, active.x - 80),
+        animated: true,
+      })
+    })
+
+    return () => {
+      scrollPosition.removeListener(listenerId)
+    }
+  }, [scrollPosition, tabLayouts])
+
   const handleCityPress = useCallback(() => {
-    if (!locationGranted) onRequestLocation()
+    if (!locationGranted) {
+      onRequestLocation()
+    }
+
     onTabPress(0)
   }, [locationGranted, onRequestLocation, onTabPress])
 
   return (
-    <>
-      <LinearGradient
-        colors={['rgba(0,0,0,0.4)', 'transparent']}
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 10,
-          paddingTop: insets.top + 12,
-          paddingBottom: 8,
-        }}
-        pointerEvents="box-none"
+    <View
+      pointerEvents="box-none"
+      style={[
+        styles.header,
+        { paddingTop: insets.top + 6 },
+      ]}
+    >
+      <ScrollView
+        ref={tabScrollRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        bounces={false}
+        contentContainerStyle={styles.tabScrollContent}
+        style={styles.tabScroll}
       >
         <View style={styles.tabsRow}>
           {labels.map((label, index) => {
-            const visibleLabel = index === 0 && cityLabel ? cityLabel : label
-            const onPress = index === 0 ? handleCityPress : () => onTabPress(index as TabIndex)
+            const visibleLabel =
+              index === 0 && cityLabel
+                ? cityLabel
+                : label
+
+            const onPress =
+              index === 0
+                ? handleCityPress
+                : () => onTabPress(index as TabIndex)
 
             return (
-              <TouchableOpacity
+              <Pressable
                 key={label}
+                accessibilityRole="tab"
+                accessibilityLabel={visibleLabel}
                 onLayout={handleTabLayout(index)}
                 onPress={onPress}
-                activeOpacity={0.7}
                 style={styles.tabButton}
-                accessibilityRole="tab"
               >
                 <Animated.Text
                   numberOfLines={1}
@@ -128,7 +175,7 @@ export default function FeedTabsHeader({
                 >
                   {visibleLabel}
                 </Animated.Text>
-              </TouchableOpacity>
+              </Pressable>
             )
           })}
 
@@ -143,69 +190,66 @@ export default function FeedTabsHeader({
             ]}
           />
         </View>
-      </LinearGradient>
+      </ScrollView>
 
-      <TouchableOpacity
-        onPress={() => router.push({ pathname: '/explore', params: { from: '/(tabs)/feed' } })}
-        activeOpacity={0.7}
-        style={{
-          position: 'absolute',
-          right: 60,
-          top: insets.top + 10,
-          width: 32,
-          height: 32,
-          borderRadius: 16,
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 11,
-        }}
-      >
-        <Ionicons name="search-outline" size={24} color="#fff" />
-      </TouchableOpacity>
+      <View style={styles.actions}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Rechercher"
+          onPress={() => router.push('/explore' as never)}
+          style={styles.actionButton}
+        >
+          <Ionicons
+            name="search-outline"
+            size={22}
+            color="#fff"
+          />
+        </Pressable>
 
-      <TouchableOpacity
-        onPress={openCreateModal}
-        activeOpacity={0.7}
-        style={{
-          position: 'absolute',
-          right: 16,
-          top: insets.top + 10,
-          width: 32,
-          height: 32,
-          borderRadius: 16,
-          borderWidth: 1.5,
-          borderColor: '#00C853',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 11,
-        }}
-      >
-        <Ionicons name="add" size={22} color="#00C853" />
-      </TouchableOpacity>
-    </>
+        <CreateButton
+          onPress={openCreateModal}
+          size={38}
+        />
+      </View>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
+  header: {
+    position: 'absolute',
+    zIndex: 20,
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(8, 9, 10, 0.92)',
+  },
+  tabScroll: {
+    flex: 1,
+  },
+  tabScrollContent: {
+    paddingLeft: 16,
+    paddingRight: 8,
+  },
   tabsRow: {
     position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: TAB_GAP,
-    paddingLeft: 16,
-    paddingRight: 86,
+    gap: 24,
     paddingBottom: 8,
   },
   tabButton: {
+    minWidth: 54,
+    maxWidth: 120,
     paddingHorizontal: 2,
-    paddingVertical: 5,
-    maxWidth: 92,
+    paddingVertical: 6,
   },
   tabLabel: {
     color: '#fff',
     fontSize: 14,
     fontWeight: '700',
-    letterSpacing: 0.2,
   },
   indicator: {
     position: 'absolute',
@@ -214,5 +258,18 @@ const styles = StyleSheet.create({
     height: 2,
     borderRadius: 2,
     backgroundColor: '#00C853',
+  },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingBottom: 8,
+  },
+  actionButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 })
