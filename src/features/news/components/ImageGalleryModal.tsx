@@ -2,13 +2,13 @@ import { useState } from 'react'
 import {
   Dimensions,
   FlatList,
-  Image,
   Modal,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native'
+import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import type { NewsPostMedia } from '../types'
 
@@ -63,7 +63,8 @@ export default function ImageGalleryModal({
               <Image
                 source={{ uri: item.url }}
                 style={styles.image}
-                resizeMode="contain"
+                contentFit="contain"
+                transition={300}
               />
             </View>
           )}

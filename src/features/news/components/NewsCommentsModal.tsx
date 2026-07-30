@@ -2,7 +2,6 @@ import { useState } from 'react'
 import {
   Alert,
   FlatList,
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -12,6 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native'
+import { Image } from 'expo-image'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { auth } from '@/lib/firebase'

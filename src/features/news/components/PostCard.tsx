@@ -2,13 +2,13 @@ import { memo, useCallback, useState } from 'react'
 import {
   View,
   Text,
-  Image,
   Pressable,
   Share,
   StyleSheet,
   useWindowDimensions,
   Alert,
 } from 'react-native'
+import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
 import { doc, runTransaction, increment, arrayUnion, arrayRemove } from 'firebase/firestore'
@@ -78,7 +78,8 @@ function MediaVideoPreview({
             : undefined
         }
         style={StyleSheet.absoluteFillObject}
-        resizeMode="cover"
+        contentFit="cover"
+        transition={300}
       />
 
       <View style={styles.videoOverlay}>
@@ -126,7 +127,8 @@ if (media[0].type === 'video') {
             height: Math.min(availableWidth * 1.05, 620),
             backgroundColor: '#111',
           }}
-          resizeMode="cover"
+          contentFit="cover"
+          transition={300}
         />
       </Pressable>
     )
@@ -167,7 +169,8 @@ if (media[0].type === 'video') {
                 ),
               }}
               style={StyleSheet.absoluteFill}
-              resizeMode="cover"
+              contentFit="cover"
+              transition={300}
             />
 
             {index === 3 && remaining > 0 && (
