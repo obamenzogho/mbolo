@@ -225,6 +225,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(8, 9, 10, 0.92)',
+    paddingBottom: 8,
   },
   tabScroll: {
     flex: 1,
@@ -238,7 +239,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 24,
-    paddingBottom: 8,
   },
   tabButton: {
     minWidth: 54,
