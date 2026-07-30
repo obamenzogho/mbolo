@@ -1,6 +1,8 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import {
   FlatList,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   RefreshControl,
   StyleSheet,
   Text,
@@ -17,12 +19,16 @@ import type { NewsPost } from './types'
 
 interface NewsFeedScreenProps {
   isActive?: boolean
+  onScrollDirection?: (direction: 'up' | 'down') => void
 }
 
 export default function NewsFeedScreen({
   isActive = true,
+  onScrollDirection,
 }: NewsFeedScreenProps) {
   const insets = useSafeAreaInsets()
+  const lastOffset = useRef(0)
+  const lastDirection = useRef<'up' | 'down'>('down')
   const {
     posts,
     loading,
@@ -80,6 +86,40 @@ export default function NewsFeedScreen({
     void post
   }, [])
 
+  const handleNewsScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const offset = Math.max(
+        0,
+        event.nativeEvent.contentOffset.y,
+      )
+
+      if (offset <= 8) {
+        lastOffset.current = 0
+
+        if (lastDirection.current !== 'down') {
+          lastDirection.current = 'down'
+          onScrollDirection?.('down')
+        }
+
+        return
+      }
+
+      const delta = offset - lastOffset.current
+
+      if (Math.abs(delta) < 6) return
+
+      const direction = delta > 0 ? 'up' : 'down'
+
+      if (direction !== lastDirection.current) {
+        lastDirection.current = direction
+        onScrollDirection?.(direction)
+      }
+
+      lastOffset.current = offset
+    },
+    [onScrollDirection],
+  )
+
   if (loading && posts.length === 0) {
     return (
       <View
@@ -114,6 +154,8 @@ export default function NewsFeedScreen({
           paddingTop: insets.top + 78,
           paddingBottom: 32,
         }}
+        onScroll={handleNewsScroll}
+        scrollEventThrottle={16}
         onEndReached={loadMore}
         onEndReachedThreshold={0.7}
         initialNumToRender={4}

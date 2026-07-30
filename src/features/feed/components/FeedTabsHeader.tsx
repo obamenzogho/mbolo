@@ -31,6 +31,8 @@ interface FeedTabsHeaderProps {
   cityLabel: string
   locationGranted: boolean
   onRequestLocation: () => void
+  isNewsActive?: boolean
+  headerTranslateY?: Animated.Value
 }
 
 const labels = ['Ville', 'Pour toi', 'Suivi', 'Actus'] as const
@@ -42,6 +44,8 @@ export default function FeedTabsHeader({
   cityLabel,
   locationGranted,
   onRequestLocation,
+  isNewsActive = false,
+  headerTranslateY,
 }: FeedTabsHeaderProps) {
   const insets = useSafeAreaInsets()
   const { openCreateModal } = useCreateModal()
@@ -142,11 +146,19 @@ export default function FeedTabsHeader({
   }, [locationGranted, onRequestLocation, onTabPress])
 
   return (
-    <View
+    <Animated.View
       pointerEvents="box-none"
       style={[
         styles.header,
-        { paddingTop: insets.top + 6 },
+        {
+          paddingTop: insets.top + 6,
+          backgroundColor: isNewsActive
+            ? '#111214'
+            : 'rgba(8, 9, 10, 0.92)',
+          transform: [
+            { translateY: headerTranslateY ?? 0 },
+          ],
+        },
       ]}
     >
       <ScrollView
@@ -224,7 +236,7 @@ export default function FeedTabsHeader({
           size={38}
         />
       </View>
-    </View>
+    </Animated.View>
   )
 }
 

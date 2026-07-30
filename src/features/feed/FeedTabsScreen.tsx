@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useEffect,
   useRef,
   useState,
 } from 'react'
@@ -31,6 +32,10 @@ export default function FeedTabsScreen({
 }: FeedTabsScreenProps) {
   const scrollPosition = useRef(
     new Animated.Value(DEFAULT_TAB),
+  ).current
+
+  const headerTranslateY = useRef(
+    new Animated.Value(0),
   ).current
 
   const pagerRef = useRef<FeedPagerRef>(null)
@@ -111,6 +116,26 @@ export default function FeedTabsScreen({
     [],
   )
 
+  const handleNewsScrollDirection = useCallback(
+    (direction: 'up' | 'down') => {
+      if (activeTab !== 3) return
+
+      Animated.timing(headerTranslateY, {
+        toValue: direction === 'up' ? -120 : 0,
+        duration: 180,
+        useNativeDriver: true,
+      }).start()
+    },
+    [activeTab, headerTranslateY],
+  )
+
+  useEffect(() => {
+    if (activeTab !== 3) {
+      headerTranslateY.stopAnimation()
+      headerTranslateY.setValue(0)
+    }
+  }, [activeTab, headerTranslateY])
+
   const stable = isTabFocused && !isSwiping
 
   const forYouActive = stable && activeTab === 1
@@ -145,7 +170,10 @@ export default function FeedTabsScreen({
         </View>
 
         <View key="news" style={styles.page}>
-          <NewsFeedScreen isActive={newsActive} />
+          <NewsFeedScreen
+            isActive={newsActive}
+            onScrollDirection={handleNewsScrollDirection}
+          />
         </View>
       </FeedPager>
 
@@ -155,6 +183,8 @@ export default function FeedTabsScreen({
         cityLabel={cityLabel}
         locationGranted={locationGranted}
         onRequestLocation={request}
+        isNewsActive={activeTab === 3}
+        headerTranslateY={headerTranslateY}
       />
     </View>
   )
