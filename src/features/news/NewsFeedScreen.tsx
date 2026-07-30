@@ -6,6 +6,7 @@ import {
   Text,
   View,
 } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { auth } from '@/lib/firebase'
 import OrbitLoader from '@/components/OrbitLoader'
 import { PostCard } from './components/PostCard'
@@ -21,6 +22,7 @@ interface NewsFeedScreenProps {
 export default function NewsFeedScreen({
   isActive = true,
 }: NewsFeedScreenProps) {
+  const insets = useSafeAreaInsets()
   const {
     posts,
     loading,
@@ -80,7 +82,12 @@ export default function NewsFeedScreen({
 
   if (loading && posts.length === 0) {
     return (
-      <View style={styles.loader}>
+      <View
+        style={[
+          styles.loader,
+          { paddingTop: insets.top + 78 },
+        ]}
+      >
         <OrbitLoader />
       </View>
     )
@@ -103,6 +110,10 @@ export default function NewsFeedScreen({
             onMore={handleMore}
           />
         )}
+        contentContainerStyle={{
+          paddingTop: insets.top + 78,
+          paddingBottom: 32,
+        }}
         onEndReached={loadMore}
         onEndReachedThreshold={0.7}
         initialNumToRender={4}
