@@ -137,7 +137,7 @@ export default function FollowRequests() {
           return (
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={() => router.push({ pathname: '/(tabs)/(sub)/user/[userId]', params: { userId: item.id } })}
+              onPress={() => router.push({ pathname: '/user/[userId]', params: { userId: item.id } })}
               style={{
                 backgroundColor: colors.surface,
                 borderRadius: 16,

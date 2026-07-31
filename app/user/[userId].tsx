@@ -4,14 +4,8 @@ import {
   Dimensions, Modal, Share, Alert,
 } from 'react-native'
 
-import {
-  useSharedValue,
-  useDerivedValue,
-  withSpring,
-  runOnJS,
-} from 'react-native-reanimated'
-import { GestureDetector, Gesture } from 'react-native-gesture-handler'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { type GestureType } from 'react-native-gesture-handler'
 import { useLocalSearchParams, router, Redirect } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { doc, onSnapshot } from 'firebase/firestore'
@@ -95,6 +89,7 @@ export default function UserProfile() {
   const [viewerIndex, setViewerIndex] = useState<number | null>(null)
   const [menuVisible, setMenuVisible] = useState(false)
   const [actionsOpen, setActionsOpen] = useState(false)
+  const [backGesture, setBackGesture] = useState<GestureType | null>(null)
 
   const { isFollowing, isFriend, followerCount, followingCount, loading: followLoading, toggleFollow } = useFollow(userId || '')
 
@@ -140,13 +135,6 @@ export default function UserProfile() {
 
   const tabConfig: ProfileTab[] = ['grid']
 
-  const translateX = useSharedValue(0)
-  const tabCount = tabConfig.length
-  const swipeOffsetPx = useDerivedValue(() => {
-    'worklet'
-    return -translateX.value / tabCount
-  })
-
   const handleTabChange = useCallback((tab: ProfileTab) => {
     if (tab === 'grid' && activeTab === 'grid') {
       setFilterOpen((p) => !p)
@@ -154,32 +142,7 @@ export default function UserProfile() {
     }
     setFilterOpen(false)
     setActiveTab(tab)
-    translateX.value = 0
   }, [setActiveTab, activeTab])
-
-  const swipeGesture = Gesture.Pan()
-    .activeOffsetX([-10, 10])
-    .failOffsetY([-5, 5])
-    .onTouchesDown((e, mgr) => {
-      'worklet'
-      if (e.changedTouches[0].absoluteX < 30) {
-        mgr.fail()
-      }
-    })
-    .onUpdate((e) => {
-      translateX.value = e.translationX
-    })
-    .onEnd((e) => {
-      const idx = tabConfig.indexOf(activeTab)
-      const threshold = SCREEN_WIDTH * 0.2
-      if (e.translationX < -threshold && idx < tabConfig.length - 1) {
-        runOnJS(handleTabChange)(tabConfig[idx + 1])
-      } else if (e.translationX > threshold && idx > 0) {
-        runOnJS(handleTabChange)(tabConfig[idx - 1])
-      } else {
-        translateX.value = withSpring(0, { damping: 20, stiffness: 250 })
-      }
-    })
 
   const openFollowList = async (initialType: 'followers' | 'following') => {
     if (!profile) return
@@ -216,7 +179,7 @@ export default function UserProfile() {
 
   if (!ready) {
     return (
-    <PageWrapper type="stack" swipeBack swipeBackEdgeOnly backTo="/(tabs)/profile">
+    <PageWrapper type="stack" swipeBack swipeBackEdgeOnly backTo="/(tabs)/profile" onSwipeBackGesture={setBackGesture}>
       <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
         <ProfileSkeleton />
       </SafeAreaView>
@@ -225,18 +188,18 @@ export default function UserProfile() {
   }
 
   return (
-    <PageWrapper type="stack" swipeBack swipeBackEdgeOnly backTo="/(tabs)/profile">
+    <PageWrapper type="stack" swipeBack swipeBackEdgeOnly backTo="/(tabs)/profile" onSwipeBackGesture={setBackGesture}>
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
-      <GestureDetector gesture={swipeGesture}>
-        <VideoGrid
-          videos={filteredVideos}
-          tab={activeTab}
-          loading={loading}
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          loadMore={loadMore}
-          hasMore={hasMore}
-          onThumbnailPress={handleThumbnailPress}
+      <VideoGrid
+        videos={filteredVideos}
+        tab={activeTab}
+        loading={loading}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        loadMore={loadMore}
+        hasMore={hasMore}
+        onThumbnailPress={handleThumbnailPress}
+        simultaneousGesture={backGesture ?? undefined}
           ListHeaderComponent={
             <View>
               <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10 }}>
@@ -330,7 +293,6 @@ export default function UserProfile() {
                   activeTab={activeTab}
                   onTabChange={handleTabChange}
                   tabs={tabConfig}
-                  swipeOffsetPx={swipeOffsetPx}
                 />
                 {filterOpen && (
                   <View style={{ position: 'absolute', top: 44, left: 8, backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.border, elevation: 10 }}>
@@ -352,7 +314,6 @@ export default function UserProfile() {
             </View>
           }
           />
-      </GestureDetector>
 
       {/* MENU MODAL */}
       <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
@@ -452,7 +413,7 @@ export default function UserProfile() {
                     onPress={() => {
                       if (!isMe) {
                         closeFollowModal()
-                        setTimeout(() => router.push({ pathname: '/(tabs)/(sub)/user/[userId]', params: { userId: item.id } }), 300)
+                        setTimeout(() => router.push({ pathname: '/user/[userId]', params: { userId: item.id } }), 300)
                       }
                     }}
                     style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 12 }}
@@ -494,7 +455,7 @@ export default function UserProfile() {
                     onPress={() => {
                       if (!isMe) {
                         closeFollowModal()
-                        setTimeout(() => router.push({ pathname: '/(tabs)/(sub)/user/[userId]', params: { userId: item.id } }), 300)
+                        setTimeout(() => router.push({ pathname: '/user/[userId]', params: { userId: item.id } }), 300)
                       }
                     }}
                     style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 12 }}

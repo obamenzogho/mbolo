@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react'
-import { useWindowDimensions } from 'react-native'
+import { Platform, useWindowDimensions } from 'react-native'
 import { Gesture } from 'react-native-gesture-handler'
 import {
   Easing,
@@ -49,6 +49,9 @@ export function useSwipeBack({
     goBack(backTo)
   }, [onBack, goBack, backTo])
 
+  // Capturé hors worklet : `Platform` n'est pas accessible dans les worklets.
+  const isIOS = Platform.OS === 'ios'
+
   useFocusEffect(
     useCallback(() => {
       translateX.value = 0
@@ -73,13 +76,21 @@ export function useSwipeBack({
 
         if (shouldClose) {
           closing.value = true
-          translateX.value = withTiming(
-            width,
-            { duration: reduceMotion ? 0 : CLOSE_DURATION, easing: Easing.out(Easing.cubic) },
-            (finished) => {
-              if (finished) runOnJS(handleBack)()
-            }
-          )
+          if (isIOS) {
+            // iOS : pas de fausse fermeture JS — la sous-couche simulée est un fond
+            // noir. On réinitialise la translation et on laisse le pop natif jouer
+            // sa parallaxe sur la vraie page précédente (pas d'écran noir).
+            translateX.value = 0
+            runOnJS(handleBack)()
+          } else {
+            translateX.value = withTiming(
+              width,
+              { duration: reduceMotion ? 0 : CLOSE_DURATION, easing: Easing.out(Easing.cubic) },
+              (finished) => {
+                if (finished) runOnJS(handleBack)()
+              }
+            )
+          }
         } else {
           translateX.value = withSpring(0, {
             damping: 32,

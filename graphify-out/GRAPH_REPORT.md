@@ -5,7 +5,7 @@
 
 ## Summary
 - 7960 nodes
-- 9893 edges
+- 9891 edges
 - 352 communities
 - 13 Firestore collections
 - Extraction: 100% EXTRACTED
@@ -22,8 +22,8 @@
 8. `scripts/enrich-graphify-roles.js` - 87 edges
 9. `utils/ffmpeg.ts` - 81 edges
 10. `src/features/feed/hooks/useFollowingFeedData.ts` - 79 edges
-11. `app/(tabs)/(sub)/user/[userId].tsx` - 78 edges
-12. `app/(tabs)/messages.tsx` - 76 edges
+11. `app/(tabs)/messages.tsx` - 76 edges
+12. `src/services/searchService.ts` - 76 edges
 
 ## Firestore Collections
 - `usernames`

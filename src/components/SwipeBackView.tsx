@@ -1,6 +1,6 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { StyleSheet, View } from 'react-native'
-import { GestureDetector } from 'react-native-gesture-handler'
+import { GestureDetector, type GestureType } from 'react-native-gesture-handler'
 import Animated from 'react-native-reanimated'
 import { useSwipeBack, type UseSwipeBackOptions } from '@/hooks/useSwipeBack'
 import { colors } from '@/lib/theme'
@@ -8,6 +8,12 @@ import { colors } from '@/lib/theme'
 interface SwipeBackViewProps extends UseSwipeBackOptions {
   children: React.ReactNode
   style?: object
+  /**
+   * Expose le pan de retour pour qu'un contenu scrollable (VideoGrid)
+   * puisse le composer en simultané (sinon l'arène des gestes du scroll
+   * neutralise le pan ancêtre).
+   */
+  onGesture?: (gesture: GestureType) => void
 }
 
 /**
@@ -15,8 +21,12 @@ interface SwipeBackViewProps extends UseSwipeBackOptions {
  * Utilisé sur Android, Web, et sur iOS pour le premier écran d'une Stack
  * (où le geste natif n'a rien à popper).
  */
-const SwipeBackView: React.FC<SwipeBackViewProps> = ({ children, style, ...options }) => {
+const SwipeBackView: React.FC<SwipeBackViewProps> = ({ children, style, onGesture, ...options }) => {
   const { gesture, pageStyle, edgeShadowStyle, scrimStyle, underlayStyle } = useSwipeBack(options)
+
+  useEffect(() => {
+    if (onGesture) onGesture(gesture)
+  }, [onGesture, gesture])
 
   return (
     <View style={styles.root}>

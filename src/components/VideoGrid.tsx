@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react'
-import { View, Text, FlatList, Dimensions } from 'react-native'
-import { Gesture, GestureDetector } from 'react-native-gesture-handler'
+import { View, Text, FlatList, Dimensions, Platform } from 'react-native'
+import { Gesture, GestureDetector, type GestureType } from 'react-native-gesture-handler'
 import { useSharedValue, runOnJS } from 'react-native-reanimated'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '@/lib/theme'
@@ -31,15 +31,22 @@ interface VideoGridProps {
   isOwn?: boolean
   ListHeaderComponent?: React.ReactElement | null
   onThumbnailPress?: (videoId: string) => void
+  /**
+   * Geste externe composé en simultané (ex. le pan de swipe-back du profil).
+   * Nécessaire : l'arène des gestes de ce composant neutralise sinon tout
+   * geste de retour ancêtre ou natif.
+   */
+  simultaneousGesture?: GestureType
 }
 
 export function VideoGrid({
   videos, tab, loading, refreshing,
   onRefresh, loadMore, hasMore, isOwn,
-  ListHeaderComponent, onThumbnailPress,
+  ListHeaderComponent, onThumbnailPress, simultaneousGesture,
 }: VideoGridProps) {
   const refreshingRef = useRef(false)
   refreshingRef.current = refreshing
+  const pullTriggeredRef = useRef(false)
   const scrollOffsetY = useSharedValue(0)
 
   const renderItem = useCallback(
@@ -49,15 +56,27 @@ export function VideoGrid({
 
   const keyExtractor = useCallback((item: VideoType) => item.id, [])
 
-  const onScroll = useCallback((e: any) => {
-    scrollOffsetY.value = e.nativeEvent.contentOffset.y
-  }, [])
-
   const handleRefresh = useCallback(() => {
     if (onRefresh && !refreshingRef.current) {
       onRefresh()
     }
   }, [onRefresh])
+
+  // iOS : le GestureDetector du pull-to-refresh custom neutralise le swipe-back
+  // natif du native-stack. Sur iOS on renonce au détecteur et on déclenche le
+  // refresh via le rebond du scroll (contentOffset négatif), comportement natif.
+  const isIOS = Platform.OS === 'ios'
+
+  const onScroll = useCallback((e: any) => {
+    const y = e.nativeEvent.contentOffset.y
+    scrollOffsetY.value = y
+    if (isIOS && !pullTriggeredRef.current && y < -80) {
+      pullTriggeredRef.current = true
+      handleRefresh()
+    } else if (y > -20) {
+      pullTriggeredRef.current = false
+    }
+  }, [handleRefresh])
 
   const nativeGesture = Gesture.Native()
   const panGesture = Gesture.Pan()
@@ -67,7 +86,9 @@ export function VideoGrid({
         runOnJS(handleRefresh)()
       }
     })
-  const composedGesture = Gesture.Simultaneous(nativeGesture, panGesture)
+  const composedGesture = simultaneousGesture
+    ? Gesture.Simultaneous(Gesture.Simultaneous(nativeGesture, panGesture), simultaneousGesture)
+    : Gesture.Simultaneous(nativeGesture, panGesture)
 
   const headerWithRefresh = (
     <View>
@@ -82,62 +103,60 @@ export function VideoGrid({
 
   if (videos.length === 0) {
     const msg = EMPTY_MESSAGES[tab]
-    return (
-      <GestureDetector gesture={composedGesture}>
-        <FlatList
-          data={[]}
-          numColumns={GRID_COLS}
-          keyExtractor={keyExtractor}
-          renderItem={renderItem}
-          onScroll={onScroll}
-          scrollEventThrottle={16}
-          ListHeaderComponent={
-            <View>
-              {refreshing && (
-                <View style={{ paddingVertical: 20, alignItems: 'center' }}>
-                  <OrbitLoader size={36} />
-                </View>
-              )}
-              {ListHeaderComponent}
-              <View style={{ paddingVertical: 60, alignItems: 'center', gap: 8 }}>
-                <Ionicons name={msg.icon as any} size={48} color="#333" />
-                <Text style={{ color: '#666', fontSize: 16, fontWeight: '600' }}>{msg.title}</Text>
-                <Text style={{ color: '#555', fontSize: 13, textAlign: 'center', paddingHorizontal: 40 }}>{msg.subtitle}</Text>
-                {loading && (
-                  <View style={{ paddingTop: 20 }}>
-                    <OrbitLoader size={32} />
-                  </View>
-                )}
-              </View>
-            </View>
-          }
-          contentContainerStyle={{ flexGrow: 1 }}
-        />
-      </GestureDetector>
-    )
-  }
-
-  return (
-    <GestureDetector gesture={composedGesture}>
+    const list = (
       <FlatList
-        data={videos}
+        data={[]}
         numColumns={GRID_COLS}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
         onScroll={onScroll}
         scrollEventThrottle={16}
-        ListHeaderComponent={headerWithRefresh}
-        onEndReached={loadMore && hasMore ? loadMore : undefined}
-        onEndReachedThreshold={0.5}
-        contentContainerStyle={{ flexGrow: 1 }}
-        ListFooterComponent={
-          loading && videos.length > 0 ? (
-            <View style={{ paddingVertical: 20, alignItems: 'center' }}>
-              <OrbitLoader size={40} />
+        ListHeaderComponent={
+          <View>
+            {refreshing && (
+              <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                <OrbitLoader size={36} />
+              </View>
+            )}
+            {ListHeaderComponent}
+            <View style={{ paddingVertical: 60, alignItems: 'center', gap: 8 }}>
+              <Ionicons name={msg.icon as any} size={48} color="#333" />
+              <Text style={{ color: '#666', fontSize: 16, fontWeight: '600' }}>{msg.title}</Text>
+              <Text style={{ color: '#555', fontSize: 13, textAlign: 'center', paddingHorizontal: 40 }}>{msg.subtitle}</Text>
+              {loading && (
+                <View style={{ paddingTop: 20 }}>
+                  <OrbitLoader size={32} />
+                </View>
+              )}
             </View>
-          ) : null
+          </View>
         }
+        contentContainerStyle={{ flexGrow: 1 }}
       />
-    </GestureDetector>
+    )
+    return isIOS ? list : <GestureDetector gesture={composedGesture}>{list}</GestureDetector>
+  }
+
+  const list = (
+    <FlatList
+      data={videos}
+      numColumns={GRID_COLS}
+      keyExtractor={keyExtractor}
+      renderItem={renderItem}
+      onScroll={onScroll}
+      scrollEventThrottle={16}
+      ListHeaderComponent={headerWithRefresh}
+      onEndReached={loadMore && hasMore ? loadMore : undefined}
+      onEndReachedThreshold={0.5}
+      contentContainerStyle={{ flexGrow: 1 }}
+      ListFooterComponent={
+        loading && videos.length > 0 ? (
+          <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+            <OrbitLoader size={40} />
+          </View>
+        ) : null
+      }
+    />
   )
+  return isIOS ? list : <GestureDetector gesture={composedGesture}>{list}</GestureDetector>
 }

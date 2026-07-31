@@ -124,7 +124,7 @@ export default function PostDetailScreen() {
   const openAuthor = useCallback(
     (userId: string) => {
       router.push({
-        pathname: '/(tabs)/(sub)/user/[userId]',
+        pathname: '/user/[userId]',
         params: { userId },
       })
     },

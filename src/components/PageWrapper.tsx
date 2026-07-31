@@ -1,6 +1,7 @@
 import React from 'react'
 import { StyleSheet } from 'react-native'
 import Animated from 'react-native-reanimated'
+import { type GestureType } from 'react-native-gesture-handler'
 import { usePageAnimation } from '@/hooks/usePageAnimation'
 import { useIsStackEntry } from '@/hooks/useIsStackEntry'
 import SwipeBackView from '@/components/SwipeBackView'
@@ -19,6 +20,11 @@ interface PageWrapperProps {
   backTo?: string
   /** Désactive temporairement le geste (enregistrement caméra, formulaire modifié...). */
   swipeBackEnabled?: boolean
+  /**
+   * Expose le pan de retour JS pour qu'un contenu scrollable puisse le
+   * composer en simultané (voir `VideoGrid.simultaneousGesture`).
+   */
+  onSwipeBackGesture?: (gesture: GestureType) => void
 }
 
 /**
@@ -37,6 +43,7 @@ const PageWrapper: React.FC<PageWrapperProps> = ({
   swipeBackEdgeOnly = false,
   swipeBackEnabled = true,
   backTo,
+  onSwipeBackGesture,
 }) => {
   const isStackEntry = useIsStackEntry()
   const resolvedType = type === 'stack' && isStackEntry ? 'stackEntry' : type
@@ -57,6 +64,7 @@ const PageWrapper: React.FC<PageWrapperProps> = ({
       enabled={swipeBackEnabled}
       edgeOnly={swipeBackEdgeOnly}
       backTo={backTo}
+      onGesture={onSwipeBackGesture}
     >
       {content}
     </SwipeBackView>

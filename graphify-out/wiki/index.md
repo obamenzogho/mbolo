@@ -32,12 +32,13 @@ Stack
 │   └── (sub)         → Stack (animations slideRight/slideUpFast)
 │       ├── camera, upload, story-upload, reel-upload, video-editor (slideUpFast)
 │       ├── edit-profile, discover, explore (slideRightEdgeOnly)
-│       ├── user/[userId], messages/conversation/[id]
+│       ├── messages/conversation/[id]
 │       └── notifications/follow-requests
 ├── post             → Modal (presentation: 'modal', slideUpFast)
 ├── settings         → Stack (slideRight, avec sous-routes)
 └── autres flat routes : search, insights, hashtag/[tag], u/[pseudo],
     news-compose, post-detail, place/[id], legal/*
+    + user/[userId] → profil d'un utilisateur (Stack racine depuis ADR 2026-07-31)
 ```
 
 ### Notification deep-links (app/_layout.tsx:22-44)
@@ -98,7 +99,7 @@ app/(tabs)/_layout.tsx
 | 4 | profile | `person` | Profil | 26px |
 
 #### Groupe `(sub)` (href: null, Stack natif)
-`camera`, `upload`, `story-upload`, `reel-upload`, `video-editor`, `edit-profile`, `discover`, `explore`, `user/[userId]`, `messages/conversation/[id]`, `notifications/follow-requests`
+`camera`, `upload`, `story-upload`, `reel-upload`, `video-editor`, `edit-profile`, `discover`, `explore`, `messages/conversation/[id]`, `notifications/follow-requests`
 
 #### Dépendances ajoutées
 - `expo-haptics` → retour haptique `ImpactFeedbackStyle.Light` au changement d'onglet
@@ -166,7 +167,7 @@ Variants :
 | `hooks/useHighlights.ts` | `getHighlights` (userId + createdAt desc) |
 | `app/(tabs)/notifications.tsx` | `onSnapshot` avec callback `onError` + banner + retry |
 | `app/(tabs)/profile.tsx` | `loadVideos`, `loadSaved`, `loadLiked`, `checkStories` — banners par section |
-| `app/(tabs)/(sub)/user/[userId].tsx` | `loadVideos` — banner avec retry |
+| `app/user/[userId].tsx` | `loadVideos` — banner avec retry |
 
 ---
 
@@ -338,7 +339,7 @@ Usage: lookup rapide pseudo → email au login (login.tsx:52)
 - Cover upload via Cloudinary
 
 ### 6. Profile & Users
-**Fichiers**: app/(tabs)/profile.tsx, app/(tabs)/(sub)/edit-profile.tsx, app/(tabs)/(sub)/user/[userId].tsx
+**Fichiers**: app/(tabs)/profile.tsx, app/(tabs)/(sub)/edit-profile.tsx, app/user/[userId].tsx
 **Hooks**: useFollow (91 lignes), useSuggestions (43 lignes)
 **Components**: FollowButton
 **Firestore**: users (followers/following arrays, arrayUnion/arrayRemove)
@@ -923,4 +924,38 @@ Usage: lookup rapide pseudo → email au login (login.tsx:52)
 - Un même utilisateur partageant plusieurs fois un même post ne compte qu'une fois (`shares/{userId}`). Accepté (aligné sur saves/reposts).
 - `deleteAccount` ne nettoie pas les sous-collections orphelines sous `posts/` (reactions/saves/reposts/shares/pollVotes d'un compte supprimé) → compteurs potentiellement non remis à zéro. À traiter (CF `onPostDelete` recursive delete / recompute) dans un prochain ticket.
 - **Non déployé** : règles + fonctions à déployer ensemble (`npm run firebase:deploy:rules` puis `firebase deploy --only functions`) pour éviter un état hybride.
+
+---
+
+## ADR 2026-07-31: Profil utilisateur déplacé dans la Stack racine (fix retour)
+
+**Problème :** Le profil `app/(tabs)/(sub)/user/[userId].tsx` vivait dans la Stack imbriquée `(sub)` des tabs. Ouvert depuis un post (feed ou `post-detail`), il était le plus souvent la **première/unique route** de cette Stack (index 0) : `router.canGoBack()` renvoyait `false` (rien à popper dans `(sub)`, les tabs ne gèrent pas GO_BACK, Stack racine à l'index 0), et `useGoBack()` basculait sur le repli `router.replace('/(tabs)/feed')` → le feed était **remonté de zéro** (pager réinitialisé sur « Pour toi », scroll/onglet Actus perdus) au lieu de revenir sur le post. Le geste retour natif iOS était aussi inopérant (rien à popper dans `(sub)`).
+
+**Décision :** Déplacer le profil vers la **Stack racine** (`app/user/[userId].tsx`, `git mv`), comme `post-detail`, `settings`, `news-compose`, etc.
+
+- `app/_layout.tsx` : `<Stack.Screen name="user/[userId]" options={slideRight} />` ajouté ; `app/(tabs)/(sub)/_layout.tsx` : écran retiré.
+- Tous les points d'appel (`post-detail`, `NewsFeedScreen`, `notifications`, `profile` tab, `follow-requests`, recherche, suggestions, repost, commentaires, deep-link notifs, `u/[pseudo]`) passent de `/(tabs)/(sub)/user/[userId]` à `/user/[userId]`.
+- URL/deep links inchangés (`user/xxx`) ; tab bar couverte par l'écran racine (comportement identique à `post-detail`).
+
+**Résultat — back ramène toujours au bon endroit :**
+- post-detail → profil → back poppe vers `post-detail` (racine `[(tabs), post-detail, user]`) ;
+- feed → profil → back revient sur **le même** `(tabs)` (état pager/scroll préservé) ;
+- conversation/notifications/recherche/suggestions → retour à l'écran d'origine ;
+- profil → profil (liste followers) → back empile proprement sur la racine.
+- Repli `backTo` du profil conservé (`/(tabs)/profile`) — uniquement en cold-start/deep link direct.
+
+**Swipe-back depuis le profil** : le contenu (`VideoGrid`) enveloppe sa `FlatList` dans un `GestureDetector` (`Gesture.Simultaneous(Native, Pan)` pour le pull-to-refresh custom). Cette arène de gestes **neutralise tout geste de retour** : le geste natif iOS (`fullScreenGestureEnabled` et même l'edge pan) ET le pan JS ancêtre de `SwipeBackView` (`pan began` puis annulé par le `Pan` interne `.minDistance(10)` qui s'active avant les 12 px du retour). Ceci explique pourquoi `slideRight`, `slideRightEdgeOnly` puis le pan JS seul échouaient tous.
+
+**Fix (composition simultanée) :**
+- `PageWrapper`/`SwipeBackView` : nouveau prop `onSwipeBackGesture` qui **expose le pan de retour JS**.
+- `VideoGrid` : nouveau prop `simultaneousGesture` — le pan de retour est composé `Gesture.Simultaneous(native, pan, backPan)` au lieu d'être éclipsé.
+- `app/user/[userId].tsx` : branche les deux (`onSwipeBackGesture={setBackGesture}`, `simultaneousGesture={backGesture}`).
+- **iOS poussé** : le geste natif est réactivé (route `user/[userId]` = `slideRight`, comme `post-detail`/`settings`). Pour que l'arène de `VideoGrid` ne le bloque plus, **iOS ne monte plus le `GestureDetector`** : le pull-to-refresh y est déclenché par le rebond natif du scroll (`contentOffset.y < -80` dans `onScroll`), comportement iOS standard. → `needsJsGesture=false` → pas de `SwipeBackView` → **parallaxe native sur la vraie page précédente, zéro fond noir**.
+- **Android / Web** : pas de geste natif → le pan JS est seul à assurer le retour, toujours composé en simultané dans l'arène de `VideoGrid` (`Gesture.Simultaneous(native, pan, backPan)`).
+
+Résultat : swipe-back de bord fonctionne sur iOS, Android et Web, y compris sur le contenu `VideoGrid`. Le `VideoGrid` reste utilisable tel quel ailleurs (le prop est optionnel).
+
+**Fond noir au relâchement (iOS) :** la sous-couche simulée du geste JS est un simple fond sombre (pas de vraie page précédente), et la fausse animation de fermeture JS s'enchaînait avec le pop natif → écran noir avant l'apparition de la page. Garde-fou dans `useSwipeBack` : sur iOS, au relâchement validé, `translateX` est réinitialisé à 0 et `router.back()` est appelé immédiatement — c'est le **pop natif** qui anime la sortie avec la parallaxe de la vraie page (pas de noir). Android/Web conservent la fermeture JS animée. Ce chemin ne s'active plus pour le profil poussé (le natif gère), mais reste le filet de sécurité des écrans iOS en premier de Stack.
+
+**À surveiller (même patron) :** `messages/conversation/[id]` et `notifications/follow-requests` restent dans `(sub)` : ouverts en premier écran de cette Stack, leur retour tombe aussi dans le repli. À migrer vers la racine si le même symptôme est signalé (ou à mutualiser via un helper).
 
