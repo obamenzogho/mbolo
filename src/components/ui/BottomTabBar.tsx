@@ -43,7 +43,7 @@ const BottomTabBar = React.memo(function BottomTabBar({
 }: BottomTabBarProps) {
   const insets = useSafeAreaInsets()
   const { lightImpact } = useHaptics()
-  const { isTabBarHidden } = useTabBarVisibility()
+  const { isTabBarHidden, feedBottomBarBg } = useTabBarVisibility()
 
   const activeRouteName = state.routes[state.index]?.name
   const isFeed = activeRouteName === 'feed'
@@ -97,9 +97,9 @@ const BottomTabBar = React.memo(function BottomTabBar({
         left: 0,
         right: 0,
         flexDirection: 'row',
-        backgroundColor: isFeed ? 'transparent' : 'rgba(13, 17, 23, 0.92)',
+        backgroundColor: isFeed ? feedBottomBarBg : 'rgba(13, 17, 23, 0.92)',
         borderTopWidth: 0.5,
-        borderTopColor: isFeed ? 'transparent' : colors.border,
+        borderTopColor: isFeed ? feedBottomBarBg : colors.border,
         paddingTop: 8,
         paddingBottom: insets.bottom + 4,
         height: 64 + insets.bottom,

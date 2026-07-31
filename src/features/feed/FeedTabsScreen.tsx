@@ -20,6 +20,7 @@ import NewsFeedScreen from '../news/NewsFeedScreen'
 import { FEED_DEBUG } from './store/feedStore'
 import { ConnectionBanner } from './components/ConnectionBanner'
 import { useUserLocation } from '../location/useUserLocation'
+import { useTabBarVisibility } from '../../contexts/TabBarVisibilityContext'
 
 const DEFAULT_TAB: FeedPagerIndex = 1
 
@@ -43,6 +44,8 @@ export default function FeedTabsScreen({
     useState<FeedPagerIndex>(DEFAULT_TAB)
   const [isSwiping, setIsSwiping] = useState(false)
   const lastScrollLog = useRef(0)
+
+  const { setFeedBottomBarBg } = useTabBarVisibility()
 
   const {
     place,
@@ -135,6 +138,10 @@ export default function FeedTabsScreen({
       headerTranslateY.setValue(0)
     }
   }, [activeTab, headerTranslateY])
+
+  useEffect(() => {
+    setFeedBottomBarBg(activeTab === 2 ? '#111214' : 'transparent')
+  }, [activeTab, setFeedBottomBarBg])
 
   const stable = isTabFocused && !isSwiping
 
