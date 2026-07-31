@@ -254,16 +254,18 @@ service cloud.firestore {
           'public', 'followers', 'private'
         ];
 
-      allow update: if request.auth != null && (
-        (
-          resource.data.userId == request.auth.uid &&
-          request.resource.data.userId == resource.data.userId
-        ) ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'likes', 'likedBy', 'comments', 'shares', 'saves', 'savedBy', 'reactionCounts',
-          'reposts', 'repostedBy'
-        ])
-      );
+      // 🔒 Les agrégats (likes/likedBy/comments/shares/saves/savedBy/
+      // reactionCounts/reposts/repostedBy) sont possédés par les Cloud
+      // Functions. Le mobile n'exprime que ses intentions dans les
+      // sous-collections ci-dessous ; seul l'auteur édite son document,
+      // et jamais les champs de comptage (recalculés par le backend).
+      allow update: if request.auth != null
+        && request.auth.uid == resource.data.userId
+        && request.resource.data.userId == resource.data.userId
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'likes', 'likedBy', 'comments', 'shares', 'saves', 'savedBy',
+          'reactionCounts', 'reposts', 'repostedBy'
+        ]);
 
       allow delete: if request.auth != null
         && request.auth.uid == resource.data.userId;
@@ -292,14 +294,72 @@ service cloud.firestore {
       match /reactions/{userId} {
         allow read: if request.auth != null;
         allow create: if request.auth != null
+          && request.auth.uid == userId
           && request.resource.data.userId == request.auth.uid
           && request.resource.data.type in ['like', 'love', 'fire', 'clap'];
         allow update: if request.auth != null
-          && request.auth.uid == resource.data.userId
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['type']);
+          && request.auth.uid == userId
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.type in ['like', 'love', 'fire', 'clap']
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['type', 'updatedAt']);
         allow delete: if request.auth != null
-          && request.auth.uid == resource.data.userId;
+          && request.auth.uid == userId;
       }
+
+      match /saves/{userId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null
+          && request.auth.uid == userId
+          && request.resource.data.userId == request.auth.uid;
+        allow delete: if request.auth != null
+          && request.auth.uid == userId;
+      }
+
+      match /reposts/{userId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null
+          && request.auth.uid == userId
+          && request.resource.data.userId == request.auth.uid;
+        allow delete: if request.auth != null
+          && request.auth.uid == userId;
+      }
+
+      match /shares/{userId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null
+          && request.auth.uid == userId
+          && request.resource.data.userId == request.auth.uid;
+        allow delete: if request.auth != null
+          && request.auth.uid == userId;
+      }
+
+      match /pollVotes/{userId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null
+          && request.auth.uid == userId
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.optionId is string;
+        allow update: if request.auth != null
+          && request.auth.uid == userId
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['optionId', 'updatedAt']);
+        allow delete: if request.auth != null
+          && request.auth.uid == userId;
+      }
+    }
+
+    // Historique des republications d'un utilisateur (feature repost).
+    match /users/{userId}/reposts/{postId} {
+      allow read: if request.auth != null
+        && request.auth.uid == userId;
+      allow create: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.postId == postId;
+      allow delete: if request.auth != null
+        && request.auth.uid == userId;
     }
 
     match /reports/{reportId} {

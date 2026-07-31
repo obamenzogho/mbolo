@@ -4,26 +4,26 @@
 - local update mode - Enhanced architectural extraction
 
 ## Summary
-- 7687 nodes
-- 9446 edges
-- 345 communities
+- 7960 nodes
+- 9893 edges
+- 352 communities
 - 13 Firestore collections
 - Extraction: 100% EXTRACTED
 - Token cost: 0 input - 0 output
 
 ## God Nodes
-1. `functions/src/index.ts` - 164 edges
+1. `functions/src/index.ts` - 152 edges
 2. `scripts/graphify-cli.js` - 145 edges
-3. `app/(tabs)/profile.tsx` - 126 edges
-4. `functions/src/search.ts` - 111 edges
-5. `src/hooks/useComments.ts` - 104 edges
-6. `scripts/enrich-graphify-roles.js` - 87 edges
-7. `utils/ffmpeg.ts` - 81 edges
-8. `src/features/feed/hooks/useFollowingFeedData.ts` - 79 edges
-9. `app/(tabs)/(sub)/user/[userId].tsx` - 78 edges
-10. `app/(tabs)/messages.tsx` - 76 edges
-11. `src/services/searchService.ts` - 76 edges
-12. `functions/lib/index.js` - 68 edges
+3. `functions/lib/functions/src/index.js` - 131 edges
+4. `app/(tabs)/profile.tsx` - 126 edges
+5. `functions/src/search.ts` - 111 edges
+6. `functions/lib/functions/src/search.js` - 104 edges
+7. `src/hooks/useComments.ts` - 104 edges
+8. `scripts/enrich-graphify-roles.js` - 87 edges
+9. `utils/ffmpeg.ts` - 81 edges
+10. `src/features/feed/hooks/useFollowingFeedData.ts` - 79 edges
+11. `app/(tabs)/(sub)/user/[userId].tsx` - 78 edges
+12. `app/(tabs)/messages.tsx` - 76 edges
 
 ## Firestore Collections
 - `usernames`

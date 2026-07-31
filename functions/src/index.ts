@@ -1,4 +1,4 @@
-import { onDocumentCreated, onDocumentDeleted, onDocumentUpdated, onDocumentWritten } from 'firebase-functions/v2/firestore'
+import { onDocumentCreated, onDocumentDeleted, onDocumentWritten } from 'firebase-functions/v2/firestore'
 import { onCall, HttpsError } from 'firebase-functions/v2/https'
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { initializeApp } from 'firebase-admin/app'
@@ -400,6 +400,10 @@ export const onReportCreate = onDocumentCreated('reports/{reportId}', async (eve
 /* ---------- TYPESENSE SEARCH SYNC ---------- */
 export * from './search'
 
+/* ---------- POST AGGREGATES (posts/*) ---------- */
+export * from './posts/onReactionWrite'
+export * from './posts/onEngagementWrite'
+
 /* ---------- DELETE ACCOUNT : callable ---------- */
 export const deleteAccount = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Must be signed in')
@@ -494,73 +498,6 @@ export const refreshHotScores = onSchedule('every 60 minutes', async () => {
   }
   if (ops > 0) await batch.commit()
 })
-
-/* ==========================================================
-   POST REACTIONS — posts/{postId}/reactions/{userId}
-   Les compteurs (reactionCounts) sont maintenus par le serveur.
-   ========================================================== */
-
-export const onPostReactionCreate = onDocumentCreated(
-  'posts/{postId}/reactions/{userId}',
-  async (e) => {
-    const type = e.data?.data()?.type
-    if (!type) return
-    const postRef = db.doc(`posts/${e.params.postId}`)
-
-    await postRef.update({
-      [`reactionCounts.${type}`]: FieldValue.increment(1),
-      [`reactionCounts.total`]: FieldValue.increment(1),
-      likes: FieldValue.increment(1),
-      likedBy: FieldValue.arrayUnion(e.params.userId),
-    }).catch((err) => console.warn('onPostReactionCreate:', err?.message ?? err))
-
-    // Notification à l'auteur du post
-    const postSnap = await postRef.get().catch(() => null)
-    const postData = postSnap?.data()
-    if (postData?.userId && postData.userId !== e.params.userId) {
-      await db.doc(`notifications/${db.collection('_').doc().id}`).set({
-        userId: postData.userId,
-        type: 'post_like',
-        fromUserId: e.params.userId,
-        postId: e.params.postId,
-        text: '',
-        read: false,
-        createdAt: FieldValue.serverTimestamp(),
-      }).catch(() => {})
-    }
-  }
-)
-
-export const onPostReactionUpdate = onDocumentUpdated(
-  'posts/{postId}/reactions/{userId}',
-  async (e) => {
-    const oldType = e.data?.before?.data()?.type
-    const newType = e.data?.after?.data()?.type
-    if (!oldType || !newType || oldType === newType) return
-
-    const postRef = db.doc(`posts/${e.params.postId}`)
-    await postRef.update({
-      [`reactionCounts.${oldType}`]: FieldValue.increment(-1),
-      [`reactionCounts.${newType}`]: FieldValue.increment(1),
-    }).catch((err) => console.warn('onPostReactionUpdate:', err?.message ?? err))
-  }
-)
-
-export const onPostReactionDelete = onDocumentDeleted(
-  'posts/{postId}/reactions/{userId}',
-  async (e) => {
-    const type = ((e as any).data?.before)?.data()?.type
-    if (!type) return
-
-    const postRef = db.doc(`posts/${e.params.postId}`)
-    await postRef.update({
-      [`reactionCounts.${type}`]: FieldValue.increment(-1),
-      [`reactionCounts.total`]: FieldValue.increment(-1),
-      likes: FieldValue.increment(-1),
-      likedBy: FieldValue.arrayRemove(e.params.userId),
-    }).catch((err) => console.warn('onPostReactionDelete:', err?.message ?? err))
-  }
-)
 
 /* ==========================================================
    POST RANKING — Score basé sur engagement + fraîcheur

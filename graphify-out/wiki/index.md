@@ -891,3 +891,36 @@ Usage: lookup rapide pseudo → email au login (login.tsx:52)
 
 **Backend non touché à ce stade** : les écritures de `postInteractions.ts` (update partiel `reactionCounts`/`savedBy`/`repostedBy`, sous-collections `reactions`) doivent être validées contre `firestore.rules` avant activation en prod.
 
+---
+
+## ADR 2026-07-31: Modèle d'écriture des posts — sous-collections d'intention + agrégats par Cloud Functions
+
+**Problème :** Le mobile écrivait directement les agrégats sur le document `posts` (likes, reactionCounts, savedBy, reposts, shares, comments) via `runTransaction`/`increment`. Les règles autorisaient tout utilisateur authentifié à modifier ces champs (`affectedKeys().hasOnly([...agrégats])`) — écrasement possible des compteurs, impossible de tracer les intentions, et l'historique repost `users/{uid}/reposts` n'était couvert par aucune règle.
+
+**Décision :** Adopter pour `posts` le modèle déjà en place pour `videos` : le client n'écrit que son intention dans des **sous-collections cléées par utilisateur**, et les Cloud Functions maintiennent les compteurs du document.
+
+- `posts/{postId}/reactions/{userId}` `{ userId, type, updatedAt }` — `setDoc` merge / `deleteDoc`
+- `posts/{postId}/saves/{userId}` `{ userId, createdAt }` — create/delete
+- `posts/{postId}/reposts/{userId}` `{ userId, createdAt }` — create/delete (agrégat)
+- `users/{userId}/reposts/{postId}` `{ userId, postId, createdAt }` — historique utilisateur (règle dédiée ajoutée)
+- `posts/{postId}/shares/{userId}` `{ userId, createdAt }` — un doc par utilisateur (idempotent)
+- `posts/{postId}/pollVotes/{userId}` `{ userId, optionId, updatedAt }` — vote de sondage
+- `posts/{postId}/comments/{commentId}` — déjà en sous-collection ; le compteur `comments` est désormais maintenu par CF (le client n'incrémente plus)
+
+**Règles (`firestore.rules`) :**
+- `posts update` → **auteur uniquement**, `userId` immuable, et interdiction d'écrire les champs agrégats (`likes, likedBy, comments, shares, saves, savedBy, reactionCounts, reposts, repostedBy`).
+- Sous-collections : `create`/`delete` réservés à l'utilisateur dont l'uid est le doc id ; `reactions`/`pollVotes` valident `type`/`optionId` et n'autorisent l'update que sur `type|updatedAt` / `optionId|updatedAt`.
+- Lecture `posts` conservée (visibilité public/followers/private) — pas affaiblie.
+- L'édition de post (`news-compose`) reste possible : elle n'écrit que des champs de contenu.
+
+**Cloud Functions :**
+- `functions/src/posts/onReactionWrite.ts` : `onPostReactionCreate/Update/Delete` (extraits de `index.ts`, qui n'exposait qu'une agrégation inline) — fix du `onPostReactionDelete` qui lisait `event.data.before` (inexistant en v2, le compteur n'était jamais décrémenté).
+- `functions/src/posts/onEngagementWrite.ts` : `onPostSaveCreate/Delete`, `onPostRepostCreate/Delete`, `onPostShareCreate/Delete`, `onPostCommentCreate/Delete`, `onPostPollVoteWrite` (recalcul de `poll.options` depuis `pollVotes`, votes orphelins ignorés).
+- `getFirestore()` appelé dans les handlers (ordre d'import vs `initializeApp()`).
+
+**Conséquences / limites connues :**
+- Les compteurs affichés sont **éventuellement cohérents** (agrégation différée par CF) — l'optimiste local masque le délai, convergence au rechargement.
+- Un même utilisateur partageant plusieurs fois un même post ne compte qu'une fois (`shares/{userId}`). Accepté (aligné sur saves/reposts).
+- `deleteAccount` ne nettoie pas les sous-collections orphelines sous `posts/` (reactions/saves/reposts/shares/pollVotes d'un compte supprimé) → compteurs potentiellement non remis à zéro. À traiter (CF `onPostDelete` recursive delete / recompute) dans un prochain ticket.
+- **Non déployé** : règles + fonctions à déployer ensemble (`npm run firebase:deploy:rules` puis `firebase deploy --only functions`) pour éviter un état hybride.
+

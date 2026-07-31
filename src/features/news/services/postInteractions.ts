@@ -1,22 +1,17 @@
 /* src/features/news/services/postInteractions.ts
 
    Toutes les écritures Firestore liées à une carte de post, sorties de l'UI.
-   Une transaction par intention, aucune boucle de lecture, delta renvoyé au
-   hook pour que l'optimiste et le serveur convergent.
 
-   À valider lors de la passe backend :
-   - règles `posts` : autoriser l'update partiel de reactionCounts / savedBy
-     / repostedBy sans autoriser l'écriture libre du document.
-   - sous-collection `posts/{postId}/reactions/{userId}` : lecture publique,
-     écriture réservée à l'auteur de la réaction. */
+   Le mobile n'écrit JAMAIS les compteurs du document post (likes,
+   reactionCounts, savedBy, reposts, shares...) : il exprime son intention
+   dans une sous-collection `posts/{postId}/<kind>/{userId}`. Les Cloud
+   Functions agrègent ensuite les compteurs sur le document (modèle identique
+   à celui des vidéos). Les règles Firestore interdisent toute autre écriture. */
 
 import {
-  arrayRemove,
-  arrayUnion,
   deleteDoc,
   doc,
-  increment,
-  runTransaction,
+  getDoc,
   serverTimestamp,
   setDoc,
 } from 'firebase/firestore'
@@ -41,7 +36,9 @@ export interface ReactionResult {
 
 /**
  * Pose, remplace ou retire la réaction de l'utilisateur.
- * `next === null` retire la réaction courante.
+ * `next === null` retire la réaction courante. Le compteur du post
+ * (`reactionCounts`, `likes`, `likedBy`) est recalculé par la Cloud Function
+ * `posts/onReactionWrite`.
  */
 export async function setPostReaction(
   postId: string,
@@ -50,52 +47,34 @@ export async function setPostReaction(
 ): Promise<ReactionResult | null> {
   if (!userId) return null
 
-  const postRef = doc(db, POSTS, postId)
   const reactionRef = doc(db, POSTS, postId, 'reactions', userId)
 
   try {
-    return await runTransaction(db, async (transaction) => {
-      const [postSnap, reactionSnap] = await Promise.all([
-        transaction.get(postRef),
-        transaction.get(reactionRef),
-      ])
+    if (next === null) {
+      await deleteDoc(reactionRef)
 
-      if (!postSnap.exists()) {
-        throw new Error('Publication introuvable')
+      return {
+        reaction: null,
+        previous: null,
+        totalDelta: -1,
       }
+    }
 
-      const previous =
-        (reactionSnap.data()?.type as PostReactionType | undefined) ?? null
+    await setDoc(
+      reactionRef,
+      {
+        userId,
+        type: next,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    )
 
-      if (previous === next) {
-        return { reaction: previous, previous, totalDelta: 0 }
-      }
-
-      const totalDelta = (next ? 1 : 0) - (previous ? 1 : 0)
-      const updates: Record<string, unknown> = {
-        'reactionCounts.total': increment(totalDelta),
-        // Compatibilité avec l'ancien modèle likes / likedBy
-        likes: increment(totalDelta),
-        likedBy: next ? arrayUnion(userId) : arrayRemove(userId),
-      }
-
-      if (previous) updates[`reactionCounts.${previous}`] = increment(-1)
-      if (next) updates[`reactionCounts.${next}`] = increment(1)
-
-      transaction.update(postRef, updates)
-
-      if (next) {
-        transaction.set(reactionRef, {
-          type: next,
-          userId,
-          createdAt: serverTimestamp(),
-        })
-      } else {
-        transaction.delete(reactionRef)
-      }
-
-      return { reaction: next, previous, totalDelta }
-    })
+    return {
+      reaction: next,
+      previous: null,
+      totalDelta: 1,
+    }
   } catch (error) {
     report(error, 'postInteractions.setPostReaction', postId)
     return null
@@ -107,91 +86,79 @@ export interface ToggleResult {
   delta: number
 }
 
+/** Sauvegarde : un document `posts/{postId}/saves/{userId}` fait foi. */
 export async function togglePostSave(
   postId: string,
   userId: string,
 ): Promise<ToggleResult | null> {
   if (!userId) return null
 
-  const postRef = doc(db, POSTS, postId)
+  const saveRef = doc(db, POSTS, postId, 'saves', userId)
 
   try {
-    return await runTransaction(db, async (transaction) => {
-      const snap = await transaction.get(postRef)
+    const wasSaved = (await getDoc(saveRef)).exists()
 
-      if (!snap.exists()) {
-        throw new Error('Publication introuvable')
-      }
+    if (wasSaved) {
+      await deleteDoc(saveRef)
+    } else {
+      await setDoc(saveRef, { userId, createdAt: serverTimestamp() })
+    }
 
-      const savedBy: string[] = snap.data().savedBy ?? []
-      const wasSaved = savedBy.includes(userId)
-
-      transaction.update(postRef, {
-        savedBy: wasSaved ? arrayRemove(userId) : arrayUnion(userId),
-        saves: increment(wasSaved ? -1 : 1),
-      })
-
-      return { active: !wasSaved, delta: wasSaved ? -1 : 1 }
-    })
+    return { active: !wasSaved, delta: wasSaved ? -1 : 1 }
   } catch (error) {
     report(error, 'postInteractions.togglePostSave', postId)
     return null
   }
 }
 
+/** Repost : sous-collection du post (agrégat) + historique côté utilisateur. */
 export async function togglePostRepost(
   postId: string,
   userId: string,
 ): Promise<ToggleResult | null> {
   if (!userId) return null
 
-  const postRef = doc(db, POSTS, postId)
-  const repostRef = doc(db, 'users', userId, 'reposts', postId)
+  const postRepostRef = doc(db, POSTS, postId, 'reposts', userId)
+  const userRepostRef = doc(db, 'users', userId, 'reposts', postId)
 
   try {
-    const result = await runTransaction(db, async (transaction) => {
-      const snap = await transaction.get(postRef)
+    const wasReposted = (await getDoc(postRepostRef)).exists()
 
-      if (!snap.exists()) {
-        throw new Error('Publication introuvable')
-      }
-
-      const repostedBy: string[] = snap.data().repostedBy ?? []
-      const wasReposted = repostedBy.includes(userId)
-
-      transaction.update(postRef, {
-        repostedBy: wasReposted ? arrayRemove(userId) : arrayUnion(userId),
-        reposts: increment(wasReposted ? -1 : 1),
-      })
-
-      return { active: !wasReposted, delta: wasReposted ? -1 : 1 }
-    })
-
-    // Index côté utilisateur, hors transaction : non critique pour le compteur.
-    if (result.active) {
-      await setDoc(repostRef, { postId, createdAt: serverTimestamp() })
+    if (wasReposted) {
+      await deleteDoc(postRepostRef)
+      await deleteDoc(userRepostRef)
     } else {
-      await deleteDoc(repostRef)
+      await setDoc(postRepostRef, { userId, createdAt: serverTimestamp() })
+      await setDoc(userRepostRef, {
+        userId,
+        postId,
+        createdAt: serverTimestamp(),
+      })
     }
 
-    return result
+    return { active: !wasReposted, delta: wasReposted ? -1 : 1 }
   } catch (error) {
     report(error, 'postInteractions.togglePostRepost', postId)
     return null
   }
 }
 
-export async function incrementShareCount(postId: string): Promise<void> {
+/** Partage : un document `posts/{postId}/shares/{userId}` (idempotent). */
+export async function recordShare(
+  postId: string,
+  userId: string,
+): Promise<boolean> {
+  if (!userId) return false
+
   try {
-    await runTransaction(db, async (transaction) => {
-      const postRef = doc(db, POSTS, postId)
-      const snap = await transaction.get(postRef)
+    await setDoc(
+      doc(db, POSTS, postId, 'shares', userId),
+      { userId, createdAt: serverTimestamp() },
+    )
 
-      if (!snap.exists()) return
-
-      transaction.update(postRef, { shares: increment(1) })
-    })
+    return true
   } catch (error) {
-    report(error, 'postInteractions.incrementShareCount', postId)
+    report(error, 'postInteractions.recordShare', postId)
+    return false
   }
 }

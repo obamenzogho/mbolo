@@ -14,7 +14,6 @@ import {
   query,
   runTransaction,
   serverTimestamp,
-  updateDoc,
 } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
 import { captureException } from '@/lib/sentry'
@@ -108,10 +107,6 @@ export function useNewsComments(postId: string | null, postOwnerId?: string) {
         createdAt: serverTimestamp(),
       })
 
-      await updateDoc(doc(db, 'posts', postId), {
-        comments: increment(1),
-      })
-
       if (postOwnerId) {
         notifyPostOwner({
           postOwnerId,
@@ -155,10 +150,6 @@ export function useNewsComments(postId: string | null, postOwnerId?: string) {
       }
 
       await deleteDoc(commentRef)
-
-      await updateDoc(doc(db, 'posts', postId), {
-        comments: increment(-1),
-      })
 
       return true
     } catch (error) {

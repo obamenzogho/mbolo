@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { View, Text, Pressable, StyleSheet } from 'react-native'
-import { doc, runTransaction } from 'firebase/firestore'
+import { doc, serverTimestamp, setDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { captureException } from '@/lib/sentry'
 import { colors } from '@/lib/theme'
@@ -14,29 +14,39 @@ export default function PollView({ poll, postId, currentUserId }: { poll: NewsPo
   const vote = async (optionId: string) => {
     if (myVote) return
 
-    setLocalPoll((p) => ({
+    const optimistic = (p: NewsPoll): NewsPoll => ({
       ...p,
       options: p.options.map((o) => o.id === optionId
         ? { ...o, votes: o.votes + 1, votedBy: [...o.votedBy, currentUserId] }
         : o),
-    }))
+    })
+
+    setLocalPoll(optimistic)
 
     try {
-      await runTransaction(db, async (tx) => {
-        const ref = doc(db, 'posts', postId)
-        const snap = await tx.get(ref)
-        if (!snap.exists()) return
-        const data = snap.data()
-        const currentOptions = (data.poll?.options ?? []).map((o: any) => {
-          if (o.id === optionId) {
-            const votedBy = Array.isArray(o.votedBy) ? [...o.votedBy, currentUserId] : [currentUserId]
-            return { ...o, votes: (o.votes ?? 0) + 1, votedBy }
-          }
-          return o
-        })
-        tx.update(ref, { 'poll.options': currentOptions })
-      })
+      // Intention uniquement : le recalcule de poll.options (votes/votedBy)
+      // est fait par la Cloud Function onPostPollVoteWrite.
+      await setDoc(
+        doc(db, 'posts', postId, 'pollVotes', currentUserId),
+        {
+          userId: currentUserId,
+          optionId,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      )
     } catch (error) {
+      setLocalPoll((p) => ({
+        ...p,
+        options: p.options.map((o) => o.id === optionId
+          ? {
+              ...o,
+              votes: Math.max(0, o.votes - 1),
+              votedBy: o.votedBy.filter((u) => u !== currentUserId),
+            }
+          : o),
+      }))
+
       captureException(
         error instanceof Error ? error : new Error(String(error)),
         { context: 'PollView.vote', postId, optionId },

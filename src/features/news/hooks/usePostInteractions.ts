@@ -12,7 +12,7 @@ import { Share } from 'react-native'
 import type { StoreApi } from 'zustand'
 import { captureException } from '@/lib/sentry'
 import {
-  incrementShareCount,
+  recordShare,
   setPostReaction,
   togglePostRepost,
   togglePostSave,
@@ -208,7 +208,7 @@ export function usePostInteractions({
 
         if (result.action === Share.sharedAction) {
           patch(post.id, { shares: post.shares + 1 })
-          void incrementShareCount(post.id)
+          void recordShare(post.id, currentUserId)
         }
       } catch (error) {
         captureException(
@@ -217,7 +217,7 @@ export function usePostInteractions({
         )
       }
     },
-    [patch],
+    [currentUserId, patch],
   )
 
   return useMemo(
