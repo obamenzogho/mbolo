@@ -183,7 +183,7 @@ export default function FeedTabsScreen({
         cityLabel={cityLabel}
         locationGranted={locationGranted}
         onRequestLocation={request}
-        isNewsActive={activeTab === 2}
+        activeTab={activeTab}
         headerTranslateY={headerTranslateY}
       />
     </View>

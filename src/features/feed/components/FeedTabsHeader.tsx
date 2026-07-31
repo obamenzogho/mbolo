@@ -31,7 +31,7 @@ interface FeedTabsHeaderProps {
   cityLabel: string
   locationGranted: boolean
   onRequestLocation: () => void
-  isNewsActive?: boolean
+  activeTab?: number
   headerTranslateY?: Animated.Value
 }
 
@@ -44,7 +44,7 @@ export default function FeedTabsHeader({
   cityLabel,
   locationGranted,
   onRequestLocation,
-  isNewsActive = false,
+  activeTab,
   headerTranslateY,
 }: FeedTabsHeaderProps) {
   const insets = useSafeAreaInsets()
@@ -152,9 +152,12 @@ export default function FeedTabsHeader({
         styles.header,
         {
           paddingTop: insets.top + 6,
-          backgroundColor: isNewsActive
-            ? '#111214'
-            : 'rgba(8, 9, 10, 0.92)',
+          backgroundColor:
+            activeTab === 1 || activeTab === 3
+              ? 'transparent'
+              : activeTab === 2
+                ? '#111214'
+                : 'rgba(8, 9, 10, 0.92)',
           transform: [
             { translateY: headerTranslateY ?? 0 },
           ],
