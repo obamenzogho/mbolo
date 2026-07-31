@@ -252,7 +252,12 @@ service cloud.firestore {
         ]
         && request.resource.data.visibility in [
           'public', 'followers', 'private'
-        ];
+        ]
+        // `verified` est dénormalisé depuis le doc user à la création : on
+        // interdit de l'inventer côté client (l'update est bloqué plus bas).
+        && (!('verified' in request.resource.data)
+            || request.resource.data.verified ==
+               (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.verified == true));
 
       // 🔒 Les agrégats (likes/likedBy/comments/shares/saves/savedBy/
       // reactionCounts/reposts/repostedBy) sont possédés par les Cloud
@@ -264,7 +269,7 @@ service cloud.firestore {
         && request.resource.data.userId == resource.data.userId
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
           'likes', 'likedBy', 'comments', 'shares', 'saves', 'savedBy',
-          'reactionCounts', 'reposts', 'repostedBy'
+          'reactionCounts', 'reposts', 'repostedBy', 'verified'
         ]);
 
       allow delete: if request.auth != null

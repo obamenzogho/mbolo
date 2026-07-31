@@ -118,6 +118,7 @@ export interface NewsPost {
   reposts: number
   repostedBy: string[]
   // ── Nouveaux champs (Phase 0) ──
+  verified?: boolean
   reactionCounts?: ReactionCounts
   myReaction?: PostReactionType | null
   article?: NewsPostArticle

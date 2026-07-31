@@ -1,19 +1,45 @@
 /* src/features/news/utils/format.ts
    Formatage pur, sans dépendance React. Testable unitairement.
-   `timeAgo` prend `now` en paramètre pour être déterministe en test. */
+   `timeAgo` prend `now` en paramètre pour être déterministe en test et des
+   `labels` i18n optionnels (retour au français si non fournis). */
 
 const MINUTE = 60
 const HOUR = 3600
 const DAY = 86400
 const WEEK = 604800
 
-export function timeAgo(date: Date, now: number = Date.now()): string {
+export interface TimeLabels {
+  justNow: string
+  minutes: string
+  hours: string
+  yesterday: string
+  days: string
+}
+
+const DEFAULT_LABELS: TimeLabels = {
+  justNow: "À l'instant",
+  minutes: 'Il y a {n} min',
+  hours: 'Il y a {n} h',
+  yesterday: 'Hier',
+  days: 'Il y a {n} j',
+}
+
+export function interpolate(template: string, value: number): string {
+  return template.replace('{n}', String(value))
+}
+
+export function timeAgo(
+  date: Date,
+  now: number = Date.now(),
+  labels: TimeLabels = DEFAULT_LABELS,
+): string {
   const seconds = Math.max(1, Math.floor((now - date.getTime()) / 1000))
 
-  if (seconds < MINUTE) return "À l'instant"
-  if (seconds < HOUR) return `${Math.floor(seconds / MINUTE)} min`
-  if (seconds < DAY) return `${Math.floor(seconds / HOUR)} h`
-  if (seconds < WEEK) return `${Math.floor(seconds / DAY)} j`
+  if (seconds < MINUTE) return labels.justNow
+  if (seconds < HOUR) return interpolate(labels.minutes, Math.floor(seconds / MINUTE))
+  if (seconds < DAY) return interpolate(labels.hours, Math.floor(seconds / HOUR))
+  if (seconds < DAY * 2) return labels.yesterday
+  if (seconds < WEEK) return interpolate(labels.days, Math.floor(seconds / DAY))
 
   const sameYear = date.getFullYear() === new Date(now).getFullYear()
 

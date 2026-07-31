@@ -1,14 +1,18 @@
 import { useCallback } from 'react'
-import { Text, StyleSheet } from 'react-native'
+import { Text, StyleSheet, type StyleProp, type TextStyle } from 'react-native'
 import { router } from 'expo-router'
 import { colors } from '@/lib/theme'
 
 interface Props {
   text: string
-  style?: any
+  style?: StyleProp<TextStyle>
 }
 
-const REGEX = /(#[\w\u00C0-\u024F]+|@[\w\u00C0-\u024F]+)/g
+const TOKEN_PATTERN = /(#[\w\u00C0-\u024F]+|@[\w\u00C0-\u024F]+)/g
+
+function isToken(part: string): boolean {
+  return part.startsWith('#') || part.startsWith('@')
+}
 
 export default function RichPostText({ text, style }: Props) {
   const handlePress = useCallback((token: string) => {
@@ -25,27 +29,24 @@ export default function RichPostText({ text, style }: Props) {
     }
   }, [])
 
-  const parts = text.split(REGEX)
+  const parts = text.split(TOKEN_PATTERN)
 
   return (
     <Text style={[styles.base, style]} selectable>
-      {parts.map((part, index) => {
-        if (REGEX.test(part)) {
-          REGEX.lastIndex = 0
-
-          return (
-            <Text
-              key={index}
-              style={styles.link}
-              onPress={() => handlePress(part)}
-            >
-              {part}
-            </Text>
-          )
-        }
-
-        return part
-      })}
+      {parts.map((part, index) =>
+        isToken(part) ? (
+          <Text
+            key={index}
+            accessibilityRole="link"
+            style={styles.link}
+            onPress={() => handlePress(part)}
+          >
+            {part}
+          </Text>
+        ) : (
+          part
+        ),
+      )}
     </Text>
   )
 }

@@ -7,7 +7,7 @@
 
    Il couvre aussi les cinq états : squelette, erreur, vide, liste, fin de fil. */
 
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActionSheetIOS,
   Alert,
@@ -25,9 +25,13 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
+import * as Clipboard from 'expo-clipboard'
 import { auth } from '@/lib/firebase'
 import OrbitLoader from '@/components/OrbitLoader'
 import { ContentActionsSheet } from '@/components/ContentActionsSheet'
+import { useI18n } from '@/i18n'
+import { useFollowFast } from '@/hooks/useFollowFast'
+import { useFollowAction } from '@/hooks/useFollowAction'
 import { deletePost } from './services/postMutations'
 import { PostCard } from './components/post/PostCard'
 import { NewsFeedSkeleton } from './components/post/PostCardSkeleton'
@@ -37,6 +41,7 @@ import { ReactionPicker } from './components/ReactionPicker'
 import { newsFeedStore } from './store/newsFeedStore'
 import { useNewsFeedData } from './hooks/useNewsFeedData'
 import { usePostInteractions } from './hooks/usePostInteractions'
+import { useActiveStories } from './hooks/useActiveStories'
 import { postColors, postSpacing, postType } from './theme/postTokens'
 import type { NewsPost, PostReactionType } from './types'
 
@@ -62,6 +67,7 @@ export default function NewsFeedScreen({
 }: NewsFeedScreenProps) {
   const insets = useSafeAreaInsets()
   const currentUserId = auth.currentUser?.uid ?? ''
+  const { t } = useI18n()
 
   const {
     posts,
@@ -81,11 +87,49 @@ export default function NewsFeedScreen({
     currentUserId,
   })
 
+  /* ── Anneaux de story : un seul getDocs groupé par page de fil ── */
+  const authorIds = useMemo(
+    () => Array.from(new Set(posts.map((post) => post.userId))),
+    [posts],
+  )
+  const activeStories = useActiveStories(authorIds)
+
   /* ── Overlays, un seul de chaque ─────────────────────────── */
   const [commentPost, setCommentPost] = useState<NewsPost | null>(null)
   const [gallery, setGallery] = useState<GalleryTarget | null>(null)
   const [reactionTarget, setReactionTarget] = useState<NewsPost | null>(null)
   const [actionsPost, setActionsPost] = useState<NewsPost | null>(null)
+
+  /* ── Légendes dépliées : survit au recyclage des cartes ──── */
+  const [expandedPosts, setExpandedPosts] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  )
+
+  const toggleExpanded = useCallback((postId: string) => {
+    setExpandedPosts((previous) => {
+      const next = new Set(previous)
+
+      if (next.has(postId)) {
+        next.delete(postId)
+      } else {
+        next.add(postId)
+      }
+
+      return next
+    })
+  }, [])
+
+  /* ── Toast local (lien copié) ────────────────────────────── */
+  const [toast, setToast] = useState<string | null>(null)
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  useEffect(() => () => clearTimeout(toastTimer.current), [])
+
+  const showToast = useCallback((message: string) => {
+    setToast(message)
+    clearTimeout(toastTimer.current)
+    toastTimer.current = setTimeout(() => setToast(null), 2000)
+  }, [])
 
   /* ── Direction de scroll ─────────────────────────────────── */
   const lastOffset = useRef(0)
@@ -161,12 +205,12 @@ export default function NewsFeedScreen({
   const confirmDelete = useCallback(
     (post: NewsPost) => {
       Alert.alert(
-        'Supprimer la publication',
-        'Cette action est définitive.',
+        t.news.feed.deleteTitle,
+        t.news.feed.deleteMsg,
         [
-          { text: 'Annuler', style: 'cancel' },
+          { text: t.news.menu.cancel, style: 'cancel' },
           {
-            text: 'Supprimer',
+            text: t.news.feed.delete,
             style: 'destructive',
             onPress: async () => {
               const ok = await deletePost(post.id, currentUserId)
@@ -174,14 +218,14 @@ export default function NewsFeedScreen({
               if (ok) {
                 newsFeedStore.getState().removePost(post.id)
               } else {
-                Alert.alert('Erreur', 'Impossible de supprimer. Réessaie.')
+                Alert.alert(t.news.feed.error, t.news.feed.deleteFailed)
               }
             },
           },
         ],
       )
     },
-    [currentUserId],
+    [currentUserId, t],
   )
 
   const editPost = useCallback((post: NewsPost) => {
@@ -196,7 +240,7 @@ export default function NewsFeedScreen({
         return
       }
 
-      const options = ['Modifier', 'Supprimer', 'Annuler']
+      const options = [t.news.feed.edit, t.news.feed.delete, t.news.menu.cancel]
 
       const run = (index: number) => {
         if (index === 0) editPost(post)
@@ -216,18 +260,40 @@ export default function NewsFeedScreen({
         return
       }
 
-      Alert.alert('Publication', undefined, [
+      Alert.alert(t.news.feed.menuTitle, undefined, [
         { text: options[0], onPress: () => run(0) },
         {
           text: options[1],
           style: 'destructive',
           onPress: () => run(1),
         },
-        { text: 'Annuler', style: 'cancel' },
+        { text: t.news.menu.cancel, style: 'cancel' },
       ])
     },
-    [confirmDelete, currentUserId, editPost],
+    [confirmDelete, currentUserId, editPost, t],
   )
+
+  /* ── Menu enrichi (copier le lien, sauvegarder, ne plus suivre) ── */
+  const sheetAuthorId = actionsPost?.userId ?? ''
+  const { isFollowing: sheetIsFollowing } = useFollowFast(sheetAuthorId)
+  const { toggleFollow } = useFollowAction()
+  const sheetSaved = actionsPost
+    ? interactions.viewerStateFor(actionsPost).saved
+    : false
+
+  const copyPostLink = useCallback(() => {
+    if (!actionsPost) return
+    void Clipboard.setStringAsync(`https://mbolo.app/post/${actionsPost.id}`)
+    showToast(t.news.menu.linkCopied)
+  }, [actionsPost, showToast, t])
+
+  const toggleSheetSave = useCallback(() => {
+    if (actionsPost) interactions.onToggleSave(actionsPost)
+  }, [actionsPost, interactions])
+
+  const toggleSheetFollow = useCallback(() => {
+    if (sheetAuthorId) void toggleFollow(sheetAuthorId)
+  }, [sheetAuthorId, toggleFollow])
 
   const keyExtractor = useCallback((item: NewsPost) => item.id, [])
 
@@ -237,6 +303,8 @@ export default function NewsFeedScreen({
         post={item}
         currentUserId={currentUserId}
         viewer={interactions.viewerStateFor(item)}
+        hasStory={activeStories.has(item.userId)}
+        expanded={expandedPosts.has(item.id)}
         onOpenPost={openPost}
         onOpenAuthor={openAuthor}
         onOpenOptions={openOptions}
@@ -248,10 +316,13 @@ export default function NewsFeedScreen({
         onToggleSave={interactions.onToggleSave}
         onToggleRepost={interactions.onToggleRepost}
         onShare={interactions.onShare}
+        onToggleExpanded={toggleExpanded}
       />
     ),
     [
+      activeStories,
       currentUserId,
+      expandedPosts,
       interactions,
       openAuthor,
       openComments,
@@ -260,6 +331,7 @@ export default function NewsFeedScreen({
       openPost,
       openReactionList,
       openReactionPicker,
+      toggleExpanded,
     ],
   )
 
@@ -291,20 +363,20 @@ export default function NewsFeedScreen({
           color={postColors.textTertiary}
         />
         <Text style={styles.stateTitle}>
-          {error === 'network' ? 'Pas de connexion' : 'Le fil n’a pas pu charger'}
+          {error === 'network' ? t.news.feed.noConnection : t.news.feed.loadFailed}
         </Text>
         <Text style={styles.stateText}>
           {error === 'network'
-            ? 'Vérifie ta connexion, on réessaie dès que tu es prêt.'
-            : 'Un incident est survenu de notre côté.'}
+            ? t.news.feed.offlineDesc
+            : t.news.feed.incidentDesc}
         </Text>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Réessayer de charger le fil"
+          accessibilityLabel={t.news.feed.retryA11y}
           onPress={retry}
           style={({ pressed }) => [styles.retry, pressed && styles.pressed]}
         >
-          <Text style={styles.retryText}>Réessayer</Text>
+          <Text style={styles.retryText}>{t.news.feed.retry}</Text>
         </Pressable>
       </View>
     )
@@ -344,17 +416,17 @@ export default function NewsFeedScreen({
                 size={34}
                 color={postColors.textTertiary}
               />
-              <Text style={styles.stateTitle}>Aucune actu pour l’instant</Text>
+              <Text style={styles.stateTitle}>{t.news.feed.empty}</Text>
               <Text style={styles.stateText}>
-                Abonne-toi à quelques comptes, leurs publications atterriront ici.
+                {t.news.feed.emptyDesc}
               </Text>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Découvrir des comptes"
+                accessibilityLabel={t.news.feed.discover}
                 onPress={() => router.push('/explore')}
                 style={({ pressed }) => [styles.retry, pressed && styles.pressed]}
               >
-                <Text style={styles.retryText}>Découvrir des comptes</Text>
+                <Text style={styles.retryText}>{t.news.feed.discover}</Text>
               </Pressable>
             </View>
           ) : null
@@ -371,11 +443,11 @@ export default function NewsFeedScreen({
               style={({ pressed }) => [styles.footer, pressed && styles.pressed]}
             >
               <Text style={styles.footerLink}>
-                Impossible de charger la suite. Réessayer
+                {t.news.feed.loadMoreFailed}
               </Text>
             </Pressable>
           ) : !hasMore && posts.length > 0 ? (
-            <Text style={styles.footerText}>Tu es à jour</Text>
+            <Text style={styles.footerText}>{t.news.feed.upToDate}</Text>
           ) : null
         }
       />
@@ -405,8 +477,22 @@ export default function NewsFeedScreen({
         targetId={actionsPost?.id ?? ''}
         contentOwnerId={actionsPost?.userId}
         contentOwnerName={actionsPost?.userName}
+        isFollowing={sheetIsFollowing}
+        onToggleFollow={toggleSheetFollow}
+        isSaved={sheetSaved}
+        onToggleSave={toggleSheetSave}
+        onCopyLink={copyPostLink}
         onClose={() => setActionsPost(null)}
       />
+
+      {toast ? (
+        <View
+          pointerEvents="none"
+          style={[styles.toast, { bottom: insets.bottom + 88 }]}
+        >
+          <Text style={styles.toastText}>{toast}</Text>
+        </View>
+      ) : null}
     </View>
   )
 }
@@ -464,5 +550,19 @@ const styles = StyleSheet.create({
   footerLink: {
     ...postType.link,
     color: postColors.accent,
+  },
+  toast: {
+    position: 'absolute',
+    alignSelf: 'center',
+    maxWidth: '80%',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(8, 9, 10, 0.92)',
+  },
+  toastText: {
+    color: postColors.textPrimary,
+    fontSize: 14,
+    fontWeight: '600',
   },
 })

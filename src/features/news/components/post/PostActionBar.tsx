@@ -7,6 +7,7 @@ import { memo, useMemo, useRef } from 'react'
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
+import { useI18n } from '@/i18n'
 import {
   HIT_SLOP,
   postColors,
@@ -52,6 +53,7 @@ function PostStatsComponent({
   onOpenComments,
   onToggleSave,
 }: PostStatsProps) {
+  const { t } = useI18n()
   const emojis = useMemo(() => topReactions(post.reactionCounts), [post.reactionCounts])
   const hasActivity =
     reactionTotal > 0 || post.comments > 0 || post.shares > 0 || repostCount > 0
@@ -63,7 +65,10 @@ function PostStatsComponent({
       {reactionTotal > 0 ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${formatCount(reactionTotal)} réactions, voir le détail`}
+          accessibilityLabel={t.news.actions.a11yReactionsDetail.replace(
+            '{n}',
+            formatCount(reactionTotal),
+          )}
           onPress={() => onOpenReactionList(post)}
           style={({ pressed }) => [styles.reactionSummary, pressed && styles.pressed]}
         >
@@ -91,7 +96,13 @@ function PostStatsComponent({
 
       <View style={styles.statsRight}>
         {repostCount > 0 ? (
-          <Text style={styles.statText}>{countLabel(repostCount, 'repost')}</Text>
+          <Text style={styles.statText}>
+            {countLabel(
+              repostCount,
+              t.news.actions.pluralRepost,
+              t.news.actions.pluralReposts,
+            )}
+          </Text>
         ) : null}
 
         {post.comments > 0 ? (
@@ -100,19 +111,31 @@ function PostStatsComponent({
             onPress={() => onOpenComments(post)}
             style={styles.statText}
           >
-            {countLabel(post.comments, 'commentaire')}
+            {countLabel(
+              post.comments,
+              t.news.actions.pluralComment,
+              t.news.actions.pluralComments,
+            )}
           </Text>
         ) : null}
 
         {post.shares > 0 ? (
-          <Text style={styles.statText}>{countLabel(post.shares, 'partage')}</Text>
+          <Text style={styles.statText}>
+            {countLabel(
+              post.shares,
+              t.news.actions.pluralShare,
+              t.news.actions.pluralShares,
+            )}
+          </Text>
         ) : null}
 
         <Pressable
           hitSlop={HIT_SLOP}
           accessibilityRole="button"
           accessibilityState={{ selected: saved }}
-          accessibilityLabel={saved ? 'Retirer des enregistrements' : 'Enregistrer'}
+          accessibilityLabel={
+            saved ? t.news.actions.a11yRemoveSave : t.news.actions.a11ySave
+          }
           onPress={() => onToggleSave(post)}
           style={({ pressed }) => pressed && styles.pressed}
         >
@@ -228,6 +251,9 @@ function PostActionsComponent({
   onRepost,
   onShare,
 }: PostActionsProps) {
+  const { t } = useI18n()
+  const reactionLabel = reaction ? REACTION_LABELS[reaction] : t.news.actions.like
+
   return (
     <>
       <View style={styles.divider} />
@@ -236,12 +262,12 @@ function PostActionsComponent({
         <ActionButton
           icon={reaction ? 'thumbs-up' : 'thumbs-up-outline'}
           emoji={reaction ? REACTION_EMOJI[reaction] : undefined}
-          label={reaction ? REACTION_LABELS[reaction] : "J'aime"}
+          label={reactionLabel}
           active={!!reaction}
           accessibilityLabel={
             reaction
-              ? `Réaction ${REACTION_LABELS[reaction]}. Appuyer pour retirer, appui long pour changer`
-              : "J'aime cette publication. Appui long pour choisir une réaction"
+              ? t.news.actions.a11yReaction.replace('{label}', REACTION_LABELS[reaction])
+              : t.news.actions.a11yLike
           }
           onPress={() => onToggleReaction(post)}
           onLongPress={() => onOpenReactionPicker(post)}
@@ -250,25 +276,27 @@ function PostActionsComponent({
         {post.commentsEnabled ? (
           <ActionButton
             icon="chatbubble-outline"
-            label="Commenter"
-            accessibilityLabel="Commenter la publication"
+            label={t.news.actions.comment}
+            accessibilityLabel={t.news.actions.a11yComment}
             onPress={() => onComment(post)}
           />
         ) : null}
 
         <ActionButton
           icon="repeat-outline"
-          label="Reposter"
+          label={t.news.actions.repost}
           active={reposted}
           disabled={repostPending}
-          accessibilityLabel={reposted ? 'Annuler le repost' : 'Reposter la publication'}
+          accessibilityLabel={
+            reposted ? t.news.actions.a11yReposted : t.news.actions.a11yRepost
+          }
           onPress={() => onRepost(post)}
         />
 
         <ActionButton
           icon="arrow-redo-outline"
-          label="Partager"
-          accessibilityLabel="Partager la publication"
+          label={t.news.actions.share}
+          accessibilityLabel={t.news.actions.a11yShare}
           onPress={() => onShare(post)}
         />
       </View>

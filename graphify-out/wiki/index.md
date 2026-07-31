@@ -959,3 +959,60 @@ Résultat : swipe-back de bord fonctionne sur iOS, Android et Web, y compris sur
 
 **À surveiller (même patron) :** `messages/conversation/[id]` et `notifications/follow-requests` restent dans `(sub)` : ouverts en premier écran de cette Stack, leur retour tombe aussi dans le repli. À migrer vers la racine si le même symptôme est signalé (ou à mutualiser via un helper).
 
+---
+
+## ADR 2026-07-31: En-tête de post Actus au niveau Facebook + i18n du module news
+
+**Décision :** Porter l'en-tête des posts Actus au niveau Facebook : badge vérifié, ligne d'activité (humeur · lieu), horodatage relatif FB (« Hier », « Il y a X »), bouton Suivre, anneau de story, menu « … » enrichi (copier le lien / sauvegarder / ne plus suivre / signaler / bloquer), et internationaliser l'ensemble du module news (fr/fang/punu/nzebi).
+
+**Schema (`posts`)** :
+- Nouveau champ **`verified?: boolean`**, dénormalisé depuis le doc `users` **à la création** du post (`app/news-compose.tsx`).
+- Règles : sur `create`, `verified` doit être absent ou égal au `verified` du doc user (impossible de l'inventer côté client) ; `verified` ajouté à la **blocklist** de `posts update` (seul le backend peut le faire évoluer).
+
+**Header** (`PostHeader.tsx`, désormais seul non-strictement-présentationnel du module) :
+- **Badge vérifié** : `checkmark-circle` (couleur `postColors.verified`).
+- **Ligne d'activité** : `se sent {emoji} {label} · est à {lieu}` — le lieu quitte `PostBody` (plus de doublon). Libellés d'humeur traduits via `t.news.moods[emoji]` (fallback sur le label stocké).
+- **Horodatage FB** : `timeAgo(date, now, labels)` prend désormais des `labels` i18n (interface `TimeLabels`) — « À l'instant », « Il y a {n} min/h/j », « Hier » (24-48 h), sinon date fr-FR. Compatible avec les anciens appels (labels fr par défaut).
+- **Bouton Suivre** : même pattern que `AuthorInfo` du feed (`useFollowFast` + `useFollowAction` + état `idle/done/hidden` avec timer 2 s), **dans la ligne du nom** (nom tronqué via `flexShrink`, pastille toujours visible à sa droite), masqué si propriétaire ou déjà suivi. Lecture d'abonnement ignorée pour ses propres posts (`useFollowFast('')`).
+- **Anneau de story** : simple bordure 2 px `postColors.accent` (pattern `StoryCard.avatarRing`, pas de dégradé) quand l'auteur a une story non lue.
+- Accessibilité (labels d'écran) traduite.
+
+**Anneaux par carte — zéro N+1** : nouveau `src/features/news/hooks/useActiveStories.ts` — un seul `getDocs` groupé par page de fil (`where('userId','in',[…30])` + `where('expiresAt','>',now)` + `limit(100)`), index composite `stories userId ASC + expiresAt ASC` déjà existant. `NewsFeedScreen` déduit les auteurs visibles et propage `hasStory` par carte. Limites : plafonné à 30 auteurs par page, pas de filtrage `privateAccount`, l'anneau n'ouvre pas le viewer de stories (tap = profil) — amélioration documentée pour un prochain ticket.
+
+**Menu « … » enrichi** (`ContentActionsSheet`, props optionnels — les autres appelants `user/[userId]`, `post-detail` restent inchangés) : `onCopyLink` (deep link `mbolo://post/{id}` + `expo-clipboard`, toast local), `onToggleSave` (`isSaved`), `onToggleFollow` (`isFollowing`), en plus de Signaler/Bloquer existants. `NewsFeedScreen` câble le tout avec `useFollowFast`/`useFollowAction` sur l'auteur de la feuille ouverte (un seul getDoc actif à la fois).
+
+**i18n** : nouvelle section `t.news.*` (time, moods, menu, feed states, actions) dans `src/i18n/translations.ts` pour les 4 langues. `timeAgo` reste pur (labels injectés). ⚠️ **Fang/Punu/Nzebi à faire relire par un locuteur natif** (traductions best-effort, réutilisant le vocabulaire existant du fichier).
+
+**Limites connues** :
+- Le cache 60 s de `useFollowFast` peut afficher un état de suivi périmé après une action via le menu (norme app).
+- Le mode édition de post n'écrit pas `verified` (inchangé) — conformité garantie par les règles.
+- `absoluteDate` (lecteurs d'écran) reste fr-FR.
+
+### ADR — Légende du post : état d'expansion remonté à l'écran + correction « modifié »
+
+**Décision :** Rendre la légende cohérente avec l'architecture (cart 100 % présentationnelle) et corriger deux défauts.
+
+**Corrections** :
+- **Bug « Modifié » fantôme** : le flux de création écrivait `updatedAt` → tous les posts affichaient « modifié ». `updatedAt` n'est désormais écrit que par l'édition (`app/news-compose.tsx`). En plus, `PostHeader` n'affiche « modifié » que si `updatedAt - createdAt > 60 s` (couverture des anciens docs en base).
+- **`expanded` remonté** : l'état de dépliage n'est plus un `useState` local à `PostBody` (perdu au recyclage FlatList) mais un `ReadonlySet<string>` possédé par `NewsFeedScreen` ; `PostBody`/`PostCard` restent présentationnels (props `expanded` + `onToggleExpanded`). `post-detail` déplie par défaut (`useState(true)`). Le comparateur mémo de `PostCard` compare `expanded`.
+- **Variante hero** : même repli que l'inline — `numberOfLines` 8 replié, plus de coupe quand déplié, lien « Voir plus / Voir moins » sous le dégradé (padding dédié `heroMoreLink`).
+- **`RichPostText`** : typage strict (`style?: StyleProp<TextStyle>`, plus de `any`), `accessibilityRole="link"` sur les tokens `#`/`@`, détection de token sans regex globale mutante.
+- **i18n** : `a11yOpenPost` (label « Ouvrir la publication ») ajouté en 4 langues (plus de français codé en dur dans `PostCard`).
+
+**Limite** : le dépliage ne survit pas à un `refresh()` du fil (les posts sont remplacés) — acceptable.
+
+### ADR — Grille média du post : états chargement/erreur, ratios, i18n
+
+**Décision :** Durcir le composant média (`PostMedia.tsx`) : états explicites, ratios non carrés, labels accessibilité internationalisés.
+
+**Changements** :
+- **`TileImage`** : sous-composant qui enveloppe `expo-image` et suit `onLoadStart/onLoad/onError` → **skeleton** `ShimmerBlock` (pulsation opacité, `postColors.surfaceRaised`) sur toute la tuile pendant le chargement, icône `image-outline` si échec. Plus d'image « transparente » silencieuse, plus d'`OrbitLoader` par tuile.
+- **`ShimmerBlock` unifié** : `PostCardSkeleton` n'a plus son propre `Shimmer` en doublon (déduplication vers `Skeletons.tsx`), et `style` y est typé `StyleProp<ViewStyle>` (plus de `any`).
+- **Ratios** : helper `naturalRatio(item)` (ratio réel clampé 0.72–1.91). Appliqué à **1** (comme avant), **2** (cellules côte à côte au ratio du premier visuel — fini le carré qui écrasait les portraits) et **3** (« une + deux »). La grille 4+ reste carrée.
+- **i18n** : labels accessibilité `a11yMediaOpen` (« Agrandir le média {n} »), `a11yMediaMore`, `a11yVideoPlay` en 4 langues, interpolation via `interpolate()` (exporté de `utils/format.ts`).
+- **Tokens** : `postColors.onMedia` (`#FFFFFF`) pour texte/icônes sur média — plus d'hex en dur dans `PostMedia` ni dans le texte hero de `PostBody`.
+
+**Limites** :
+- 2 visuels de ratios différents : le second est recadré au ratio du premier.
+- Traductions fang/punu/nzebi best-effort (à faire relire par un natif, cf. note existante).
+

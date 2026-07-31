@@ -1,10 +1,10 @@
 import { useEffect } from 'react'
-import { View, StyleSheet } from 'react-native'
+import { View, StyleSheet, type StyleProp, type ViewStyle } from 'react-native'
 import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, Easing } from 'react-native-reanimated'
 
 const SKELETON_COLOR = '#1A1B1E'
 
-export function ShimmerBlock({ style, color }: { style?: any; color?: string }) {
+export function ShimmerBlock({ style, color }: { style?: StyleProp<ViewStyle>; color?: string }) {
   const opacity = useSharedValue(0.4)
 
   useEffect(() => {

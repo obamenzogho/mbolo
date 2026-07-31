@@ -1,64 +1,37 @@
 /* src/features/news/components/post/PostCardSkeleton.tsx
    Remplace le loader plein écran au premier chargement : la structure du fil
    apparaît immédiatement, la perception de latence chute.
-   Pulsation d'opacité uniquement (propriété non-layout, driver natif). */
+   Pulsation d'opacité uniquement via ShimmerBlock (propriété non-layout,
+   driver natif). */
 
-import { memo, useEffect, useRef } from 'react'
-import { Animated, Easing, StyleSheet, View } from 'react-native'
+import { memo } from 'react'
+import { StyleSheet, View } from 'react-native'
+import { ShimmerBlock } from '../Skeletons'
 import { postColors, postRadius, postSpacing } from '../../theme/postTokens'
-
-function Shimmer({ style }: { style: object }) {
-  const opacity = useRef(new Animated.Value(0.4)).current
-
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, {
-          toValue: 0.85,
-          duration: 720,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacity, {
-          toValue: 0.4,
-          duration: 720,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
-        }),
-      ]),
-    )
-
-    loop.start()
-
-    return () => loop.stop()
-  }, [opacity])
-
-  return <Animated.View style={[styles.block, style, { opacity }]} />
-}
 
 function PostCardSkeletonComponent({ withMedia = true }: { withMedia?: boolean }) {
   return (
     <View style={styles.card} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       <View style={styles.header}>
-        <Shimmer style={styles.avatar} />
+        <ShimmerBlock style={styles.avatar} color={postColors.surfaceRaised} />
         <View style={styles.identity}>
-          <Shimmer style={styles.lineName} />
-          <Shimmer style={styles.lineMeta} />
+          <ShimmerBlock style={styles.lineName} color={postColors.surfaceRaised} />
+          <ShimmerBlock style={styles.lineMeta} color={postColors.surfaceRaised} />
         </View>
       </View>
 
       <View style={styles.body}>
-        <Shimmer style={styles.lineFull} />
-        <Shimmer style={styles.lineFull} />
-        <Shimmer style={styles.lineShort} />
+        <ShimmerBlock style={styles.lineFull} color={postColors.surfaceRaised} />
+        <ShimmerBlock style={styles.lineFull} color={postColors.surfaceRaised} />
+        <ShimmerBlock style={styles.lineShort} color={postColors.surfaceRaised} />
       </View>
 
-      {withMedia ? <Shimmer style={styles.media} /> : null}
+      {withMedia ? <ShimmerBlock style={styles.media} color={postColors.surfaceRaised} /> : null}
 
       <View style={styles.footer}>
-        <Shimmer style={styles.chip} />
-        <Shimmer style={styles.chip} />
-        <Shimmer style={styles.chip} />
+        <ShimmerBlock style={styles.chip} color={postColors.surfaceRaised} />
+        <ShimmerBlock style={styles.chip} color={postColors.surfaceRaised} />
+        <ShimmerBlock style={styles.chip} color={postColors.surfaceRaised} />
       </View>
     </View>
   )
@@ -83,10 +56,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: postSpacing.cardGap,
     borderBottomColor: postColors.canvas,
     paddingBottom: 14,
-  },
-  block: {
-    backgroundColor: postColors.surfaceRaised,
-    borderRadius: 6,
   },
   header: {
     flexDirection: 'row',
@@ -129,7 +98,6 @@ const styles = StyleSheet.create({
   media: {
     width: '100%',
     height: 220,
-    borderRadius: 0,
   },
   footer: {
     flexDirection: 'row',

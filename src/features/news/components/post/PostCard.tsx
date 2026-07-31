@@ -9,6 +9,7 @@
 
 import { memo } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
+import { useI18n } from '@/i18n'
 import { PostHeader } from './PostHeader'
 import { PostBody } from './PostBody'
 import { PostMedia } from './PostMedia'
@@ -39,18 +40,25 @@ export interface PostCardHandlers {
   onToggleSave: (post: NewsPost) => void
   onToggleRepost: (post: NewsPost) => void
   onShare: (post: NewsPost) => void
+  onToggleExpanded: (postId: string) => void
 }
 
 interface PostCardProps extends PostCardHandlers {
   post: NewsPost
   currentUserId: string
   viewer: PostViewerState
+  /** L'auteur a une story non lue (anneau autour de l'avatar). */
+  hasStory?: boolean
+  /** Légende dépliée (état possédé par l'écran). */
+  expanded?: boolean
 }
 
 function PostCardComponent({
   post,
   currentUserId,
   viewer,
+  hasStory = false,
+  expanded = false,
   onOpenPost,
   onOpenAuthor,
   onOpenOptions,
@@ -62,22 +70,30 @@ function PostCardComponent({
   onToggleSave,
   onToggleRepost,
   onShare,
+  onToggleExpanded,
 }: PostCardProps) {
+  const { t } = useI18n()
+
   return (
     <View style={styles.card}>
       <PostHeader
         post={post}
         isOwner={post.userId === currentUserId}
+        hasStory={hasStory}
         onOpenAuthor={onOpenAuthor}
         onOpenOptions={onOpenOptions}
       />
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Ouvrir la publication"
+        accessibilityLabel={t.news.a11yOpenPost}
         onPress={() => onOpenPost(post)}
       >
-        <PostBody post={post} />
+        <PostBody
+          post={post}
+          expanded={expanded}
+          onToggleExpanded={() => onToggleExpanded(post.id)}
+        />
       </Pressable>
 
       <PostMedia
@@ -138,6 +154,8 @@ function areEqual(previous: PostCardProps, next: PostCardProps): boolean {
     a.userPhotoURL === b.userPhotoURL &&
     a.updatedAt?.getTime() === b.updatedAt?.getTime() &&
     previous.currentUserId === next.currentUserId &&
+    previous.hasStory === next.hasStory &&
+    previous.expanded === next.expanded &&
     previous.viewer.reaction === next.viewer.reaction &&
     previous.viewer.saved === next.viewer.saved &&
     previous.viewer.reposted === next.viewer.reposted &&

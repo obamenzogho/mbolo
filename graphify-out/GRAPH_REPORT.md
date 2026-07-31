@@ -4,9 +4,9 @@
 - local update mode - Enhanced architectural extraction
 
 ## Summary
-- 7960 nodes
-- 9891 edges
-- 352 communities
+- 8021 nodes
+- 9978 edges
+- 353 communities
 - 13 Firestore collections
 - Extraction: 100% EXTRACTED
 - Token cost: 0 input - 0 output

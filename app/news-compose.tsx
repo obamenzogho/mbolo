@@ -318,6 +318,7 @@ export default function NewsComposeScreen() {
         userId: user.uid,
         userName: profile?.nom || profile?.pseudo || user.displayName || user.email?.split('@')[0] || 'Utilisateur',
         userPhotoURL: profile?.photoURL || user.photoURL || null,
+        verified: profile?.verified === true,
         text: text.trim(),
         format: articleMode ? 'article' : videoShareMode ? 'video_share' : inferFormat(media),
         media: uploaded,
@@ -354,7 +355,6 @@ export default function NewsComposeScreen() {
         repostedBy: [],
         moderationStatus: 'visible',
         createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
       })
 
       await updateDoc(doc(db, 'users', user.uid), {

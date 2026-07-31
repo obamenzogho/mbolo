@@ -20,8 +20,17 @@ export const postColors = {
   textSecondary: '#A6ABB0',
   textTertiary: '#7B8187',
 
+  /** Texte/icônes sur média ou dégradé (bouton play, durée, +N) */
+  onMedia: '#FFFFFF',
+
   accent: appColors.primary,
   accentSoft: 'rgba(0, 200, 83, 0.12)',
+
+  /** Badge « compte vérifié » */
+  verified: '#3B82F6',
+
+  /** Fond des boutons d'icône ronds (options, ...) */
+  buttonDark: '#000000',
 
   /** Voile sur média (bouton play, compteur +N) */
   scrim: 'rgba(8, 9, 10, 0.72)',

@@ -2,8 +2,10 @@
    Grille média mesurée par onLayout (pas de useWindowDimensions : sinon
    chaque rotation ou ouverture de clavier re-rend TOUTES les cartes du fil).
 
-   Mises en page : 1 média plein cadre au ratio réel (clampé), 2 côte à côte,
-   3 en « une + deux », 4+ en 2x2 avec overlay +N. Vidéo = aperçu 16/9. */
+   Mises en page : 1 média plein cadre au ratio réel (clampé), 2 côte à côte
+   au ratio du premier visuel, 3 en « une + deux », 4+ en 2x2 avec overlay +N.
+   Vidéo = aperçu 16/9.
+   Chaque tuile gère ses états de chargement / erreur (TileImage). */
 
 import { memo, useCallback, useState } from 'react'
 import {
@@ -13,9 +15,12 @@ import {
   Text,
   View,
 } from 'react-native'
-import { Image } from 'expo-image'
+import { Image, type ImageContentFit } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
+import { useI18n } from '@/i18n'
 import { getFeedImageUrl } from '@/lib/cloudinary'
+import { ShimmerBlock } from '../Skeletons'
+import { interpolate } from '../../utils/format'
 import {
   MEDIA_GAP,
   MEDIA_VISIBLE_MAX,
@@ -31,6 +36,12 @@ import type { NewsPostMedia } from '../../types'
 const MIN_RATIO = 0.72
 const MAX_RATIO = 1.91
 
+interface MediaLabels {
+  openMedia: string
+  mediaMore: string
+  videoPlay: string
+}
+
 interface PostMediaProps {
   media: NewsPostMedia[]
   onOpenImage: (index: number) => void
@@ -44,12 +55,60 @@ function thumb(item: NewsPostMedia, width: number): string {
   )
 }
 
+type ImageStatus = 'loading' | 'loaded' | 'error'
+
+/* Image avec états explicites : fond placeholder + OrbitLoader pendant le
+   chargement, icône cassée si le téléchargement échoue. */
+function TileImage({
+  uri,
+  contentFit,
+  transition,
+  recyclingKey,
+}: {
+  uri: string
+  contentFit: ImageContentFit
+  transition: number
+  recyclingKey: string
+}) {
+  const [status, setStatus] = useState<ImageStatus>('loading')
+
+  return (
+    <View style={StyleSheet.absoluteFill}>
+      <Image
+        source={{ uri }}
+        style={StyleSheet.absoluteFill}
+        contentFit={contentFit}
+        transition={transition}
+        recyclingKey={recyclingKey}
+        onLoadStart={() => setStatus('loading')}
+        onLoad={() => setStatus('loaded')}
+        onError={() => setStatus('error')}
+      />
+
+      {status === 'loading' ? (
+        <ShimmerBlock style={styles.loadingShimmer} />
+      ) : null}
+
+      {status === 'error' ? (
+        <View style={styles.errorOverlay}>
+          <Ionicons
+            name="image-outline"
+            size={26}
+            color={postColors.textTertiary}
+          />
+        </View>
+      ) : null}
+    </View>
+  )
+}
+
 function Tile({
   item,
   width,
   height,
   index,
   overlayCount,
+  labels,
   onPress,
 }: {
   item: NewsPostMedia
@@ -57,6 +116,7 @@ function Tile({
   height: number
   index: number
   overlayCount?: number
+  labels: MediaLabels
   onPress: (index: number) => void
 }) {
   return (
@@ -64,8 +124,8 @@ function Tile({
       accessibilityRole="imagebutton"
       accessibilityLabel={
         overlayCount
-          ? `Voir les ${overlayCount + 1} médias restants`
-          : `Agrandir le média ${index + 1}`
+          ? interpolate(labels.mediaMore, overlayCount)
+          : interpolate(labels.openMedia, index + 1)
       }
       onPress={() => onPress(index)}
       style={({ pressed }) => [
@@ -74,9 +134,8 @@ function Tile({
         pressed && styles.pressed,
       ]}
     >
-      <Image
-        source={{ uri: thumb(item, width * 2) }}
-        style={StyleSheet.absoluteFill}
+      <TileImage
+        uri={thumb(item, width * 2)}
         contentFit="cover"
         transition={postMotion.imageTransition}
         recyclingKey={item.url}
@@ -94,16 +153,18 @@ function Tile({
 function VideoPreview({
   item,
   width,
+  labels,
   onPress,
 }: {
   item: NewsPostMedia
   width: number
+  labels: MediaLabels
   onPress: () => void
 }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Lire la vidéo"
+      accessibilityLabel={labels.videoPlay}
       onPress={onPress}
       style={({ pressed }) => [
         { width, height: Math.round((width * 9) / 16) },
@@ -111,9 +172,8 @@ function VideoPreview({
         pressed && styles.pressed,
       ]}
     >
-      <Image
-        source={{ uri: thumb(item, width * 2) }}
-        style={StyleSheet.absoluteFill}
+      <TileImage
+        uri={thumb(item, width * 2)}
         contentFit="cover"
         transition={postMotion.imageTransition}
         recyclingKey={item.url}
@@ -121,7 +181,7 @@ function VideoPreview({
 
       <View style={styles.videoScrim}>
         <View style={styles.playButton}>
-          <Ionicons name="play" size={26} color="#FFFFFF" />
+          <Ionicons name="play" size={26} color={postColors.onMedia} />
         </View>
       </View>
 
@@ -137,7 +197,15 @@ function VideoPreview({
   )
 }
 
+/* Ratio effectif d'une tuile à partir des dimensions naturelles du visuel. */
+function naturalRatio(item: NewsPostMedia): number {
+  if (!item.width || !item.height) return 1
+
+  return Math.min(MAX_RATIO, Math.max(MIN_RATIO, item.width / item.height))
+}
+
 function PostMediaComponent({ media, onOpenImage, onOpenVideo }: PostMediaProps) {
+  const { t } = useI18n()
   const [width, setWidth] = useState(0)
 
   const handleLayout = useCallback((event: LayoutChangeEvent) => {
@@ -146,11 +214,19 @@ function PostMediaComponent({ media, onOpenImage, onOpenVideo }: PostMediaProps)
     setWidth((previous) => (Math.abs(previous - next) > 1 ? next : previous))
   }, [])
 
+  const labels: MediaLabels = {
+    openMedia: t.news.a11yMediaOpen,
+    mediaMore: t.news.a11yMediaMore,
+    videoPlay: t.news.a11yVideoPlay,
+  }
+
   if (media.length === 0) return null
 
   return (
     <View onLayout={handleLayout} style={styles.container}>
-      {width > 0 ? renderGrid(media, width, onOpenImage, onOpenVideo) : null}
+      {width > 0
+        ? renderGrid(media, width, labels, onOpenImage, onOpenVideo)
+        : null}
     </View>
   )
 }
@@ -158,26 +234,24 @@ function PostMediaComponent({ media, onOpenImage, onOpenVideo }: PostMediaProps)
 function renderGrid(
   media: NewsPostMedia[],
   width: number,
+  labels: MediaLabels,
   onOpenImage: (index: number) => void,
   onOpenVideo: () => void,
 ) {
   const [first] = media
 
   if (first.type === 'video') {
-    return <VideoPreview item={first} width={width} onPress={onOpenVideo} />
+    return <VideoPreview item={first} width={width} labels={labels} onPress={onOpenVideo} />
   }
 
   if (media.length === 1) {
-    const natural =
-      first.width && first.height ? first.width / first.height : 1
-    const ratio = Math.min(MAX_RATIO, Math.max(MIN_RATIO, natural))
-
     return (
       <Tile
         item={first}
         index={0}
         width={width}
-        height={Math.round(width / ratio)}
+        height={Math.round(width / naturalRatio(first))}
+        labels={labels}
         onPress={onOpenImage}
       />
     )
@@ -185,6 +259,7 @@ function renderGrid(
 
   if (media.length === 2) {
     const cell = (width - MEDIA_GAP) / 2
+    const height = Math.round(cell / naturalRatio(first))
 
     return (
       <View style={styles.row}>
@@ -194,7 +269,8 @@ function renderGrid(
             item={item}
             index={index}
             width={cell}
-            height={cell}
+            height={height}
+            labels={labels}
             onPress={onOpenImage}
           />
         ))}
@@ -203,7 +279,7 @@ function renderGrid(
   }
 
   if (media.length === 3) {
-    const height = Math.round(width * 0.72)
+    const height = Math.round(width / naturalRatio(first))
     const main = Math.round((width - MEDIA_GAP) * 0.62)
     const side = width - MEDIA_GAP - main
     const sideCell = (height - MEDIA_GAP) / 2
@@ -215,6 +291,7 @@ function renderGrid(
           index={0}
           width={main}
           height={height}
+          labels={labels}
           onPress={onOpenImage}
         />
         <View style={styles.column}>
@@ -225,6 +302,7 @@ function renderGrid(
               index={offset + 1}
               width={side}
               height={sideCell}
+              labels={labels}
               onPress={onOpenImage}
             />
           ))}
@@ -249,6 +327,7 @@ function renderGrid(
           overlayCount={
             index === MEDIA_VISIBLE_MAX - 1 && remaining > 0 ? remaining : undefined
           }
+          labels={labels}
           onPress={onOpenImage}
         />
       ))}
@@ -283,6 +362,16 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.88,
   },
+  loadingShimmer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: postColors.surfaceRaised,
+  },
+  errorOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: postColors.mediaPlaceholder,
+  },
   countOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
@@ -290,7 +379,7 @@ const styles = StyleSheet.create({
     backgroundColor: postColors.scrimHeavy,
   },
   countText: {
-    color: '#FFFFFF',
+    color: postColors.onMedia,
     fontSize: 30,
     fontWeight: '700',
   },
@@ -319,7 +408,7 @@ const styles = StyleSheet.create({
     backgroundColor: postColors.scrim,
   },
   durationText: {
-    color: '#FFFFFF',
+    color: postColors.onMedia,
     fontSize: 11,
     fontWeight: '600',
     fontVariant: ['tabular-nums'],

@@ -34,6 +34,11 @@ export default function PostDetailScreen() {
   const [actionsPost, setActionsPost] = useState<NewsPost | null>(null)
   const [galleryIndex, setGalleryIndex] = useState<number | null>(null)
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false)
+  const [expanded, setExpanded] = useState(true)
+
+  const toggleExpanded = useCallback(() => {
+    setExpanded((previous) => !previous)
+  }, [])
 
   useEffect(() => {
     if (!postId) return
@@ -207,6 +212,7 @@ export default function PostDetailScreen() {
             post={post}
             currentUserId={uid}
             viewer={viewer}
+            expanded={expanded}
             onOpenPost={noop}
             onOpenAuthor={openAuthor}
             onOpenOptions={openOptions}
@@ -218,6 +224,7 @@ export default function PostDetailScreen() {
             onToggleSave={interactions.onToggleSave}
             onToggleRepost={interactions.onToggleRepost}
             onShare={share}
+            onToggleExpanded={toggleExpanded}
           />
         </ScrollView>
 
