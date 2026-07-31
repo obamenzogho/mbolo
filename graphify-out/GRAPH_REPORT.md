@@ -1,12 +1,12 @@
-# Graph Report - .  (2026-07-29)
+# Graph Report - .  (2026-07-31)
 
 ## Corpus Check
 - local update mode - Enhanced architectural extraction
 
 ## Summary
-- 7459 nodes
-- 9179 edges
-- 333 communities
+- 7687 nodes
+- 9446 edges
+- 345 communities
 - 13 Firestore collections
 - Extraction: 100% EXTRACTED
 - Token cost: 0 input - 0 output

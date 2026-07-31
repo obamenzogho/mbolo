@@ -870,3 +870,24 @@ Usage: lookup rapide pseudo → email au login (login.tsx:52)
 - Android/Web : fallback JS via `useSwipeBack` (Pan gesture + Reanimated)
 - `dist-ios/` retiré du suivi git (déjà dans `.gitignore`)
 
+---
+
+## ADR 2026-07-31: Refonte frontend Actus — PostCard monolithique → composants purs + interactions centralisées
+
+**Problème :** L'ancien `PostCard.tsx` (~700 lignes) mélangeait UI, transactions Firestore et modales. Chaque carte montait sa propre `ImageGalleryModal` + `ReactionPicker` (≈ 80 modales pour un fil de 40 posts) et 2 hooks Firestore par carte (`useReactions` + `useNewsRepost` → 2×N listeners). `memo()` sans comparateur, `useWindowDimensions` dans la grille média, `catch {}` muet dans `useNewsFeedData`, variables mortes, `Alert.alert` au lieu d'action sheet pour les options.
+
+**Solution — architecture en couches :**
+1. **`src/features/news/components/post/`** : composants 100 % présentationnels mémoïsés (`PostCard`, `PostHeader`, `PostBody`, `PostMedia`, `PostActionBar`, `PostCardSkeleton`). La carte ne connaît plus ni Firestore ni le store : elle reçoit `post`, `currentUserId`, `viewer: PostViewerState` (primitives uniquement) et 14 handlers.
+2. **`src/features/news/hooks/usePostInteractions.ts`** : remplace `useReactions` + `useNewsRepost` — un seul hook monté au niveau écran, écriture optimiste dans le store avec rollback, handlers stables (deps vides/uid), verrou anti-double-tap sur les reposts. `patch?` optionnel permet de cibler un état local hors store (cas `app/post-detail.tsx`).
+3. **`src/features/news/services/postInteractions.ts`** : écritures Firestore centralisées (`setPostReaction`, `togglePostSave`, `togglePostRepost`, `incrementShareCount`).
+4. **`NewsFeedScreen.tsx`** est le seul propriétaire des overlays (galerie, reaction picker, commentaires, action sheet) et couvre 5 états : squelette, erreur, vide, liste, fin de fil.
+5. **`theme/postTokens.ts`** : tokens uniques (couleurs, espacements, rayons, typo) — aucun StyleSheet hors tokens ; **`utils/format.ts`** : `timeAgo`, `absoluteDate`, `formatCount`, `countLabel`.
+
+**Décisions connexes :**
+- `PostMedia` mesure la grille via `onLayout` (fini `useWindowDimensions`) ; ratio clampé `[0.72 ; 1.91]` pour 1 média, 2 côte à côte, 3 = 1+2, 4+ = 2×2 avec overlay +N.
+- `openOptions` : propriétaire → Modifier/Supprimer réels (`deletePost` + `removePost`) ; non-propriétaire → `ContentActionsSheet`.
+- Routes corrigées : détail = `/post-detail?postId=` (l'ancien `app/post.tsx` est l'écran de publication de reel), profil = `/(tabs)/(sub)/user/[userId]`.
+- Anciens fichiers supprimés : `components/PostCard.tsx`, `hooks/useReactions.ts`, `hooks/useNewsRepost.ts`, `services/repostMutations.ts`, doublon `PostCardSkeleton` dans `Skeletons.tsx`. La collection `reposts` reste (utilisée par `src/features/repost/`).
+
+**Backend non touché à ce stade** : les écritures de `postInteractions.ts` (update partiel `reactionCounts`/`savedBy`/`repostedBy`, sous-collections `reactions`) doivent être validées contre `firestore.rules` avant activation en prod.
+

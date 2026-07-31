@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
+  Alert,
   ScrollView,
   StyleSheet,
   View,
@@ -9,14 +10,18 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { doc, getDoc } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
 import { colors } from '@/lib/theme'
-import { PostCard } from '@/features/news/components/PostCard'
+import { PostCard } from '@/features/news/components/post/PostCard'
+import type { PostViewerState } from '@/features/news/components/post/PostCard'
 import NewsCommentsModal from '@/features/news/components/NewsCommentsModal'
+import ImageGalleryModal from '@/features/news/components/ImageGalleryModal'
+import { ReactionPicker } from '@/features/news/components/ReactionPicker'
 import { deletePost } from '@/features/news/services/postMutations'
-import { toDate } from '@/features/news/utils'
+import { usePostInteractions } from '@/features/news/hooks/usePostInteractions'
 import { ContentActionsSheet } from '@/components/ContentActionsSheet'
 import OrbitLoader from '@/components/OrbitLoader'
 import { BackButton } from '@/components/ui/BackButton'
-import type { NewsPost } from '@/features/news/types'
+import { toDate } from '@/features/news/utils'
+import type { NewsPost, PostReactionType } from '@/features/news/types'
 import PageWrapper from '@/components/PageWrapper'
 
 export default function PostDetailScreen() {
@@ -27,6 +32,8 @@ export default function PostDetailScreen() {
   const [loading, setLoading] = useState(true)
   const [commentPost, setCommentPost] = useState<NewsPost | null>(null)
   const [actionsPost, setActionsPost] = useState<NewsPost | null>(null)
+  const [galleryIndex, setGalleryIndex] = useState<number | null>(null)
+  const [reactionPickerOpen, setReactionPickerOpen] = useState(false)
 
   useEffect(() => {
     if (!postId) return
@@ -64,6 +71,8 @@ export default function PostDetailScreen() {
         location: data.location || undefined,
         mood: data.mood || undefined,
         poll: data.poll || undefined,
+        reactionCounts: data.reactionCounts || undefined,
+        myReaction: data.myReaction ?? undefined,
       })
 
       setLoading(false)
@@ -71,6 +80,111 @@ export default function PostDetailScreen() {
 
     return () => { cancelled = true }
   }, [postId])
+
+  /* Interactions optimistes ciblées sur l'état local (le post n'est pas dans
+     le store du fil) : on injecte un `patch` local à usePostInteractions. */
+  const patch = useCallback(
+    (id: string, updates: Partial<NewsPost>) => {
+      setPost((previous) =>
+        previous && previous.id === id
+          ? { ...previous, ...updates }
+          : previous,
+      )
+    },
+    [],
+  )
+
+  const interactions = usePostInteractions({
+    store: undefined,
+    currentUserId: uid,
+    patch,
+  })
+
+  const viewer: PostViewerState = post
+    ? {
+        reaction:
+          post.myReaction ?? (post.likedBy.includes(uid) ? 'like' : null),
+        saved: post.savedBy.includes(uid),
+        reposted: post.repostedBy.includes(uid),
+        repostCount: post.reposts,
+        reactionTotal: post.reactionCounts?.total ?? post.likes,
+        repostPending: false,
+      }
+    : {
+        reaction: null,
+        saved: false,
+        reposted: false,
+        repostCount: 0,
+        reactionTotal: 0,
+        repostPending: false,
+      }
+
+  const noop = useCallback(() => {}, [])
+
+  const openAuthor = useCallback(
+    (userId: string) => {
+      router.push({
+        pathname: '/(tabs)/(sub)/user/[userId]',
+        params: { userId },
+      })
+    },
+    [router],
+  )
+
+  const openComments = useCallback((target: NewsPost) => {
+    setCommentPost(target)
+  }, [])
+
+  const openMedia = useCallback((target: NewsPost, index: number) => {
+    setGalleryIndex(index)
+  }, [])
+
+  const selectReaction = useCallback(
+    (type: PostReactionType) => {
+      if (post) interactions.onSelectReaction(post, type)
+      setReactionPickerOpen(false)
+    },
+    [interactions, post],
+  )
+
+  const openOptions = useCallback(
+    (target: NewsPost) => {
+      if (target.userId !== uid) {
+        setActionsPost(target)
+        return
+      }
+
+      Alert.alert('Publication', undefined, [
+        {
+          text: 'Modifier',
+          onPress: () =>
+            router.push({
+              pathname: '/news-compose',
+              params: { editPostId: target.id },
+            }),
+        },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: async () => {
+            const ok = await deletePost(target.id, uid)
+
+            if (ok) {
+              router.back()
+            } else {
+              Alert.alert('Erreur', 'Impossible de supprimer. Réessaie.')
+            }
+          },
+        },
+        { text: 'Annuler', style: 'cancel' },
+      ])
+    },
+    [router, uid],
+  )
+
+  const share = useCallback((target: NewsPost) => {
+    void interactions.onShare(target)
+  }, [interactions])
 
   if (loading || !post) {
     return (
@@ -92,14 +206,18 @@ export default function PostDetailScreen() {
           <PostCard
             post={post}
             currentUserId={uid}
-            onComment={setCommentPost}
-            onEdit={(p) => router.push({ pathname: '/news-compose', params: { editPostId: p.id } })}
-            onDelete={async () => {
-              if (!post) return
-              const ok = await deletePost(post.id, uid)
-              if (ok) router.back()
-            }}
-            onMore={setActionsPost}
+            viewer={viewer}
+            onOpenPost={noop}
+            onOpenAuthor={openAuthor}
+            onOpenOptions={openOptions}
+            onOpenMedia={openMedia}
+            onOpenComments={openComments}
+            onOpenReactionList={noop}
+            onOpenReactionPicker={() => setReactionPickerOpen(true)}
+            onToggleReaction={interactions.onToggleReaction}
+            onToggleSave={interactions.onToggleSave}
+            onToggleRepost={interactions.onToggleRepost}
+            onShare={share}
           />
         </ScrollView>
 
@@ -109,20 +227,27 @@ export default function PostDetailScreen() {
           onClose={() => setCommentPost(null)}
         />
 
-        {actionsPost && (
-          <ContentActionsSheet
-            visible
-            targetType="post"
-            targetId={actionsPost.id}
-            contentOwnerId={actionsPost.userId}
-            contentOwnerName={actionsPost.userName}
-            onClose={() => setActionsPost(null)}
-            onBlocked={() => {
-              setActionsPost(null)
-              router.back()
-            }}
-          />
-        )}
+        <ReactionPicker
+          visible={reactionPickerOpen}
+          onSelect={selectReaction}
+          onClose={() => setReactionPickerOpen(false)}
+        />
+
+        <ImageGalleryModal
+          visible={galleryIndex !== null}
+          media={post.media}
+          initialIndex={galleryIndex ?? 0}
+          onClose={() => setGalleryIndex(null)}
+        />
+
+        <ContentActionsSheet
+          visible={!!actionsPost}
+          targetType="post"
+          targetId={actionsPost?.id ?? ''}
+          contentOwnerId={actionsPost?.userId}
+          contentOwnerName={actionsPost?.userName}
+          onClose={() => setActionsPost(null)}
+        />
       </SafeAreaView>
     </PageWrapper>
   )

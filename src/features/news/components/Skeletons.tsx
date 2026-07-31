@@ -34,33 +34,6 @@ export function StoryCardSkeleton() {
   )
 }
 
-export function PostCardSkeleton() {
-  return (
-    <View style={s.postCard}>
-      <View style={s.postHeader}>
-        <ShimmerBlock style={s.postAvatar} />
-        <View style={{ flex: 1 }}>
-          <ShimmerBlock style={{ width: '45%', height: 14, borderRadius: 7, marginBottom: 6 }} />
-          <ShimmerBlock style={{ width: '25%', height: 10, borderRadius: 5 }} />
-        </View>
-      </View>
-
-      <View style={s.postBody}>
-        <ShimmerBlock style={{ width: '90%', height: 13, borderRadius: 6, marginBottom: 6 }} />
-        <ShimmerBlock style={{ width: '70%', height: 13, borderRadius: 6 }} />
-      </View>
-
-      <ShimmerBlock style={s.postImage} />
-
-      <View style={s.postActions}>
-        <ShimmerBlock style={{ width: 60, height: 10, borderRadius: 5 }} />
-        <ShimmerBlock style={{ width: 60, height: 10, borderRadius: 5 }} />
-        <ShimmerBlock style={{ width: 60, height: 10, borderRadius: 5 }} />
-      </View>
-    </View>
-  )
-}
-
 export function CommentSkeleton() {
   return (
     <View style={cs.container}>
@@ -346,39 +319,5 @@ const s = StyleSheet.create({
     position: 'absolute',
     left: 8,
     bottom: 10,
-  },
-  postCard: {
-    backgroundColor: '#111214',
-    borderBottomWidth: 8,
-    borderBottomColor: '#08090A',
-    paddingBottom: 4,
-  },
-  postHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingTop: 13,
-    paddingBottom: 8,
-    gap: 10,
-  },
-  postAvatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-  },
-  postBody: {
-    paddingHorizontal: 14,
-    paddingBottom: 12,
-  },
-  postImage: {
-    width: '100%',
-    height: 200,
-    backgroundColor: SKELETON_COLOR,
-  },
-  postActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
   },
 })

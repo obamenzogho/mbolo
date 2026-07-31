@@ -470,7 +470,7 @@ class NewsFeedSource {
         },
       )
 
-      return null
+      throw error
     } finally {
       this.loading = false
     }
