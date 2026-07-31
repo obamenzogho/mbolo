@@ -14,14 +14,13 @@ import { PostCard } from '@/features/news/components/post/PostCard'
 import type { PostViewerState } from '@/features/news/components/post/PostCard'
 import NewsCommentsModal from '@/features/news/components/NewsCommentsModal'
 import ImageGalleryModal from '@/features/news/components/ImageGalleryModal'
-import { ReactionPicker } from '@/features/news/components/ReactionPicker'
 import { deletePost } from '@/features/news/services/postMutations'
 import { usePostInteractions } from '@/features/news/hooks/usePostInteractions'
 import { ContentActionsSheet } from '@/components/ContentActionsSheet'
 import OrbitLoader from '@/components/OrbitLoader'
 import { BackButton } from '@/components/ui/BackButton'
 import { toDate } from '@/features/news/utils'
-import type { NewsPost, PostReactionType } from '@/features/news/types'
+import type { NewsPost } from '@/features/news/types'
 import PageWrapper from '@/components/PageWrapper'
 
 export default function PostDetailScreen() {
@@ -33,7 +32,6 @@ export default function PostDetailScreen() {
   const [commentPost, setCommentPost] = useState<NewsPost | null>(null)
   const [actionsPost, setActionsPost] = useState<NewsPost | null>(null)
   const [galleryIndex, setGalleryIndex] = useState<number | null>(null)
-  const [reactionPickerOpen, setReactionPickerOpen] = useState(false)
   const [expanded, setExpanded] = useState(true)
 
   const toggleExpanded = useCallback(() => {
@@ -76,8 +74,6 @@ export default function PostDetailScreen() {
         location: data.location || undefined,
         mood: data.mood || undefined,
         poll: data.poll || undefined,
-        reactionCounts: data.reactionCounts || undefined,
-        myReaction: data.myReaction ?? undefined,
       })
 
       setLoading(false)
@@ -107,20 +103,17 @@ export default function PostDetailScreen() {
 
   const viewer: PostViewerState = post
     ? {
-        reaction:
-          post.myReaction ?? (post.likedBy.includes(uid) ? 'like' : null),
+        liked: post.likedBy.includes(uid),
         saved: post.savedBy.includes(uid),
         reposted: post.repostedBy.includes(uid),
         repostCount: post.reposts,
-        reactionTotal: post.reactionCounts?.total ?? post.likes,
         repostPending: false,
       }
     : {
-        reaction: null,
+        liked: false,
         saved: false,
         reposted: false,
         repostCount: 0,
-        reactionTotal: 0,
         repostPending: false,
       }
 
@@ -143,14 +136,6 @@ export default function PostDetailScreen() {
   const openMedia = useCallback((target: NewsPost, index: number) => {
     setGalleryIndex(index)
   }, [])
-
-  const selectReaction = useCallback(
-    (type: PostReactionType) => {
-      if (post) interactions.onSelectReaction(post, type)
-      setReactionPickerOpen(false)
-    },
-    [interactions, post],
-  )
 
   const openOptions = useCallback(
     (target: NewsPost) => {
@@ -218,9 +203,7 @@ export default function PostDetailScreen() {
             onOpenOptions={openOptions}
             onOpenMedia={openMedia}
             onOpenComments={openComments}
-            onOpenReactionList={noop}
-            onOpenReactionPicker={() => setReactionPickerOpen(true)}
-            onToggleReaction={interactions.onToggleReaction}
+            onToggleLike={interactions.onToggleLike}
             onToggleSave={interactions.onToggleSave}
             onToggleRepost={interactions.onToggleRepost}
             onShare={share}
@@ -232,12 +215,6 @@ export default function PostDetailScreen() {
           post={commentPost}
           visible={commentPost !== null}
           onClose={() => setCommentPost(null)}
-        />
-
-        <ReactionPicker
-          visible={reactionPickerOpen}
-          onSelect={selectReaction}
-          onClose={() => setReactionPickerOpen(false)}
         />
 
         <ImageGalleryModal

@@ -1,9 +1,9 @@
 /* src/features/news/NewsFeedScreen.tsx
 
-   L'écran est le seul propriétaire des overlays : une galerie, une feuille de
-   réactions, un menu d'options, une modale de commentaires. Avant, chaque
-   PostCard montait sa propre ImageGalleryModal + ReactionPicker : sur un fil
-   de 40 posts cela faisait 80 modales dans l'arbre.
+   L'écran est le seul propriétaire des overlays : une galerie, un menu
+   d'options, une modale de commentaires. Avant, chaque PostCard montait sa
+   propre modale d'images : sur un fil de 40 posts cela faisait 40 modales
+   dans l'arbre.
 
    Il couvre aussi les cinq états : squelette, erreur, vide, liste, fin de fil. */
 
@@ -37,13 +37,12 @@ import { PostCard } from './components/post/PostCard'
 import { NewsFeedSkeleton } from './components/post/PostCardSkeleton'
 import NewsCommentsModal from './components/NewsCommentsModal'
 import ImageGalleryModal from './components/ImageGalleryModal'
-import { ReactionPicker } from './components/ReactionPicker'
 import { newsFeedStore } from './store/newsFeedStore'
 import { useNewsFeedData } from './hooks/useNewsFeedData'
 import { usePostInteractions } from './hooks/usePostInteractions'
 import { useActiveStories } from './hooks/useActiveStories'
 import { postColors, postSpacing, postType } from './theme/postTokens'
-import type { NewsPost, PostReactionType } from './types'
+import type { NewsPost } from './types'
 
 /** Décalage sous le header d'onglets translucide */
 const HEADER_OFFSET = 78
@@ -97,7 +96,6 @@ export default function NewsFeedScreen({
   /* ── Overlays, un seul de chaque ─────────────────────────── */
   const [commentPost, setCommentPost] = useState<NewsPost | null>(null)
   const [gallery, setGallery] = useState<GalleryTarget | null>(null)
-  const [reactionTarget, setReactionTarget] = useState<NewsPost | null>(null)
   const [actionsPost, setActionsPost] = useState<NewsPost | null>(null)
 
   /* ── Légendes dépliées : survit au recyclage des cartes ──── */
@@ -185,22 +183,6 @@ export default function NewsFeedScreen({
   const openComments = useCallback((post: NewsPost) => {
     setCommentPost(post)
   }, [])
-
-  const openReactionList = useCallback((post: NewsPost) => {
-    router.push({ pathname: '/post-detail', params: { postId: post.id } })
-  }, [])
-
-  const openReactionPicker = useCallback((post: NewsPost) => {
-    setReactionTarget(post)
-  }, [])
-
-  const selectReaction = useCallback(
-    (type: PostReactionType) => {
-      if (reactionTarget) interactions.onSelectReaction(reactionTarget, type)
-      setReactionTarget(null)
-    },
-    [interactions, reactionTarget],
-  )
 
   const confirmDelete = useCallback(
     (post: NewsPost) => {
@@ -310,9 +292,7 @@ export default function NewsFeedScreen({
         onOpenOptions={openOptions}
         onOpenMedia={openMedia}
         onOpenComments={openComments}
-        onOpenReactionList={openReactionList}
-        onOpenReactionPicker={openReactionPicker}
-        onToggleReaction={interactions.onToggleReaction}
+        onToggleLike={interactions.onToggleLike}
         onToggleSave={interactions.onToggleSave}
         onToggleRepost={interactions.onToggleRepost}
         onShare={interactions.onShare}
@@ -329,8 +309,6 @@ export default function NewsFeedScreen({
       openMedia,
       openOptions,
       openPost,
-      openReactionList,
-      openReactionPicker,
       toggleExpanded,
     ],
   )
@@ -450,12 +428,6 @@ export default function NewsFeedScreen({
             <Text style={styles.footerText}>{t.news.feed.upToDate}</Text>
           ) : null
         }
-      />
-
-      <ReactionPicker
-        visible={!!reactionTarget}
-        onSelect={selectReaction}
-        onClose={() => setReactionTarget(null)}
       />
 
       <ImageGalleryModal

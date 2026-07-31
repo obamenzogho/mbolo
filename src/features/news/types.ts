@@ -33,37 +33,6 @@ export interface NewsMood {
   label: string
 }
 
-// ── Reactions ─────────────────────────────────────────────
-export type PostReactionType = 'like' | 'love' | 'fire' | 'clap'
-
-export interface PostReaction {
-  type: PostReactionType
-  userId: string
-  createdAt: Date
-}
-
-export interface ReactionCounts {
-  like: number
-  love: number
-  fire: number
-  clap: number
-  total: number
-}
-
-export const REACTION_EMOJI: Record<PostReactionType, string> = {
-  like: '👍',
-  love: '❤️',
-  fire: '🔥',
-  clap: '👏',
-}
-
-export const REACTION_LABELS: Record<PostReactionType, string> = {
-  like: "J'aime",
-  love: 'Adore',
-  fire: 'Feu',
-  clap: 'Bravo',
-}
-
 // ── Article ───────────────────────────────────────────────
 export interface NewsPostArticle {
   title: string
@@ -119,8 +88,6 @@ export interface NewsPost {
   repostedBy: string[]
   // ── Nouveaux champs (Phase 0) ──
   verified?: boolean
-  reactionCounts?: ReactionCounts
-  myReaction?: PostReactionType | null
   article?: NewsPostArticle
   videoShare?: NewsPostVideoShare
   rankingScore?: number

@@ -1,9 +1,9 @@
 /* src/features/news/components/post/PostActionBar.tsx
    Deux blocs : le résumé social (PostStats) et les actions (PostActions).
-   « Enregistrer » migre dans le résumé en icône seule : cinq actions à plat
-   écrasaient les libellés sur petit écran. */
+   Modèle aligné sur le feed vidéo : un j'aime simple, un enregistrement,
+   un repost et un partage. Plus de réactions multiples ni d'emojis empilés. */
 
-import { memo, useMemo, useRef } from 'react'
+import { memo, useRef } from 'react'
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
@@ -16,9 +16,8 @@ import {
   postSpacing,
   postType,
 } from '../../theme/postTokens'
-import { countLabel, formatCount } from '../../utils/format'
-import { REACTION_EMOJI, REACTION_LABELS } from '../../types'
-import type { NewsPost, PostReactionType, ReactionCounts } from '../../types'
+import { countLabel, formatCount, interpolate } from '../../utils/format'
+import type { NewsPost } from '../../types'
 
 type IoniconName = keyof typeof Ionicons.glyphMap
 
@@ -26,79 +25,51 @@ type IoniconName = keyof typeof Ionicons.glyphMap
 
 interface PostStatsProps {
   post: NewsPost
-  reactionTotal: number
-  repostCount: number
   saved: boolean
-  onOpenReactionList: (post: NewsPost) => void
+  onOpenReactions: (post: NewsPost) => void
   onOpenComments: (post: NewsPost) => void
   onToggleSave: (post: NewsPost) => void
 }
 
-function topReactions(counts: ReactionCounts | undefined): PostReactionType[] {
-  if (!counts) return []
-
-  return (Object.entries(counts) as [string, number][])
-    .filter(([key, value]) => key !== 'total' && value > 0)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 3)
-    .map(([key]) => key as PostReactionType)
-}
-
 function PostStatsComponent({
   post,
-  reactionTotal,
-  repostCount,
   saved,
-  onOpenReactionList,
+  onOpenReactions,
   onOpenComments,
   onToggleSave,
 }: PostStatsProps) {
   const { t } = useI18n()
-  const emojis = useMemo(() => topReactions(post.reactionCounts), [post.reactionCounts])
   const hasActivity =
-    reactionTotal > 0 || post.comments > 0 || post.shares > 0 || repostCount > 0
+    post.likes > 0 || post.comments > 0 || post.shares > 0 || post.reposts > 0
 
   if (!hasActivity && !saved) return null
 
   return (
     <View style={styles.stats}>
-      {reactionTotal > 0 ? (
+      {post.likes > 0 ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={t.news.actions.a11yReactionsDetail.replace(
-            '{n}',
-            formatCount(reactionTotal),
+          accessibilityLabel={interpolate(
+            t.news.actions.a11yLikes,
+            post.likes,
           )}
-          onPress={() => onOpenReactionList(post)}
-          style={({ pressed }) => [styles.reactionSummary, pressed && styles.pressed]}
+          onPress={() => onOpenReactions(post)}
+          style={({ pressed }) => [styles.likeSummary, pressed && styles.pressed]}
         >
-          {emojis.length > 0 ? (
-            <View style={styles.emojiStack}>
-              {emojis.map((type, index) => (
-                <Text
-                  key={type}
-                  style={[styles.emoji, index > 0 && styles.emojiOverlap]}
-                >
-                  {REACTION_EMOJI[type]}
-                </Text>
-              ))}
-            </View>
-          ) : (
-            <View style={styles.likeBadge}>
-              <Ionicons name="thumbs-up" size={11} color="#FFFFFF" />
-            </View>
-          )}
-          <Text style={styles.statText}>{formatCount(reactionTotal)}</Text>
+          <View style={styles.likeBadge}>
+            <Ionicons name="thumbs-up" size={11} color="#FFFFFF" />
+          </View>
+          <Text style={styles.statText}>{formatCount(post.likes)}</Text>
         </Pressable>
       ) : (
         <View />
       )}
 
       <View style={styles.statsRight}>
-        {repostCount > 0 ? (
+        {post.reposts > 0 ? (
           <Text style={styles.statText}>
             {countLabel(
-              repostCount,
+              post.reposts,
               t.news.actions.pluralRepost,
               t.news.actions.pluralReposts,
             )}
@@ -158,20 +129,16 @@ function ActionButton({
   icon,
   label,
   active,
-  emoji,
   disabled,
   accessibilityLabel,
   onPress,
-  onLongPress,
 }: {
   icon: IoniconName
   label: string
   active?: boolean
-  emoji?: string
   disabled?: boolean
   accessibilityLabel: string
   onPress: () => void
-  onLongPress?: () => void
 }) {
   const scale = useRef(new Animated.Value(1)).current
 
@@ -191,14 +158,6 @@ function ActionButton({
         void Haptics.selectionAsync()
         onPress()
       }}
-      onLongPress={
-        onLongPress
-          ? () => {
-              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
-              onLongPress()
-            }
-          : undefined
-      }
       style={({ pressed }) => [
         styles.action,
         active && styles.actionActive,
@@ -207,15 +166,11 @@ function ActionButton({
       ]}
     >
       <Animated.View style={{ transform: [{ scale }] }}>
-        {emoji ? (
-          <Text style={styles.actionEmoji}>{emoji}</Text>
-        ) : (
-          <Ionicons
-            name={icon}
-            size={20}
-            color={active ? postColors.accent : postColors.textSecondary}
-          />
-        )}
+        <Ionicons
+          name={icon}
+          size={20}
+          color={active ? postColors.accent : postColors.textSecondary}
+        />
       </Animated.View>
 
       <Text
@@ -230,11 +185,10 @@ function ActionButton({
 
 interface PostActionsProps {
   post: NewsPost
-  reaction: PostReactionType | null
+  liked: boolean
   reposted: boolean
   repostPending: boolean
-  onToggleReaction: (post: NewsPost) => void
-  onOpenReactionPicker: (post: NewsPost) => void
+  onToggleLike: (post: NewsPost) => void
   onComment: (post: NewsPost) => void
   onRepost: (post: NewsPost) => void
   onShare: (post: NewsPost) => void
@@ -242,17 +196,15 @@ interface PostActionsProps {
 
 function PostActionsComponent({
   post,
-  reaction,
+  liked,
   reposted,
   repostPending,
-  onToggleReaction,
-  onOpenReactionPicker,
+  onToggleLike,
   onComment,
   onRepost,
   onShare,
 }: PostActionsProps) {
   const { t } = useI18n()
-  const reactionLabel = reaction ? REACTION_LABELS[reaction] : t.news.actions.like
 
   return (
     <>
@@ -260,17 +212,13 @@ function PostActionsComponent({
 
       <View style={styles.actions}>
         <ActionButton
-          icon={reaction ? 'thumbs-up' : 'thumbs-up-outline'}
-          emoji={reaction ? REACTION_EMOJI[reaction] : undefined}
-          label={reactionLabel}
-          active={!!reaction}
+          icon={liked ? 'thumbs-up' : 'thumbs-up-outline'}
+          label={t.news.actions.like}
+          active={liked}
           accessibilityLabel={
-            reaction
-              ? t.news.actions.a11yReaction.replace('{label}', REACTION_LABELS[reaction])
-              : t.news.actions.a11yLike
+            liked ? t.news.actions.a11yUnlike : t.news.actions.a11yLike
           }
-          onPress={() => onToggleReaction(post)}
-          onLongPress={() => onOpenReactionPicker(post)}
+          onPress={() => onToggleLike(post)}
         />
 
         {post.commentsEnabled ? (
@@ -314,21 +262,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: postSpacing.gutter,
   },
-  reactionSummary: {
+  likeSummary: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: postSpacing.inlineGap,
     paddingVertical: 4,
-  },
-  emojiStack: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  emoji: {
-    fontSize: 14,
-  },
-  emojiOverlap: {
-    marginLeft: -4,
   },
   likeBadge: {
     width: 20,
@@ -374,9 +312,6 @@ const styles = StyleSheet.create({
   },
   actionDisabled: {
     opacity: 0.45,
-  },
-  actionEmoji: {
-    fontSize: 19,
   },
   actionText: {
     ...postType.action,

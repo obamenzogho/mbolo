@@ -1,8 +1,8 @@
 /* src/features/news/hooks/usePostInteractions.ts
 
-   Un seul hook au niveau de l'écran, au lieu de useReactions + useNewsRepost
-   montés dans CHAQUE carte (2 x N hooks, N listeners Firestore sur un fil de
-   50 posts). Écriture optimiste dans le store, rollback si le serveur refuse.
+   Un seul hook au niveau de l'écran, au lieu de hooks montés dans CHAQUE
+   carte (N hooks, N listeners Firestore sur un fil de 50 posts). Écriture
+   optimiste dans le store, rollback si le serveur refuse.
 
    Tous les handlers sont stables (deps vides ou store/uid) : indispensable
    pour que le comparateur mémo de PostCard serve à quelque chose. */
@@ -13,36 +13,13 @@ import type { StoreApi } from 'zustand'
 import { captureException } from '@/lib/sentry'
 import {
   recordShare,
-  setPostReaction,
+  togglePostLike,
   togglePostRepost,
   togglePostSave,
 } from '../services/postInteractions'
 import type { NewsFeedState } from '../store/newsFeedStore'
-import type { NewsPost, PostReactionType, ReactionCounts } from '../types'
+import type { NewsPost } from '../types'
 import type { PostViewerState } from '../components/post/PostCard'
-
-const EMPTY_COUNTS: ReactionCounts = {
-  like: 0,
-  love: 0,
-  fire: 0,
-  clap: 0,
-  total: 0,
-}
-
-function shiftCounts(
-  counts: ReactionCounts | undefined,
-  previous: PostReactionType | null,
-  next: PostReactionType | null,
-): ReactionCounts {
-  const base = { ...(counts ?? EMPTY_COUNTS) }
-
-  if (previous) base[previous] = Math.max(0, base[previous] - 1)
-  if (next) base[next] += 1
-
-  base.total = Math.max(0, base.total + ((next ? 1 : 0) - (previous ? 1 : 0)))
-
-  return base
-}
 
 function withUser(list: string[], userId: string, present: boolean): string[] {
   const set = new Set(list)
@@ -84,66 +61,32 @@ export function usePostInteractions({
   /** État viewer dérivé, uniquement des primitives → mémo efficace. */
   const viewerStateFor = useCallback(
     (post: NewsPost): PostViewerState => ({
-      reaction:
-        post.myReaction ??
-        (post.likedBy.includes(currentUserId) ? 'like' : null),
+      liked: post.likedBy.includes(currentUserId),
       saved: post.savedBy.includes(currentUserId),
       reposted: post.repostedBy.includes(currentUserId),
       repostCount: post.reposts,
-      reactionTotal: post.reactionCounts?.total ?? post.likes,
       repostPending: pendingReposts.has(post.id),
     }),
     [currentUserId, pendingReposts],
   )
 
-  const applyReaction = useCallback(
-    async (post: NewsPost, next: PostReactionType | null) => {
+  const onToggleLike = useCallback(
+    (post: NewsPost) => {
       if (!currentUserId) return
 
-      const previous =
-        post.myReaction ?? (post.likedBy.includes(currentUserId) ? 'like' : null)
-
-      if (previous === next) return
-
-      const snapshot = {
-        myReaction: post.myReaction,
-        reactionCounts: post.reactionCounts,
-        likes: post.likes,
-        likedBy: post.likedBy,
-      }
+      const liked = post.likedBy.includes(currentUserId)
+      const snapshot = { likes: post.likes, likedBy: post.likedBy }
 
       patch(post.id, {
-        myReaction: next,
-        reactionCounts: shiftCounts(post.reactionCounts, previous, next),
-        likes: Math.max(0, post.likes + ((next ? 1 : 0) - (previous ? 1 : 0))),
-        likedBy: withUser(post.likedBy, currentUserId, !!next),
+        likedBy: withUser(post.likedBy, currentUserId, !liked),
+        likes: Math.max(0, post.likes + (liked ? -1 : 1)),
       })
 
-      const result = await setPostReaction(post.id, currentUserId, next)
-
-      if (!result) patch(post.id, snapshot)
+      void togglePostLike(post.id, currentUserId).then((result) => {
+        if (!result) patch(post.id, snapshot)
+      })
     },
     [currentUserId, patch],
-  )
-
-  const onToggleReaction = useCallback(
-    (post: NewsPost) => {
-      const current =
-        post.myReaction ?? (post.likedBy.includes(currentUserId) ? 'like' : null)
-
-      void applyReaction(post, current ? null : 'like')
-    },
-    [applyReaction, currentUserId],
-  )
-
-  const onSelectReaction = useCallback(
-    (post: NewsPost, type: PostReactionType) => {
-      const current =
-        post.myReaction ?? (post.likedBy.includes(currentUserId) ? 'like' : null)
-
-      void applyReaction(post, current === type ? null : type)
-    },
-    [applyReaction, currentUserId],
   )
 
   const onToggleSave = useCallback(
@@ -223,16 +166,14 @@ export function usePostInteractions({
   return useMemo(
     () => ({
       viewerStateFor,
-      onToggleReaction,
-      onSelectReaction,
+      onToggleLike,
       onToggleSave,
       onToggleRepost,
       onShare: (post: NewsPost) => void onShare(post),
     }),
     [
-      onSelectReaction,
       onShare,
-      onToggleReaction,
+      onToggleLike,
       onToggleRepost,
       onToggleSave,
       viewerStateFor,

@@ -29,8 +29,7 @@ export function scorePost(post: NewsPost, taste: PostUserTaste, now = Date.now()
     Math.log1p(post.likes ?? 0) * 1.0 +
     Math.log1p(post.comments ?? 0) * 1.5 +
     Math.log1p(post.shares ?? 0) * 2.0 +
-    Math.log1p(post.saves ?? 0) * 1.8 +
-    Math.log1p(post.reactionCounts?.total ?? 0) * 1.2
+    Math.log1p(post.saves ?? 0) * 1.8
 
   // Affinity : fréquence d'interaction avec cet auteur
   const affinity = taste.likedAuthors[post.userId] ?? 0

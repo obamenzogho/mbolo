@@ -1016,3 +1016,24 @@ Résultat : swipe-back de bord fonctionne sur iOS, Android et Web, y compris sur
 - 2 visuels de ratios différents : le second est recadré au ratio du premier.
 - Traductions fang/punu/nzebi best-effort (à faire relire par un natif, cf. note existante).
 
+### ADR — Actus : modèle d'interaction aligné sur le feed vidéo (retrait des réactions multiples)
+
+**Contexte :** les posts Actus copiaient Facebook (réactions multiples 👍❤️🔥👏, emojis empilés, picker au long press). Décision produit : la section Actus doit suivre le modèle du feed vidéo — un **j'aime simple**, commenter, enregistrer, reposter, partager.
+
+**Décision :** Supprimer les réactions multiples côté frontend (`PostReactionType`, `ReactionCounts`, `REACTION_EMOJI/LABELS`, `ReactionPicker`, picker/feuille de réactions) et n'exposer que J'aime / Commenter / Enregistrer / Reposter / Partager.
+
+**Changements** :
+- `types.ts` : retrait de `PostReactionType`, `PostReaction`, `ReactionCounts`, `REACTION_EMOJI`, `REACTION_LABELS` et des champs `reactionCounts`/`myReaction` de `NewsPost`.
+- `PostActionBar.tsx` : `PostStats` = badge pouce + `likes`, reposts/commentaires/partages, icône bookmark ; `PostActions` = 4 boutons sans long-press ni emoji. Labels via i18n (`a11yLike/a11yUnlike/a11yLikes` ajoutés, `a11yReaction`/`a11yReactionsDetail` supprimés).
+- `PostViewerState` simplifié : `{ liked, saved, reposted, repostCount, repostPending }`.
+- `postInteractions.ts` : `setPostReaction` supprimé, **`togglePostLike`** ajouté — écriture transactionnelle **directe** sur `posts/{postId}` (`likedBy` arrayUnion/arrayRemove + `likes` increment), à l'instar du j'aime vidéo.
+- `usePostInteractions.ts` : `onToggleLike` optimiste (rollback si serveur refuse) ; `onToggleSave`/`onToggleRepost` conservent leurs sous-collections.
+- `firestore.rules` : `posts update` autorise désormais, pour **tout membre authentifié**, le basculement de son propre uid dans `likedBy` (avec `likes`), via `changedKeys().hasOnly(['likes','likedBy'])` + `togglesSelfOnly('likedBy')` — pattern identique aux vidéos/commentaires. L'auteur ne touche toujours pas les champs de comptage.
+- `ReactionPicker.tsx` supprimé ; `newsFeedSource`/`postRanking` purgés de `reactionCounts`/`myReaction`.
+
+**Points d'attention** :
+- **Cloud Functions non modifiées** : `functions/src/posts/onReactionWrite.ts` (agrégation `reactionCounts` sur écriture de sous-collection `reactions`) et le ranking serveur (`index.ts:526`, `data.reactionCounts?.total ?? 0`) sont sans risque (plus rien n'écrit dans `reactions/`) mais **à supprimer/simplifier lors d'un prochain déploiement backend**.
+- `togglePostLike` étant une écriture directe côté client, valider les règles déployées (`firebase deploy --only firestore:rules`) **avant toute mise en production**.
+- Les traductions `a11yUnlike`/`a11yLikes` fang/punu/nzebi sont best-effort, dans le style existant (« J'aime » conservé tel quel dans les 4 langues).
+
+

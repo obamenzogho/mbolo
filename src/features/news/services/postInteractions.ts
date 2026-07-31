@@ -2,22 +2,25 @@
 
    Toutes les écritures Firestore liées à une carte de post, sorties de l'UI.
 
-   Le mobile n'écrit JAMAIS les compteurs du document post (likes,
-   reactionCounts, savedBy, reposts, shares...) : il exprime son intention
-   dans une sous-collection `posts/{postId}/<kind>/{userId}`. Les Cloud
-   Functions agrègent ensuite les compteurs sur le document (modèle identique
-   à celui des vidéos). Les règles Firestore interdisent toute autre écriture. */
+   Le j'aime est écrit directement sur le document post (likes/likedBy) par
+   transaction, comme dans le feed vidéo. La sauvegarde et le repost passent
+   par une sous-collection `posts/{postId}/<kind>/{userId}` ; les règles
+   Firestore autorisent le membre à basculer son propre état, jamais les
+   champs d'agrégation. */
 
 import {
+  arrayRemove,
+  arrayUnion,
   deleteDoc,
   doc,
   getDoc,
+  increment,
+  runTransaction,
   serverTimestamp,
   setDoc,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { captureException } from '@/lib/sentry'
-import type { PostReactionType } from '../types'
 
 const POSTS = 'posts'
 
@@ -28,62 +31,43 @@ function report(error: unknown, context: string, postId: string): void {
   )
 }
 
-export interface ReactionResult {
-  reaction: PostReactionType | null
-  previous: PostReactionType | null
-  totalDelta: number
-}
-
-/**
- * Pose, remplace ou retire la réaction de l'utilisateur.
- * `next === null` retire la réaction courante. Le compteur du post
- * (`reactionCounts`, `likes`, `likedBy`) est recalculé par la Cloud Function
- * `posts/onReactionWrite`.
- */
-export async function setPostReaction(
-  postId: string,
-  userId: string,
-  next: PostReactionType | null,
-): Promise<ReactionResult | null> {
-  if (!userId) return null
-
-  const reactionRef = doc(db, POSTS, postId, 'reactions', userId)
-
-  try {
-    if (next === null) {
-      await deleteDoc(reactionRef)
-
-      return {
-        reaction: null,
-        previous: null,
-        totalDelta: -1,
-      }
-    }
-
-    await setDoc(
-      reactionRef,
-      {
-        userId,
-        type: next,
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true },
-    )
-
-    return {
-      reaction: next,
-      previous: null,
-      totalDelta: 1,
-    }
-  } catch (error) {
-    report(error, 'postInteractions.setPostReaction', postId)
-    return null
-  }
-}
-
 export interface ToggleResult {
   active: boolean
   delta: number
+}
+
+/** J'aime : écriture transactionnelle directe sur le document post. */
+export async function togglePostLike(
+  postId: string,
+  userId: string,
+): Promise<ToggleResult | null> {
+  if (!userId) return null
+
+  try {
+    const postRef = doc(db, POSTS, postId)
+
+    return await runTransaction(db, async (transaction) => {
+      const snap = await transaction.get(postRef)
+
+      if (!snap.exists()) return null
+
+      const data = snap.data()
+      const likedBy: string[] = Array.isArray(data.likedBy)
+        ? data.likedBy
+        : []
+      const liked = likedBy.includes(userId)
+
+      transaction.update(postRef, {
+        likedBy: liked ? arrayRemove(userId) : arrayUnion(userId),
+        likes: increment(liked ? -1 : 1),
+      })
+
+      return { active: !liked, delta: liked ? -1 : 1 }
+    })
+  } catch (error) {
+    report(error, 'postInteractions.togglePostLike', postId)
+    return null
+  }
 }
 
 /** Sauvegarde : un document `posts/{postId}/saves/{userId}` fait foi. */

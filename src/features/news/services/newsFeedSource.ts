@@ -75,8 +75,6 @@ function mapDocToPost(snapshot: PostSnapshot): NewsPost {
     location: data.location,
     mood: data.mood,
     poll: data.poll,
-    reactionCounts: data.reactionCounts,
-    myReaction: data.myReaction ?? undefined,
     article: data.article,
     videoShare: data.videoShare,
     rankingScore:

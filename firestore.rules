@@ -261,16 +261,21 @@ service cloud.firestore {
 
       // 🔒 Les agrégats (likes/likedBy/comments/shares/saves/savedBy/
       // reactionCounts/reposts/repostedBy) sont possédés par les Cloud
-      // Functions. Le mobile n'exprime que ses intentions dans les
-      // sous-collections ci-dessous ; seul l'auteur édite son document,
-      // et jamais les champs de comptage (recalculés par le backend).
-      allow update: if request.auth != null
-        && request.auth.uid == resource.data.userId
-        && request.resource.data.userId == resource.data.userId
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-          'likes', 'likedBy', 'comments', 'shares', 'saves', 'savedBy',
-          'reactionCounts', 'reposts', 'repostedBy', 'verified'
-        ]);
+      // Functions et l'écriture transactionnelle du j'aime mobile. L'auteur
+      // édite son document mais jamais les champs de comptage ; un autre
+      // membre ne peut que basculer son propre uid dans likedBy (+likes).
+      allow update: if request.auth != null && (
+        ( request.auth.uid == resource.data.userId
+          && request.resource.data.userId == resource.data.userId
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'likes', 'likedBy', 'comments', 'shares', 'saves', 'savedBy',
+            'reactionCounts', 'reposts', 'repostedBy', 'verified'
+          ]) )
+        ||
+        ( changedKeys().hasOnly(['likes', 'likedBy'])
+          && ( !changedKeys().hasAny(['likedBy']) || togglesSelfOnly('likedBy') )
+          && request.resource.data.likes >= 0 )
+      );
 
       allow delete: if request.auth != null
         && request.auth.uid == resource.data.userId;

@@ -2,7 +2,7 @@
 
    Carte 100 % présentationnelle. Zéro Firestore, zéro Alert, zéro Modal.
    Toute intention remonte au parent via callbacks stables ; l'écran possède
-   une seule galerie, une seule feuille de réactions, un seul menu d'options.
+   une seule galerie, un seul menu d'options, une seule modale de commentaires.
 
    Le comparateur mémo est explicite : `post` est un nouvel objet à chaque
    `updatePost` du store, donc memo() sans comparateur ne servait à rien. */
@@ -16,15 +16,14 @@ import { PostMedia } from './PostMedia'
 import { PostActions, PostStats } from './PostActionBar'
 import PollView from '../PollView'
 import { postColors, postSpacing } from '../../theme/postTokens'
-import type { NewsPost, PostReactionType } from '../../types'
+import type { NewsPost } from '../../types'
 
 /** État du post vu par l'utilisateur courant, calculé par l'écran. */
 export interface PostViewerState {
-  reaction: PostReactionType | null
+  liked: boolean
   saved: boolean
   reposted: boolean
   repostCount: number
-  reactionTotal: number
   repostPending: boolean
 }
 
@@ -34,9 +33,7 @@ export interface PostCardHandlers {
   onOpenOptions: (post: NewsPost) => void
   onOpenMedia: (post: NewsPost, index: number) => void
   onOpenComments: (post: NewsPost) => void
-  onOpenReactionList: (post: NewsPost) => void
-  onOpenReactionPicker: (post: NewsPost) => void
-  onToggleReaction: (post: NewsPost) => void
+  onToggleLike: (post: NewsPost) => void
   onToggleSave: (post: NewsPost) => void
   onToggleRepost: (post: NewsPost) => void
   onShare: (post: NewsPost) => void
@@ -64,9 +61,7 @@ function PostCardComponent({
   onOpenOptions,
   onOpenMedia,
   onOpenComments,
-  onOpenReactionList,
-  onOpenReactionPicker,
-  onToggleReaction,
+  onToggleLike,
   onToggleSave,
   onToggleRepost,
   onShare,
@@ -110,21 +105,18 @@ function PostCardComponent({
 
       <PostStats
         post={post}
-        reactionTotal={viewer.reactionTotal}
-        repostCount={viewer.repostCount}
         saved={viewer.saved}
-        onOpenReactionList={onOpenReactionList}
+        onOpenReactions={onOpenPost}
         onOpenComments={onOpenComments}
         onToggleSave={onToggleSave}
       />
 
       <PostActions
         post={post}
-        reaction={viewer.reaction}
+        liked={viewer.liked}
         reposted={viewer.reposted}
         repostPending={viewer.repostPending}
-        onToggleReaction={onToggleReaction}
-        onOpenReactionPicker={onOpenReactionPicker}
+        onToggleLike={onToggleLike}
         onComment={onOpenComments}
         onRepost={onToggleRepost}
         onShare={onShare}
@@ -148,19 +140,21 @@ function areEqual(previous: PostCardProps, next: PostCardProps): boolean {
     a.background === b.background &&
     a.visibility === b.visibility &&
     a.commentsEnabled === b.commentsEnabled &&
+    a.likes === b.likes &&
     a.comments === b.comments &&
     a.shares === b.shares &&
+    a.saves === b.saves &&
+    a.reposts === b.reposts &&
     a.userName === b.userName &&
     a.userPhotoURL === b.userPhotoURL &&
     a.updatedAt?.getTime() === b.updatedAt?.getTime() &&
     previous.currentUserId === next.currentUserId &&
     previous.hasStory === next.hasStory &&
     previous.expanded === next.expanded &&
-    previous.viewer.reaction === next.viewer.reaction &&
+    previous.viewer.liked === next.viewer.liked &&
     previous.viewer.saved === next.viewer.saved &&
     previous.viewer.reposted === next.viewer.reposted &&
     previous.viewer.repostCount === next.viewer.repostCount &&
-    previous.viewer.reactionTotal === next.viewer.reactionTotal &&
     previous.viewer.repostPending === next.viewer.repostPending
   )
 }

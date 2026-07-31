@@ -150,9 +150,9 @@
     "semantic_hash": "2e4f5cc2a55fe53f489ac7552de93acb"
   },
   "/home/bruneel/Bureau/mbolo/app/post-detail.tsx": {
-    "mtime": 1785521297.2942595,
-    "ast_hash": "75bea8c6012b0f76c93d7d791401a5f0",
-    "semantic_hash": "75bea8c6012b0f76c93d7d791401a5f0"
+    "mtime": 1785525828.1484373,
+    "ast_hash": "15ab0b497d4589b62b96ebd0f6363dae",
+    "semantic_hash": "15ab0b497d4589b62b96ebd0f6363dae"
   },
   "/home/bruneel/Bureau/mbolo/app/post.tsx": {
     "mtime": 1785516593.9398203,
@@ -1025,9 +1025,9 @@
     "semantic_hash": "1087e97c0cff4d36941f4b91ef0ca036"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/NewsFeedScreen.tsx": {
-    "mtime": 1785521186.1951518,
-    "ast_hash": "b1adf05cdcd777ae41fe0f696e389e95",
-    "semantic_hash": "b1adf05cdcd777ae41fe0f696e389e95"
+    "mtime": 1785525940.5105462,
+    "ast_hash": "0abdb575c12cca7289b45f1712e2009b",
+    "semantic_hash": "0abdb575c12cca7289b45f1712e2009b"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/components/ImageGalleryModal.tsx": {
     "mtime": 1785516595.5508363,
@@ -1044,11 +1044,6 @@
     "ast_hash": "b22b26983fd3da5fcb3ce5bc4f1e6889",
     "semantic_hash": "b22b26983fd3da5fcb3ce5bc4f1e6889"
   },
-  "/home/bruneel/Bureau/mbolo/src/features/news/components/ReactionPicker.tsx": {
-    "mtime": 1785516595.5538363,
-    "ast_hash": "6acfc75fc8779ef6b51a8ed7bb1c3268",
-    "semantic_hash": "6acfc75fc8779ef6b51a8ed7bb1c3268"
-  },
   "/home/bruneel/Bureau/mbolo/src/features/news/components/RichPostText.tsx": {
     "mtime": 1785521096.4932687,
     "ast_hash": "d3e40a6757ab55f875d5f659444b4ef1",
@@ -1060,9 +1055,9 @@
     "semantic_hash": "7d3c0ea1063e9f45eceba5f7699212e5"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/components/post/PostActionBar.tsx": {
-    "mtime": 1785516595.5778368,
-    "ast_hash": "7044f1ab9c3d166a34cc9b469bedd4b4",
-    "semantic_hash": "7044f1ab9c3d166a34cc9b469bedd4b4"
+    "mtime": 1785526048.8236113,
+    "ast_hash": "94b3ebf76398b7f1761273bd4fe923e6",
+    "semantic_hash": "94b3ebf76398b7f1761273bd4fe923e6"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/components/post/PostBody.tsx": {
     "mtime": 1785522256.7448266,
@@ -1070,9 +1065,9 @@
     "semantic_hash": "6ed217ff988258de6efb1e3c5277b461"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/components/post/PostCard.tsx": {
-    "mtime": 1785521164.4119346,
-    "ast_hash": "1f15ade4c2209042c049ef864d45cc6f",
-    "semantic_hash": "1f15ade4c2209042c049ef864d45cc6f"
+    "mtime": 1785525711.6402757,
+    "ast_hash": "1d3fda2bfa714e1e48e54298d4909720",
+    "semantic_hash": "1d3fda2bfa714e1e48e54298d4909720"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/components/post/PostCardSkeleton.tsx": {
     "mtime": 1785522679.6640437,
@@ -1105,9 +1100,9 @@
     "semantic_hash": "d59d6abc73f1023f6e448c847c67e6df"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/hooks/usePostInteractions.ts": {
-    "mtime": 1785516595.7728386,
-    "ast_hash": "af2356d42fff2298e000e860020bf41b",
-    "semantic_hash": "af2356d42fff2298e000e860020bf41b"
+    "mtime": 1785525673.659897,
+    "ast_hash": "46008539d4065f26b14f39219b34d90c",
+    "semantic_hash": "46008539d4065f26b14f39219b34d90c"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/services/buildPostUserTaste.ts": {
     "mtime": 1785516595.7738385,
@@ -1115,9 +1110,9 @@
     "semantic_hash": "0aac656f49a8c1ea5e1ba319ca2cad14"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/services/newsFeedSource.ts": {
-    "mtime": 1785516595.9488404,
-    "ast_hash": "e29ee9ba9df1ef41532e0ebebd41bea8",
-    "semantic_hash": "e29ee9ba9df1ef41532e0ebebd41bea8"
+    "mtime": 1785525843.1235867,
+    "ast_hash": "3712e522fe0060b37eabb19bb3249a05",
+    "semantic_hash": "3712e522fe0060b37eabb19bb3249a05"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/services/newsNotifications.ts": {
     "mtime": 1785516595.9488404,
@@ -1125,9 +1120,9 @@
     "semantic_hash": "08b30a12be2c27a71ecd416924a5bf7b"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/services/postInteractions.ts": {
-    "mtime": 1785516595.9518404,
-    "ast_hash": "449424417f5d97d502130424484bccc0",
-    "semantic_hash": "449424417f5d97d502130424484bccc0"
+    "mtime": 1785525660.519766,
+    "ast_hash": "7b221e9cd18c9a2c13a5bb0682dd399e",
+    "semantic_hash": "7b221e9cd18c9a2c13a5bb0682dd399e"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/services/postMutations.ts": {
     "mtime": 1785516595.9598403,
@@ -1135,9 +1130,9 @@
     "semantic_hash": "9acbe225100dfa3eb68aa55ec1e0f6ac"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/services/postRanking.ts": {
-    "mtime": 1785516595.9608405,
-    "ast_hash": "4db5af7e35e2c2ef0f4ee76abaa75c52",
-    "semantic_hash": "4db5af7e35e2c2ef0f4ee76abaa75c52"
+    "mtime": 1785525850.6206613,
+    "ast_hash": "a20664ae021d0200746221bdfa68b5d1",
+    "semantic_hash": "a20664ae021d0200746221bdfa68b5d1"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/store/newsFeedStore.ts": {
     "mtime": 1785516595.9608405,
@@ -1150,9 +1145,9 @@
     "semantic_hash": "fa93a9d32669c8ff5de528607f5b2451"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/types.ts": {
-    "mtime": 1785516595.9658406,
-    "ast_hash": "e90dc0312ac316f4b2111069a5d5c3d5",
-    "semantic_hash": "e90dc0312ac316f4b2111069a5d5c3d5"
+    "mtime": 1785525647.7246385,
+    "ast_hash": "9d48d4708d68bb88540a257cf71f094e",
+    "semantic_hash": "9d48d4708d68bb88540a257cf71f094e"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/utils.ts": {
     "mtime": 1785516595.9698405,
@@ -1565,9 +1560,9 @@
     "semantic_hash": "40f0fcd84e5721e85c1566d9b7a7afb9"
   },
   "/home/bruneel/Bureau/mbolo/src/i18n/translations.ts": {
-    "mtime": 1785522216.559426,
-    "ast_hash": "b979dc774d4cf7500440e786be97857e",
-    "semantic_hash": "b979dc774d4cf7500440e786be97857e"
+    "mtime": 1785525903.5741827,
+    "ast_hash": "f40ff27f9ae2ff9d1d86bd03a279b8b9",
+    "semantic_hash": "f40ff27f9ae2ff9d1d86bd03a279b8b9"
   },
   "/home/bruneel/Bureau/mbolo/src/lib/blockService.ts": {
     "mtime": 1785516596.1498423,
