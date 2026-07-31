@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   View,
+  Text,
   Modal,
   ScrollView,
   StyleSheet,
@@ -15,6 +16,7 @@ import { StoryCard, CreateStoryCard } from '@/features/stories/components/StoryC
 import { StoryCardSkeleton } from '@/features/news/components/Skeletons'
 import { useStories } from '@/hooks/useStories'
 import PageWrapper from '@/components/PageWrapper'
+import CreateButton from '@/components/create/CreateButton'
 
 export default function StoriesScreen() {
   const uid = auth.currentUser?.uid ?? ''
@@ -46,6 +48,16 @@ export default function StoriesScreen() {
   return (
     <PageWrapper type="stack" swipeBack swipeBackEdgeOnly>
       <SafeAreaView style={styles.screen} edges={['top']}>
+        <View style={styles.topBar}>
+          <Text style={styles.title}>Stories</Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <CreateButton
+              onPress={() => router.push('/story-upload')}
+              size={38}
+            />
+          </View>
+        </View>
+
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -90,5 +102,16 @@ export default function StoriesScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#08090A' },
+  topBar: {
+    height: 54,
+    paddingHorizontal: 16,
+    backgroundColor: '#111214',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#2A2B2E',
+  },
+  title: { color: '#fff', fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
   storiesRow: { paddingHorizontal: 14, paddingVertical: 12, backgroundColor: '#111214' },
 })
