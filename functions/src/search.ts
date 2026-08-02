@@ -16,7 +16,7 @@ import {
   Timestamp,
 } from 'firebase-admin/firestore'
 
-import Typesense from 'typesense'
+import { Client } from 'typesense'
 
 import {
   USERS_SCHEMA,
@@ -45,8 +45,8 @@ type PostMediaType =
 
 type SearchDocument = Record<string, unknown>
 
-function client(): Typesense.Client {
-  return new Typesense.Client({
+function client(): Client {
+  return new Client({
     nodes: [
       {
         host: TYPESENSE_HOST.value(),
