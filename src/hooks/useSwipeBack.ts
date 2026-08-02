@@ -16,8 +16,8 @@ import { useGoBack } from '@/hooks/useGoBack'
 import { useAppliedAccessibility } from '@/features/settings/appliedStore'
 
 const EDGE_WIDTH = 44
-const DISMISS_RATIO = 0.4
-const VELOCITY_THRESHOLD = 650
+const DISMISS_RATIO = 0.5
+const VELOCITY_THRESHOLD = 800
 const CLOSE_DURATION = 220
 
 export interface UseSwipeBackOptions {
@@ -63,8 +63,8 @@ export function useSwipeBack({
     const pan = Gesture.Pan()
       .enabled(enabled)
       // Valeur positive : n'active le geste que sur un drag vers la droite.
-      .activeOffsetX(20)
-      .failOffsetY([-25, 25])
+      .activeOffsetX(35)
+      .failOffsetY([-40, 40])
       .onUpdate((e) => {
         if (closing.value) return
         translateX.value = Math.max(0, e.translationX)
