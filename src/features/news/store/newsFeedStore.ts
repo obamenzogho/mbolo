@@ -8,8 +8,15 @@ export interface NewsFeedState {
   refreshing: boolean
   loadingMore: boolean
   hasMore: boolean
+  /**
+   * Vrai entre la fin de l'injection du 1er lot et la réception
+   * des derniers posts de la 1re page : le skeleton reste visible
+   * derrière les posts réels, façon Facebook.
+   */
+  streaming: boolean
 
   setPosts: (posts: NewsPost[]) => void
+  setStreaming: (streaming: boolean) => void
   appendPosts: (posts: NewsPost[]) => void
   updatePost: (
     postId: string,
@@ -29,6 +36,7 @@ function createNewsFeedStore() {
     refreshing: false,
     loadingMore: false,
     hasMore: true,
+    streaming: false,
 
     setPosts: (posts) =>
       set({
@@ -36,7 +44,10 @@ function createNewsFeedStore() {
         loading: false,
         refreshing: false,
         loadingMore: false,
+        streaming: false,
       }),
+
+    setStreaming: (streaming) => set({ streaming }),
 
     appendPosts: (newPosts) =>
       set((state) => {

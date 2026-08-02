@@ -80,11 +80,13 @@ function TileImage({
         contentFit={contentFit}
         transition={transition}
         recyclingKey={recyclingKey}
+        blurRadius={status === 'loading' ? 18 : 0}
         onLoadStart={() => setStatus('loading')}
         onLoad={() => setStatus('loaded')}
         onError={() => setStatus('error')}
       />
 
+      {/* Voile couleur qui s'estompe au chargement — effet blur-up FB */}
       {status === 'loading' ? (
         <ShimmerBlock style={styles.loadingShimmer} />
       ) : null}

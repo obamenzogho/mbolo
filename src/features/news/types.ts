@@ -51,7 +51,7 @@ export interface NewsPostVideoShare {
 }
 
 // ── Post Backgrounds ─────────────────────────────────────
-export const POST_BACKGROUNDS: { id: string; colors: [string, string] }[] = [
+export const POST_BACKGROUNDS = [
   { id: 'none', colors: ['#111214', '#111214'] },
   { id: 'sunset', colors: ['#F58529', '#DD2A7B'] },
   { id: 'ocean', colors: ['#2193B0', '#6DD5ED'] },
@@ -59,7 +59,10 @@ export const POST_BACKGROUNDS: { id: string; colors: [string, string] }[] = [
   { id: 'purple', colors: ['#8134AF', '#515BD4'] },
   { id: 'night', colors: ['#232526', '#414345'] },
   { id: 'gabon', colors: ['#009E60', '#FCD116'] },
-]
+] as const satisfies ReadonlyArray<{ id: string; colors: readonly [string, string] }>
+
+/** Identifiants des fonds de texte — dérivés pour ne jamais diverger de la liste. */
+export type PostBackgroundId = (typeof POST_BACKGROUNDS)[number]['id']
 
 // ── NewsPost ──────────────────────────────────────────────
 export interface NewsPost {
@@ -80,7 +83,7 @@ export interface NewsPost {
   savedBy: string[]
   createdAt: Date
   updatedAt?: Date
-  background?: string
+  background?: PostBackgroundId
   location?: NewsLocation
   mood?: NewsMood
   poll?: NewsPoll

@@ -34,7 +34,10 @@ import { useFollowFast } from '@/hooks/useFollowFast'
 import { useFollowAction } from '@/hooks/useFollowAction'
 import { deletePost } from './services/postMutations'
 import { PostCard } from './components/post/PostCard'
-import { NewsFeedSkeleton } from './components/post/PostCardSkeleton'
+import {
+  NewsFeedSkeleton,
+  PostCardSkeleton,
+} from './components/post/PostCardSkeleton'
 import NewsCommentsModal from './components/NewsCommentsModal'
 import ImageGalleryModal from './components/ImageGalleryModal'
 import { newsFeedStore } from './store/newsFeedStore'
@@ -74,6 +77,7 @@ export default function NewsFeedScreen({
     refreshing,
     loadingMore,
     hasMore,
+    streaming,
     error,
     isEmpty,
     loadMore,
@@ -184,6 +188,10 @@ export default function NewsFeedScreen({
     setCommentPost(post)
   }, [])
 
+  const openSharedVideo = useCallback((videoId: string) => {
+    router.push({ pathname: '/(tabs)/feed', params: { videoId } })
+  }, [])
+
   const confirmDelete = useCallback(
     (post: NewsPost) => {
       Alert.alert(
@@ -292,6 +300,7 @@ export default function NewsFeedScreen({
         onOpenOptions={openOptions}
         onOpenMedia={openMedia}
         onOpenComments={openComments}
+        onOpenSharedVideo={openSharedVideo}
         onToggleLike={interactions.onToggleLike}
         onToggleSave={interactions.onToggleSave}
         onToggleRepost={interactions.onToggleRepost}
@@ -309,6 +318,7 @@ export default function NewsFeedScreen({
       openMedia,
       openOptions,
       openPost,
+      openSharedVideo,
       toggleExpanded,
     ],
   )
@@ -410,7 +420,15 @@ export default function NewsFeedScreen({
           ) : null
         }
         ListFooterComponent={
-          loadingMore ? (
+          streaming ? (
+            /* Affichage progressif façon Facebook : pendant que les
+               derniers posts de la page affluent, des placeholders
+               apparaissent sous les posts déjà présents. */
+            <View style={styles.footer}>
+              <PostCardSkeleton withMedia />
+              <PostCardSkeleton withMedia={false} />
+            </View>
+          ) : loadingMore ? (
             <View style={styles.footer}>
               <OrbitLoader />
             </View>

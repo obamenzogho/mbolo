@@ -74,6 +74,8 @@ export default function PostDetailScreen() {
         location: data.location || undefined,
         mood: data.mood || undefined,
         poll: data.poll || undefined,
+        article: data.article || undefined,
+        videoShare: data.videoShare || undefined,
       })
 
       setLoading(false)
@@ -132,6 +134,13 @@ export default function PostDetailScreen() {
   const openComments = useCallback((target: NewsPost) => {
     setCommentPost(target)
   }, [])
+
+  const openSharedVideo = useCallback(
+    (videoId: string) => {
+      router.push({ pathname: '/(tabs)/feed', params: { videoId } })
+    },
+    [router],
+  )
 
   const openMedia = useCallback((target: NewsPost, index: number) => {
     setGalleryIndex(index)
@@ -203,6 +212,7 @@ export default function PostDetailScreen() {
             onOpenOptions={openOptions}
             onOpenMedia={openMedia}
             onOpenComments={openComments}
+            onOpenSharedVideo={openSharedVideo}
             onToggleLike={interactions.onToggleLike}
             onToggleSave={interactions.onToggleSave}
             onToggleRepost={interactions.onToggleRepost}

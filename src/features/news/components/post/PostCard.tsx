@@ -13,6 +13,7 @@ import { useI18n } from '@/i18n'
 import { PostHeader } from './PostHeader'
 import { PostBody } from './PostBody'
 import { PostMedia } from './PostMedia'
+import { PostVideoShare } from './PostVideoShare'
 import { PostActions, PostStats } from './PostActionBar'
 import PollView from '../PollView'
 import { postColors, postSpacing } from '../../theme/postTokens'
@@ -33,6 +34,7 @@ export interface PostCardHandlers {
   onOpenOptions: (post: NewsPost) => void
   onOpenMedia: (post: NewsPost, index: number) => void
   onOpenComments: (post: NewsPost) => void
+  onOpenSharedVideo: (videoId: string) => void
   onToggleLike: (post: NewsPost) => void
   onToggleSave: (post: NewsPost) => void
   onToggleRepost: (post: NewsPost) => void
@@ -61,6 +63,7 @@ function PostCardComponent({
   onOpenOptions,
   onOpenMedia,
   onOpenComments,
+  onOpenSharedVideo,
   onToggleLike,
   onToggleSave,
   onToggleRepost,
@@ -96,6 +99,16 @@ function PostCardComponent({
         onOpenImage={(index) => onOpenMedia(post, index)}
         onOpenVideo={() => onOpenPost(post)}
       />
+
+      {post.videoShare ? (
+        <View style={styles.videoShare}>
+          <PostVideoShare
+            share={post.videoShare}
+            onPress={() => onOpenSharedVideo(post.videoShare!.sharedVideoId)}
+          />
+        </View>
+      ) : null}
+
 
       {post.poll ? (
         <View style={styles.poll}>
@@ -137,6 +150,7 @@ function areEqual(previous: PostCardProps, next: PostCardProps): boolean {
     a.text === b.text &&
     a.media === b.media &&
     a.poll === b.poll &&
+    a.videoShare === b.videoShare &&
     a.background === b.background &&
     a.visibility === b.visibility &&
     a.commentsEnabled === b.commentsEnabled &&
@@ -169,6 +183,9 @@ const styles = StyleSheet.create({
   },
   poll: {
     paddingHorizontal: postSpacing.gutter,
+    paddingBottom: postSpacing.blockBottom,
+  },
+  videoShare: {
     paddingBottom: postSpacing.blockBottom,
   },
 })

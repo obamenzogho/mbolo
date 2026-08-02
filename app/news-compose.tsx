@@ -1,75 +1,111 @@
-import { useEffect, useState } from 'react'
+/* app/news-compose.tsx
+
+   Écran unique de création : texte, photo, vidéo, article, sondage et
+   partage de vidéo passent tous par ici. Le fichier n'est qu'un
+   orchestrateur — l'état vit dans useComposeState, la persistance locale
+   dans useComposeDraft, l'écriture distante dans useComposePublish, et
+   chaque bloc visuel dans components/compose/.
+
+   Deux axes seulement gouvernent l'affichage :
+
+     mode : galerie | caméra | texte | sondage   ← les onglets du haut
+     step : pick | details                        ← galerie et caméra seules
+
+   L'écran ouvre sur la galerie, comme Instagram : dans la plupart des cas
+   la publication existe déjà dans le téléphone, la demander en premier
+   supprime une étape. Les onglets disparaissent à l'étape de finalisation —
+   changer de mode y reviendrait à jeter le travail en cours. En édition on
+   entre directement en « details » : on ne rechoisit pas un média pour
+   corriger une légende. */
+
+import { useCallback, useEffect, useState } from 'react'
 import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  Image,
-  ScrollView,
   Alert,
-  StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  Modal,
+  StyleSheet,
+  View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useLocalSearchParams } from 'expo-router'
-import { LinearGradient } from 'expo-linear-gradient'
-import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import * as Location from 'expo-location'
-import {
-  addDoc,
-  collection,
-  doc,
-  getDoc,
-  increment,
-  serverTimestamp,
-  updateDoc,
-} from 'firebase/firestore'
-import { auth, db } from '@/lib/firebase'
-import { uploadToCloudinary } from '@/lib/cloudinary'
-import { captureException } from '@/lib/sentry'
-import { colors } from '@/lib/theme'
-import OrbitLoader from '@/components/OrbitLoader'
-import { POST_BACKGROUNDS } from '@/features/news/types'
-import { newsFeedStore } from '@/features/news/store/newsFeedStore'
-import type {
-  NewsPostFormat,
-  NewsPostMedia,
-  NewsPostVisibility,
-  NewsLocation,
-  NewsMood,
-  NewsPoll,
-} from '@/features/news/types'
+import * as VideoThumbnails from 'expo-video-thumbnails'
 import PageWrapper from '@/components/PageWrapper'
+import OrbitLoader from '@/components/OrbitLoader'
+import { auth } from '@/lib/firebase'
+import { captureException } from '@/lib/sentry'
+import { useCurrentUserPhoto } from '@/hooks/useCurrentUserPhoto'
+import { useHaptics } from '@/hooks/useHaptics'
+import type { GalleryAsset } from '@/hooks/useGallery'
+import { useI18n } from '@/i18n'
+import { ComposeCamera } from '@/features/news/components/compose/ComposeCamera'
+import { ComposeDetails } from '@/features/news/components/compose/ComposeDetails'
+import { ComposeHeader } from '@/features/news/components/compose/ComposeHeader'
+import { ComposeModeTabs } from '@/features/news/components/compose/ComposeModeTabs'
+import type { ComposeMode } from '@/features/news/components/compose/ComposeModeTabs'
+import { DraftBanner } from '@/features/news/components/compose/DraftBanner'
+import { GalleryGrid } from '@/features/news/components/compose/GalleryGrid'
+import { MoodSheet } from '@/features/news/components/compose/MoodSheet'
+import { PublishProgress } from '@/features/news/components/compose/PublishProgress'
+import { VisibilitySheet } from '@/features/news/components/compose/VisibilitySheet'
+import { VideoPickerModal } from '@/features/news/components/VideoPickerModal'
+import { clearComposeDraft, useComposeDraft } from '@/features/news/hooks/useComposeDraft'
+import {
+  EMPTY_COMPOSE,
+  composeSnapshot,
+  useComposeState,
+} from '@/features/news/hooks/useComposeState'
+import type { ComposeState, SelectedMedia } from '@/features/news/hooks/useComposeState'
+import { useComposePublish } from '@/features/news/hooks/useComposePublish'
+import type { PublishError } from '@/features/news/hooks/useComposePublish'
+import { loadPost, type PostDraft } from '@/features/news/services/postMutations'
+import type { NewsPost } from '@/features/news/types'
+import { newsFeedStore } from '@/features/news/store/newsFeedStore'
+import { COMPOSE_MAX_MEDIA, postColors } from '@/features/news/theme/postTokens'
+import type { Video as VideoType } from '@/types'
 
-interface SelectedMedia {
-  uri: string
-  type: 'image' | 'video'
-  width?: number
-  height?: number
-  duration?: number | null
+const EMPTY_SNAPSHOT = composeSnapshot(EMPTY_COMPOSE)
+
+/** Aperçu du brouillon dans la bannière : premier contenu textuel trouvé. */
+function draftPreview(state: ComposeState): string {
+  return (
+    state.text.trim() ||
+    state.article?.title.trim() ||
+    state.poll?.question.trim() ||
+    ''
+  ).slice(0, 60)
 }
 
-const MAX_IMAGES = 8
-
-const MOODS: NewsMood[] = [
-  { emoji: '😀', label: 'heureux' },
-  { emoji: '🥰', label: 'amoureux' },
-  { emoji: '😎', label: 'cool' },
-  { emoji: '😢', label: 'triste' },
-  { emoji: '😡', label: 'énervé' },
-  { emoji: '🎉', label: 'en fête' },
-  { emoji: '😴', label: 'fatigué' },
-  { emoji: '🙏', label: 'reconnaissant' },
-]
-
-function inferFormat(media: SelectedMedia[]): NewsPostFormat {
-  if (media.length === 0) return 'text'
-  if (media[0].type === 'video') return 'video'
-  if (media.length > 1) return 'carousel'
-  return 'image'
+/* Post édité → état du composeur. Les URI distantes du document deviennent
+   les « médias » du formulaire, exactement comme en création ; le type du
+   média est resanitisé (une valeur inconnue retombe sur une image). */
+function postToComposeState(post: NewsPost): ComposeState {
+  return {
+    text: post.text,
+    media: post.media.map((item) => ({
+      uri: item.url,
+      type: item.type === 'video' ? 'video' : 'image',
+      width: item.width,
+      height: item.height,
+      duration: item.duration ?? null,
+      thumbnailUri: item.thumbnailUrl,
+    })),
+    visibility: post.visibility,
+    commentsEnabled: post.commentsEnabled,
+    background: post.background ?? 'none',
+    location: post.location ?? null,
+    mood: post.mood ?? null,
+    poll: post.poll ?? null,
+    article: post.article
+      ? {
+          title: post.article.title,
+          body: post.article.body,
+          coverImage: post.article.coverImage ?? null,
+        }
+      : null,
+    sharedVideo: post.videoShare ?? null,
+  }
 }
 
 export default function NewsComposeScreen() {
@@ -79,665 +115,513 @@ export default function NewsComposeScreen() {
   }>()
   const editing = Boolean(editPostId)
 
-  const [text, setText] = useState('')
-  const [media, setMedia] = useState<SelectedMedia[]>([])
-  const [visibility, setVisibility] = useState<NewsPostVisibility>('public')
-  const [commentsEnabled, setCommentsEnabled] = useState(true)
-  const [publishing, setPublishing] = useState(false)
-  const [progress, setProgress] = useState(0)
+  const { t } = useI18n()
+  const { lightImpact } = useHaptics()
+
+  const { state, dispatch, setText, snapshot, canPublish, canUseBackground, hasContent } =
+    useComposeState()
+
+  const [mode, setMode] = useState<ComposeMode>('gallery')
+  const [step, setStep] = useState<'pick' | 'details'>(editing ? 'details' : 'pick')
   const [loadingPost, setLoadingPost] = useState(editing)
+  const [baseline, setBaseline] = useState(EMPTY_SNAPSHOT)
+  const [visibilityOpen, setVisibilityOpen] = useState(false)
+  const [moodOpen, setMoodOpen] = useState(false)
+  const [videoPickerOpen, setVideoPickerOpen] = useState(false)
+  const [detectingLocation, setDetectingLocation] = useState(false)
 
-  const [background, setBackground] = useState('none')
-  const [location, setLocation] = useState<NewsLocation | null>(null)
-  const [mood, setMood] = useState<NewsMood | null>(null)
-  const [poll, setPoll] = useState<NewsPoll | null>(null)
-  const [moodPickerOpen, setMoodPickerOpen] = useState(false)
-  const [articleMode, setArticleMode] = useState(false)
-  const [articleTitle, setArticleTitle] = useState('')
-  const [articleBody, setArticleBody] = useState('')
-  const [articleCoverImage, setArticleCoverImage] = useState<string | null>(null)
-  const [videoShareMode, setVideoShareMode] = useState(false)
-  const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null)
+  const user = auth.currentUser
+  const photoURL = useCurrentUserPhoto()
 
-  const canUseBackground = media.length === 0 && !poll
-  const activeBg = POST_BACKGROUNDS.find((b) => b.id === background) ?? POST_BACKGROUNDS[0]
+  /* Les modes texte et sondage n'ont pas d'étape de choix : ils composent
+     directement. La galerie et la caméra choisissent d'abord un média. */
+  const inDetails = step === 'details' || mode === 'text' || mode === 'poll'
 
-  const pollValid = poll
-    ? poll.question.trim().length > 0 && poll.options.filter((o) => o.text.trim()).length >= 2
-    : true
+  const handleSuccess = useCallback(
+    (postId: string, draft: PostDraft) => {
+      // En édition, le fil est déjà chargé : on le met à jour sur place plutôt
+      // que d'attendre un aller-retour Firestore.
+      if (editing) {
+        newsFeedStore.getState().updatePost(postId, {
+          text: draft.text.trim(),
+          format: draft.format,
+          media: draft.media,
+          visibility: draft.visibility,
+          commentsEnabled: draft.commentsEnabled,
+          background: draft.background,
+          location: draft.location ?? undefined,
+          mood: draft.mood ?? undefined,
+          poll: draft.poll ?? undefined,
+          article: draft.article ?? undefined,
+          videoShare: draft.videoShare ?? undefined,
+        })
+      }
 
-  const canPublish = !publishing && pollValid && (text.trim().length > 0 || media.length > 0 || (poll ? pollValid : false))
+      clearComposeDraft()
+      router.replace('/(tabs)/feed')
+    },
+    [editing],
+  )
+
+  const handleError = useCallback(
+    (reason: PublishError) => {
+      /* Tableau exhaustif : le compilateur signale tout nouveau motif
+         de publication sans message dédié. */
+      const message: Record<PublishError, string> = {
+        auth: t.news.compose.errorForbidden,
+        write: t.news.compose.errorPublish,
+        upload: t.news.compose.errorPublish,
+        rateLimit: t.news.compose.errorRateLimit,
+      }
+      Alert.alert(t.news.compose.errorTitle, message[reason])
+    },
+    [t],
+  )
+
+  const { publish, publishing, progress } = useComposePublish({
+    postId: editPostId,
+    onSuccess: handleSuccess,
+    onError: handleError,
+  })
+
+  const {
+    pending: pendingDraft,
+    consumePending,
+    discardPending,
+    saveNow,
+  } = useComposeDraft({
+    state,
+    snapshot,
+    // Éditer un post existant ne doit pas écraser un brouillon en cours.
+    enabled: !editing && !publishing,
+    hasContent,
+  })
+
+  /** Contenu non enregistré : diffère de la baseline, hors chargement/envoi. */
+  const isDirty = !publishing && !loadingPost && snapshot !== baseline
+
+  /* Une publication partagée depuis une autre app arrive par l'URL. Elle
+     apporte du texte, pas un média : le mode texte est le bon point d'entrée. */
+  useEffect(() => {
+    if (!sharedUrl || editPostId) return
+    setText(sharedUrl)
+    setMode('text')
+  }, [sharedUrl, editPostId, setText])
 
   useEffect(() => {
-    if (sharedUrl && !editPostId) {
-      setText(sharedUrl)
-    }
-  }, [sharedUrl, editPostId])
-
-  useEffect(() => {
-    if (!editPostId || !auth.currentUser) return
+    if (!editPostId || !user) return
 
     let cancelled = false
 
-    getDoc(doc(db, 'posts', editPostId))
-      .then((snapshot) => {
-        if (cancelled || !snapshot.exists()) return
-
-        const data = snapshot.data()
-
-        if (data.userId !== auth.currentUser?.uid) {
-          Alert.alert('Action interdite', 'Vous ne pouvez pas modifier cette publication.')
+    loadPost(editPostId)
+      .then((post) => {
+        if (cancelled) return
+        if (!post) {
+          // Introuvable ou échec réseau : on ne laisse pas un éditeur vide.
+          Alert.alert(t.news.compose.errorTitle, t.news.compose.errorLoad)
           router.back()
           return
         }
 
-        setText(data.text || '')
-        setVisibility(data.visibility || 'public')
-        setCommentsEnabled(data.commentsEnabled !== false)
-
-        if (Array.isArray(data.media) && data.media.length > 0) {
-          setMedia(data.media.map((m: any) => ({
-            uri: m.url,
-            type: m.type === 'video' ? 'video' : 'image',
-            width: m.width,
-            height: m.height,
-            duration: m.duration ?? null,
-          })))
+        if (post.userId !== user.uid) {
+          Alert.alert(t.news.compose.errorTitle, t.news.compose.errorForbidden)
+          router.back()
+          return
         }
-        if (data.background && data.background !== 'none') setBackground(data.background)
-        if (data.location) setLocation(data.location)
-        if (data.mood) setMood(data.mood)
-        if (data.poll) setPoll(data.poll)
+
+        const loaded = postToComposeState(post)
+        dispatch({ type: 'hydrate', state: loaded })
+        // La baseline reflète le contenu chargé : rien n'est « sale » à l'ouverture.
+        setBaseline(composeSnapshot(loaded))
       })
       .finally(() => {
         if (!cancelled) setLoadingPost(false)
       })
 
-    return () => { cancelled = true }
-  }, [editPostId])
+    return () => {
+      cancelled = true
+    }
+  }, [editPostId, user, dispatch, t])
 
-  const pickMedia = async () => {
+  /** Vignette best-effort : sans elle, <Image> ne sait pas rendre une vidéo. */
+  const attachThumbnail = useCallback(
+    async (uri: string) => {
+      try {
+        const thumbnail = await VideoThumbnails.getThumbnailAsync(uri, {
+          time: 1000,
+          quality: 0.6,
+        })
+        dispatch({ type: 'setMediaThumbnail', uri, thumbnailUri: thumbnail.uri })
+      } catch (error) {
+        captureException(
+          error instanceof Error ? error : new Error(String(error)),
+          { context: 'news.compose.thumbnail' },
+        )
+      }
+    },
+    [dispatch],
+  )
+
+  const addMedia = useCallback(
+    (media: SelectedMedia[]) => {
+      dispatch({ type: 'addMedia', media })
+      media
+        .filter((item) => item.type === 'video')
+        .forEach((item) => attachThumbnail(item.uri))
+    },
+    [dispatch, attachThumbnail],
+  )
+
+  /* La grille pilote la sélection depuis `state.media` : la règle « une
+     vidéo occupe la publication entière » et le plafond de médias vivent
+     dans le reducer, pas ici. */
+  const handleToggleAsset = useCallback(
+    (asset: GalleryAsset) => {
+      lightImpact()
+
+      const already = state.media.some((item) => item.uri === asset.uri)
+      if (already) {
+        dispatch({ type: 'removeMedia', uri: asset.uri })
+        return
+      }
+
+      const isVideo = asset.mediaType === 'video'
+      if (!isVideo && state.media.length >= COMPOSE_MAX_MEDIA) return
+
+      addMedia([
+        {
+          uri: asset.uri,
+          type: isVideo ? 'video' : 'image',
+          width: asset.width,
+          height: asset.height,
+          duration: asset.duration ?? null,
+        },
+      ])
+    },
+    [state.media, dispatch, addMedia, lightImpact],
+  )
+
+  const handleCapture = useCallback(
+    (media: SelectedMedia) => {
+      addMedia([media])
+      setStep('details')
+    },
+    [addMedia],
+  )
+
+  /* « Ajouter » depuis l'étape détails : on ne revient pas à la grille, ce
+     qui perdrait la légende déjà saisie. Le sélecteur système suffit. */
+  const pickMoreMedia = useCallback(async () => {
+    lightImpact()
+
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images', 'videos'],
+      mediaTypes: ['images'],
       allowsMultipleSelection: true,
-      selectionLimit: MAX_IMAGES,
+      selectionLimit: COMPOSE_MAX_MEDIA,
       quality: 0.9,
     })
 
     if (result.canceled) return
 
-    const assets = result.assets.map((asset) => ({
-      uri: asset.uri,
-      type: asset.type === 'video' ? 'video' : 'image',
-      width: asset.width,
-      height: asset.height,
-      duration: asset.duration,
-    } satisfies SelectedMedia))
+    addMedia(
+      result.assets.map((asset) => ({
+        uri: asset.uri,
+        type: 'image' as const,
+        width: asset.width,
+        height: asset.height,
+      })),
+    )
+  }, [addMedia, lightImpact])
 
-    const videos = assets.filter((asset) => asset.type === 'video')
+  const pickArticleCover = useCallback(async () => {
+    lightImpact()
 
-    if (videos.length > 0 && assets.length > 1) {
-      Alert.alert('Sélection non prise en charge', 'Une publication vidéo ne peut contenir qu\'une seule vidéo.')
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: false,
+      quality: 0.9,
+    })
+
+    if (result.canceled) return
+    dispatch({ type: 'setArticleCover', coverImage: result.assets[0].uri })
+  }, [dispatch, lightImpact])
+
+  const detectLocation = useCallback(async () => {
+    setDetectingLocation(true)
+
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync()
+
+      if (status !== 'granted') {
+        Alert.alert(t.news.compose.errorTitle, t.news.compose.errorLocationDenied)
+        return
+      }
+
+      const position = await Location.getCurrentPositionAsync({})
+      const [place] = await Location.reverseGeocodeAsync({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      })
+
+      const parts = [place?.city || place?.district, place?.country].filter(Boolean)
+
+      dispatch({
+        type: 'setLocation',
+        location: {
+          name: parts.join(', ') || t.news.compose.locationCurrent,
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        },
+      })
+    } catch (error) {
+      captureException(
+        error instanceof Error ? error : new Error(String(error)),
+        { context: 'news.compose.location' },
+      )
+      Alert.alert(t.news.compose.errorTitle, t.news.compose.errorLocation)
+    } finally {
+      setDetectingLocation(false)
+    }
+  }, [dispatch, t])
+
+  /* Changer d'onglet fait jouer l'exclusion mutuelle du reducer : ouvrir un
+     sondage vide les médias, ajouter un média ferme le sondage. On la
+     déclenche ici pour que l'onglet reflète toujours l'état réel. */
+  const handleChangeMode = useCallback(
+    (next: ComposeMode) => {
+      lightImpact()
+      setMode(next)
+      setStep('pick')
+
+      if (next === 'poll') {
+        dispatch({ type: 'openPoll' })
+        return
+      }
+      if (state.poll) dispatch({ type: 'closePoll' })
+    },
+    [dispatch, lightImpact, state.poll],
+  )
+
+  const handleToggleArticle = useCallback(() => {
+    lightImpact()
+    dispatch({ type: state.article ? 'closeArticle' : 'openArticle' })
+  }, [dispatch, lightImpact, state.article])
+
+  const handleSelectSharedVideo = useCallback(
+    (video: VideoType) => {
+      lightImpact()
+      dispatch({
+        type: 'setSharedVideo',
+        video: {
+          sharedVideoId: video.id,
+          sharedVideoURL: video.videoURL,
+          sharedThumbnailURL: video.thumbnailURL,
+          sharedUserName: video.userName,
+          originalDescription: video.description,
+        },
+      })
+      setVideoPickerOpen(false)
+      setStep('details')
+    },
+    [dispatch, lightImpact],
+  )
+
+  const handleResumeDraft = useCallback(() => {
+    const draft = consumePending()
+    if (draft) {
+      dispatch({ type: 'hydrate', state: draft })
+      setStep('details')
+    }
+  }, [consumePending, dispatch])
+
+  const requestClose = useCallback(() => {
+    if (!isDirty) {
+      router.back()
       return
     }
 
-    setMedia(assets.slice(0, MAX_IMAGES))
-    setBackground('none')
-  }
-
-  const removeMedia = (index: number) => {
-    setMedia((current) => current.filter((_, i) => i !== index))
-  }
-
-  const cycleVisibility = () => {
-    setVisibility((current) => {
-      if (current === 'public') return 'followers'
-      if (current === 'followers') return 'private'
-      return 'public'
-    })
-  }
-
-  const detectLocation = async () => {
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync()
-      if (status !== 'granted') {
-        Alert.alert('Localisation', 'Autorise la localisation pour l\'ajouter.')
-        return
-      }
-      const pos = await Location.getCurrentPositionAsync({})
-      const geo = await Location.reverseGeocodeAsync({
-        latitude: pos.coords.latitude,
-        longitude: pos.coords.longitude,
-      })
-      const place = geo[0]
-      setLocation({
-        name: place ? `${place.city || place.district || ''}${place.country ? `, ${place.country}` : ''}`.trim() || 'Position actuelle' : 'Position actuelle',
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
-      })
-    } catch {
-      Alert.alert('Erreur', 'Impossible de récupérer la position.')
+    /* En création, le contenu peut être gardé ; en édition il n'y a pas de
+       brouillon possible, donc la seule question est d'abandonner ou non. */
+    if (editing) {
+      Alert.alert(t.news.compose.discardTitle, t.news.compose.discardMsg, [
+        { text: t.news.compose.discardKeep, style: 'cancel' },
+        {
+          text: t.news.compose.discardConfirm,
+          style: 'destructive',
+          onPress: () => router.back(),
+        },
+      ])
+      return
     }
-  }
 
-  const addPoll = () => {
-    setBackground('none')
-    setMedia([])
-    setPoll({
-      question: '',
-      options: [
-        { id: '1', text: '', votes: 0, votedBy: [] },
-        { id: '2', text: '', votes: 0, votedBy: [] },
-      ],
-    })
-  }
+    Alert.alert(t.news.compose.draftSaveTitle, t.news.compose.draftSaveMsg, [
+      { text: t.news.compose.discardKeep, style: 'cancel' },
+      {
+        text: t.news.compose.draftDiscard,
+        style: 'destructive',
+        onPress: () => {
+          clearComposeDraft()
+          router.back()
+        },
+      },
+      {
+        text: t.news.compose.save,
+        onPress: async () => {
+          await saveNow()
+          router.back()
+        },
+      },
+    ])
+  }, [editing, isDirty, saveNow, t])
 
-  const updatePollOption = (id: string, text: string) => {
-    setPoll((p) => p ? { ...p, options: p.options.map((o) => o.id === id ? { ...o, text } : o) } : p)
-  }
-
-  const addPollOption = () => {
-    setPoll((p) => {
-      if (!p || p.options.length >= 4) return p
-      return { ...p, options: [...p.options, { id: String(Date.now()), text: '', votes: 0, votedBy: [] }] }
-    })
-  }
-
-  const publish = async () => {
-    const user = auth.currentUser
-    if (!user || !canPublish) return
-
-    setPublishing(true)
-    setProgress(0)
-
-    try {
-      const profileSnapshot = await getDoc(doc(db, 'users', user.uid))
-      const profile = profileSnapshot.data()
-
-      if (editPostId) {
-        await updateDoc(doc(db, 'posts', editPostId), {
-          text: text.trim(),
-          visibility,
-          commentsEnabled,
-          background: media.length === 0 && !poll ? background : 'none',
-          location: location ?? null,
-          mood: mood ?? null,
-          poll: poll ? {
-            question: poll.question.trim(),
-            options: poll.options.filter((o) => o.text.trim()).map((o) => ({ ...o, text: o.text.trim() })),
-          } : null,
-          updatedAt: serverTimestamp(),
-        })
-
-        newsFeedStore.getState().updatePost(editPostId, {
-          text: text.trim(),
-          visibility,
-          commentsEnabled,
-          background: media.length === 0 && !poll ? background : 'none',
-          location: location ?? undefined,
-          mood: mood ?? undefined,
-          poll: poll ? {
-            question: poll.question.trim(),
-            options: poll.options.filter((o) => o.text.trim()).map((o) => ({ ...o, text: o.text.trim() })),
-          } : undefined,
-        })
-
-        router.replace('/(tabs)/stories')
-        return
-      }
-
-      const hashtags = Array.from(
-        new Set((text.match(/#[\w\u00C0-\u024F]+/g) || []).map((h) => h.slice(1).toLowerCase()))
-      )
-
-      const uploaded: NewsPostMedia[] = []
-
-      for (let index = 0; index < media.length; index++) {
-        const item = media[index]
-
-        const url = await uploadToCloudinary(item.uri, item.type, {
-          folder: 'posts',
-          timeout: 180000,
-          onProgress: (itemProgress) => {
-            const completed = index / Math.max(1, media.length)
-            const current = itemProgress / 100 / Math.max(1, media.length)
-            setProgress(Math.min(99, Math.round((completed + current) * 100)))
-          },
-        })
-
-        uploaded.push({
-          url,
-          type: item.type,
-          width: item.width,
-          height: item.height,
-          duration: item.duration ?? undefined,
-        })
-      }
-
-      await addDoc(collection(db, 'posts'), {
-        userId: user.uid,
-        userName: profile?.nom || profile?.pseudo || user.displayName || user.email?.split('@')[0] || 'Utilisateur',
-        userPhotoURL: profile?.photoURL || user.photoURL || null,
-        verified: profile?.verified === true,
-        text: text.trim(),
-        format: articleMode ? 'article' : videoShareMode ? 'video_share' : inferFormat(media),
-        media: uploaded,
-        visibility,
-        commentsEnabled,
-        background: media.length === 0 && !poll && !articleMode ? background : 'none',
-        hashtags,
-        location: location ?? null,
-        mood: mood ?? null,
-        poll: poll ? {
-          question: poll.question.trim(),
-          options: poll.options.filter((o) => o.text.trim()).map((o) => ({ ...o, text: o.text.trim() })),
-        } : null,
-        article: articleMode ? {
-          title: articleTitle.trim(),
-          excerpt: articleBody.trim().slice(0, 200),
-          body: articleBody.trim(),
-          coverImage: articleCoverImage ?? undefined,
-        } : null,
-        videoShare: videoShareMode && selectedVideoId ? {
-          sharedVideoId: selectedVideoId,
-          sharedVideoURL: '',
-          sharedThumbnailURL: undefined,
-          sharedUserName: undefined,
-          originalDescription: text.trim() || undefined,
-        } : null,
-        likes: 0,
-        likedBy: [],
-        comments: 0,
-        shares: 0,
-        saves: 0,
-        savedBy: [],
-        reposts: 0,
-        repostedBy: [],
-        moderationStatus: 'visible',
-        createdAt: serverTimestamp(),
-      })
-
-      await updateDoc(doc(db, 'users', user.uid), {
-        postsCount: increment(1),
-      }).catch(() => {})
-
-      setProgress(100)
-      router.replace('/(tabs)/stories')
-    } catch (error) {
-      captureException(error instanceof Error ? error : new Error(String(error)), { context: 'NewsCompose.publish' })
-
-      Alert.alert('Publication impossible', 'Vérifie ta connexion puis réessaie.')
-    } finally {
-      setPublishing(false)
+  /* Revenir de la finalisation rend la main à la grille sans rien effacer :
+     la sélection reste, l'utilisateur peut l'ajuster puis repartir. */
+  const handleBack = useCallback(() => {
+    if (step === 'details' && !editing) {
+      setStep('pick')
+      return
     }
-  }
+    requestClose()
+  }, [step, editing, requestClose])
 
-  const visibilityLabel = visibility === 'public' ? 'Tout le monde' : visibility === 'followers' ? 'Mes abonnés' : 'Moi uniquement'
-  const visibilityIcon = visibility === 'public' ? 'earth' : visibility === 'followers' ? 'people' : 'lock-closed'
+  const handlePublish = useCallback(() => {
+    if (!user) {
+      handleError('auth')
+      return
+    }
+
+    publish(state, {
+      uid: user.uid,
+      displayName: user.displayName || user.email?.split('@')[0] || 'Utilisateur',
+    })
+  }, [handleError, publish, state, user])
+
+  if (loadingPost) {
+    return (
+      <PageWrapper type="stack" swipeBack backTo="/(tabs)/feed">
+        <SafeAreaView style={styles.loading}>
+          <OrbitLoader size={72} />
+        </SafeAreaView>
+      </PageWrapper>
+    )
+  }
 
   return (
     <PageWrapper type="stack" swipeBack backTo="/(tabs)/feed">
       <SafeAreaView style={styles.screen}>
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={styles.header}>
-            <Pressable onPress={() => router.back()} hitSlop={12} style={styles.headerButton}>
-              <Ionicons name="close" size={28} color="#fff" />
-            </Pressable>
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <ComposeHeader
+            editing={editing}
+            canPublish={inDetails ? canPublish : state.media.length > 0}
+            publishing={publishing}
+            title={step === 'details' && !editing ? t.news.compose.detailsTitle : undefined}
+            actionLabel={inDetails ? undefined : t.news.compose.next}
+            leading={step === 'details' && !editing ? 'back' : 'close'}
+            onClose={handleBack}
+            onPublish={inDetails ? handlePublish : () => setStep('details')}
+          />
 
-            <Text style={styles.title}>
-              {editing ? 'Modifier la publication' : 'Créer une publication'}
-            </Text>
+          {pendingDraft ? (
+            <DraftBanner
+              preview={draftPreview(pendingDraft)}
+              onResume={handleResumeDraft}
+              onDiscard={discardPending}
+            />
+          ) : null}
 
-            <Pressable
-              onPress={publish}
-              disabled={!canPublish}
-              style={[styles.publishButton, !canPublish && styles.publishButtonDisabled]}
-            >
-              {publishing ? (
-                <OrbitLoader size={20} />
-              ) : (
-                <Text style={styles.publishText}>{editing ? 'Enregistrer' : 'Publier'}</Text>
-              )}
-            </Pressable>
-          </View>
+          {!editing && step === 'pick' ? (
+            <ComposeModeTabs mode={mode} onChange={handleChangeMode} />
+          ) : null}
 
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
-            <View style={styles.authorRow}>
-              {auth.currentUser?.photoURL ? (
-                <Image source={{ uri: auth.currentUser.photoURL }} style={styles.avatar} />
-              ) : (
-                <View style={[styles.avatar, styles.avatarFallback]}>
-                  <Ionicons name="person" size={22} color="#777" />
-                </View>
-              )}
-
-              <View>
-                <Text style={styles.authorName}>
-                  {auth.currentUser?.displayName || 'Vous'}
-                </Text>
-
-                <Pressable onPress={cycleVisibility} style={styles.visibility}>
-                  <Ionicons name={visibilityIcon} size={13} color="#DDD" />
-                  <Text style={styles.visibilityText}>{visibilityLabel}</Text>
-                  <Ionicons name="chevron-down" size={13} color="#DDD" />
-                </Pressable>
-              </View>
-            </View>
-
-            {(mood || location) && (
-              <View style={styles.contextRow}>
-                {mood && <Text style={styles.contextText}>se sent {mood.emoji} {mood.label}</Text>}
-                {location && <Text style={styles.contextText}>📍 {location.name}</Text>}
-              </View>
-            )}
-
-            {background !== 'none' && canUseBackground ? (
-              <LinearGradient colors={activeBg.colors} style={styles.bgInputWrap}>
-                <TextInput
-                  value={text}
-                  onChangeText={setText}
-                  placeholder="Quoi de neuf ?"
-                  placeholderTextColor="rgba(255,255,255,0.7)"
-                  multiline
-                  maxLength={280}
-                  autoFocus
-                  style={styles.bgInput}
-                />
-              </LinearGradient>
-            ) : (
-              <TextInput
-                value={text}
+          <View style={styles.flex}>
+            {inDetails ? (
+              <ComposeDetails
+                userName={user?.displayName || user?.email?.split('@')[0] || ''}
+                photoURL={photoURL}
+                text={state.text}
+                media={state.media}
+                visibility={state.visibility}
+                background={state.background}
+                location={state.location}
+                mood={state.mood}
+                poll={state.poll}
+                article={state.article}
+                sharedVideo={state.sharedVideo}
+                canUseBackground={canUseBackground}
+                detectingLocation={detectingLocation}
+                showArticleToggle={mode === 'text'}
                 onChangeText={setText}
-                placeholder="Quoi de neuf ?"
-                placeholderTextColor="#777"
-                multiline
-                maxLength={3000}
-                autoFocus
-                style={styles.input}
+                onPressVisibility={() => setVisibilityOpen(true)}
+                onPressLocation={detectLocation}
+                onPressMood={() => setMoodOpen(true)}
+                onRemoveLocation={() => dispatch({ type: 'setLocation', location: null })}
+                onChangeBackground={(background) => dispatch({ type: 'setBackground', background })}
+                onRemoveMedia={(uri) => dispatch({ type: 'removeMedia', uri })}
+                onAddMoreMedia={pickMoreMedia}
+                onToggleArticle={handleToggleArticle}
+                onChangeArticleTitle={(title) => dispatch({ type: 'setArticleTitle', title })}
+                onChangeArticleBody={(body) => dispatch({ type: 'setArticleBody', body })}
+                onPickArticleCover={pickArticleCover}
+                onRemoveArticleCover={() => dispatch({ type: 'setArticleCover', coverImage: null })}
+                onChangePollQuestion={(question) => dispatch({ type: 'setPollQuestion', question })}
+                onChangePollOption={(id, text) => dispatch({ type: 'setPollOption', id, text })}
+                onAddPollOption={() => dispatch({ type: 'addPollOption' })}
+                onRemovePollOption={(id) => dispatch({ type: 'removePollOption', id })}
+                onRemovePoll={() => handleChangeMode('gallery')}
+                onChangeSharedVideo={() => setVideoPickerOpen(true)}
+                onRemoveSharedVideo={() => dispatch({ type: 'setSharedVideo', video: null })}
+              />
+            ) : mode === 'camera' ? (
+              <ComposeCamera onCapture={handleCapture} />
+            ) : (
+              <GalleryGrid
+                selectedUris={state.media.map((item) => item.uri)}
+                onToggle={handleToggleAsset}
+                onPickMboloVideo={() => setVideoPickerOpen(true)}
               />
             )}
-
-            {/* Article Mode */}
-            {articleMode && (
-              <View style={{ paddingHorizontal: 14, paddingTop: 8, gap: 8 }}>
-                <TextInput
-                  value={articleTitle}
-                  onChangeText={setArticleTitle}
-                  placeholder="Titre de l'article"
-                  placeholderTextColor="#555"
-                  maxLength={200}
-                  style={{ color: '#fff', fontSize: 18, fontWeight: '700', borderBottomWidth: 0.5, borderBottomColor: '#333', paddingBottom: 8 }}
-                />
-                <TextInput
-                  value={articleBody}
-                  onChangeText={setArticleBody}
-                  placeholder="Corps de l'article..."
-                  placeholderTextColor="#555"
-                  multiline
-                  maxLength={5000}
-                  style={{ color: '#DDD', fontSize: 15, minHeight: 150, lineHeight: 22 }}
-                />
-                <Pressable
-                  onPress={() => { setArticleMode(false); setArticleTitle(''); setArticleBody(''); setArticleCoverImage(null) }}
-                  style={{ alignSelf: 'flex-end', paddingVertical: 6 }}
-                >
-                  <Text style={{ color: '#888', fontSize: 13 }}>Annuler l'article</Text>
-                </Pressable>
-              </View>
-            )}
-
-            {/* Video Share Mode */}
-            {videoShareMode && (
-              <View style={{ paddingHorizontal: 14, paddingTop: 8 }}>
-                <View style={{ backgroundColor: '#1A1A1A', borderRadius: 10, padding: 14, borderWidth: 1, borderColor: '#333' }}>
-                  <Text style={{ color: '#888', fontSize: 13, marginBottom: 8 }}>Sélectionne une de tes vidéos à partager :</Text>
-                  <Text style={{ color: '#555', fontSize: 12 }}>La sélection des vidéos arrive prochainement. Pour l'instant, tu peux écrire un texte pour ta publication.</Text>
-                </View>
-                <Pressable
-                  onPress={() => { setVideoShareMode(false); setSelectedVideoId(null) }}
-                  style={{ alignSelf: 'flex-end', paddingVertical: 6 }}
-                >
-                  <Text style={{ color: '#888', fontSize: 13 }}>Annuler le partage</Text>
-                </Pressable>
-              </View>
-            )}
-
-            {canUseBackground && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.bgPicker} contentContainerStyle={{ paddingHorizontal: 12, gap: 8 }}>
-                {POST_BACKGROUNDS.map((bg) => (
-                  <Pressable key={bg.id} onPress={() => setBackground(bg.id)}>
-                    <LinearGradient
-                      colors={bg.colors}
-                      style={[styles.bgSwatch, background === bg.id && styles.bgSwatchActive]}
-                    >
-                      {bg.id === 'none' && <Ionicons name="text" size={18} color="#888" />}
-                    </LinearGradient>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            )}
-
-            {media.length > 0 && (
-              <View style={styles.mediaGrid}>
-                {media.map((item, index) => (
-                  <View key={`${item.uri}-${index}`} style={[styles.preview, media.length === 1 && styles.previewSingle]}>
-                    <Image source={{ uri: item.uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-
-                    {item.type === 'video' && (
-                      <View style={styles.videoBadge}>
-                        <Ionicons name="videocam" size={18} color="#fff" />
-                        <Text style={styles.videoBadgeText}>Vidéo</Text>
-                      </View>
-                    )}
-
-                    <Pressable onPress={() => removeMedia(index)} style={styles.remove}>
-                      <Ionicons name="close" size={18} color="#fff" />
-                    </Pressable>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            {poll && (
-              <View style={styles.pollCard}>
-                <View style={styles.pollHeader}>
-                  <Text style={styles.pollTitle}>Sondage</Text>
-                  <Pressable onPress={() => setPoll(null)} hitSlop={10}>
-                    <Ionicons name="close-circle" size={22} color="#888" />
-                  </Pressable>
-                </View>
-                <TextInput
-                  value={poll.question}
-                  onChangeText={(q) => setPoll((p) => p ? { ...p, question: q } : p)}
-                  placeholder="Posez votre question…"
-                  placeholderTextColor="#777"
-                  style={styles.pollQuestion}
-                  maxLength={200}
-                />
-                {poll.options.map((opt, i) => (
-                  <TextInput
-                    key={opt.id}
-                    value={opt.text}
-                    onChangeText={(t) => updatePollOption(opt.id, t)}
-                    placeholder={`Option ${i + 1}`}
-                    placeholderTextColor="#777"
-                    style={styles.pollOption}
-                    maxLength={80}
-                  />
-                ))}
-                {poll.options.length < 4 && (
-                  <Pressable onPress={addPollOption} style={styles.pollAdd}>
-                    <Ionicons name="add-circle-outline" size={20} color={colors.primary} />
-                    <Text style={styles.pollAddText}>Ajouter une option</Text>
-                  </Pressable>
-                )}
-              </View>
-            )}
-
-            <View style={styles.optionsCard}>
-              <Text style={styles.optionsTitle}>Ajouter à votre publication</Text>
-
-              {!editing && (
-                <>
-                  <Pressable onPress={pickMedia} style={styles.optionButton}>
-                    <View style={styles.optionIcon}>
-                      <Ionicons name="images" size={23} color="#45BD62" />
-                    </View>
-                    <Text style={styles.optionText}>Photo ou vidéo</Text>
-                    <Ionicons name="chevron-forward" size={20} color="#777" />
-                  </Pressable>
-
-                  <Pressable onPress={() => setMoodPickerOpen(true)} style={styles.optionButton}>
-                    <View style={styles.optionIcon}>
-                      <Ionicons name="happy-outline" size={23} color="#F7B928" />
-                    </View>
-                    <Text style={styles.optionText}>{mood ? `Humeur : ${mood.emoji}` : 'Humeur / activité'}</Text>
-                    <Ionicons name="chevron-forward" size={20} color="#777" />
-                  </Pressable>
-
-                  <Pressable onPress={location ? () => setLocation(null) : detectLocation} style={styles.optionButton}>
-                    <View style={styles.optionIcon}>
-                      <Ionicons name="location-outline" size={23} color="#EB5757" />
-                    </View>
-                    <Text style={styles.optionText}>{location ? location.name : 'Localisation'}</Text>
-                    <Ionicons name={location ? 'close' : 'chevron-forward'} size={20} color="#777" />
-                  </Pressable>
-
-                  {!poll && (
-                    <Pressable onPress={addPoll} style={styles.optionButton}>
-                      <View style={styles.optionIcon}>
-                        <Ionicons name="bar-chart-outline" size={23} color="#2D9CDB" />
-                      </View>
-                      <Text style={styles.optionText}>Sondage</Text>
-                      <Ionicons name="chevron-forward" size={20} color="#777" />
-                    </Pressable>
-                  )}
-
-                  {!articleMode && (
-                    <Pressable onPress={() => setArticleMode(true)} style={styles.optionButton}>
-                      <View style={styles.optionIcon}>
-                        <Ionicons name="document-text" size={23} color="#2D9CDB" />
-                      </View>
-                      <Text style={styles.optionText}>Article long</Text>
-                      <Ionicons name="chevron-forward" size={20} color="#777" />
-                    </Pressable>
-                  )}
-
-                  {!videoShareMode && !articleMode && (
-                    <Pressable onPress={() => setVideoShareMode(true)} style={styles.optionButton}>
-                      <View style={styles.optionIcon}>
-                        <Ionicons name="logo-youtube" size={23} color="#EB5757" />
-                      </View>
-                      <Text style={styles.optionText}>Partager une vidéo</Text>
-                      <Ionicons name="chevron-forward" size={20} color="#777" />
-                    </Pressable>
-                  )}
-                </>
-              )}
-
-              <Pressable onPress={() => setCommentsEnabled((value) => !value)} style={styles.optionButton}>
-                <View style={styles.optionIcon}>
-                  <Ionicons name="chatbubble-ellipses" size={22} color="#F7B928" />
-                </View>
-                <Text style={styles.optionText}>Commentaires</Text>
-                <Ionicons name={commentsEnabled ? 'toggle' : 'toggle-outline'} size={30} color={commentsEnabled ? colors.primary : '#666'} />
-              </Pressable>
-            </View>
-
-            {publishing && (
-              <View style={styles.progressCard}>
-                <View style={styles.progressTrack}>
-                  <View style={[styles.progressFill, { width: `${progress}%` }]} />
-                </View>
-                <Text style={styles.progressText}>Publication en cours, {progress} %</Text>
-              </View>
-            )}
-          </ScrollView>
+          </View>
         </KeyboardAvoidingView>
 
-        {moodPickerOpen && <Modal transparent animationType="slide" onRequestClose={() => setMoodPickerOpen(false)}>
-          <Pressable style={styles.moodBackdrop} onPress={() => setMoodPickerOpen(false)}>
-            <Pressable style={styles.moodSheet}>
-              <Text style={styles.moodTitle}>Comment te sens-tu ?</Text>
-              <View style={styles.moodGrid}>
-                {MOODS.map((m) => (
-                  <Pressable key={m.label} onPress={() => { setMood(m); setMoodPickerOpen(false) }} style={styles.moodItem}>
-                    <Text style={{ fontSize: 30 }}>{m.emoji}</Text>
-                    <Text style={styles.moodLabel}>{m.label}</Text>
-                  </Pressable>
-                ))}
-              </View>
-              {mood && (
-                <Pressable onPress={() => { setMood(null); setMoodPickerOpen(false) }} style={styles.moodClear}>
-                  <Text style={styles.moodClearText}>Retirer l'humeur</Text>
-                </Pressable>
-              )}
-            </Pressable>
-          </Pressable>
-        </Modal>}
+        <VisibilitySheet
+          visible={visibilityOpen}
+          value={state.visibility}
+          onChange={(visibility) => dispatch({ type: 'setVisibility', visibility })}
+          onClose={() => setVisibilityOpen(false)}
+        />
+
+        <MoodSheet
+          visible={moodOpen}
+          value={state.mood}
+          onChange={(mood) => dispatch({ type: 'setMood', mood })}
+          onClose={() => setMoodOpen(false)}
+        />
+
+        {videoPickerOpen && user ? (
+          <VideoPickerModal
+            visible
+            userId={user.uid}
+            onClose={() => setVideoPickerOpen(false)}
+            onSelect={handleSelectSharedVideo}
+          />
+        ) : null}
+
+        {publishing ? <PublishProgress progress={progress} /> : null}
       </SafeAreaView>
     </PageWrapper>
   )
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.black },
-  header: {
-    minHeight: 58,
-    paddingHorizontal: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#2A2B2E',
-    flexDirection: 'row',
+  screen: { flex: 1, backgroundColor: postColors.canvas },
+  flex: { flex: 1 },
+  loading: {
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: postColors.canvas,
   },
-  headerButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
-  title: { flex: 1, color: '#fff', fontSize: 18, fontWeight: '700', marginLeft: 4 },
-  publishButton: { minWidth: 82, height: 38, borderRadius: 19, paddingHorizontal: 15, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  publishButtonDisabled: { opacity: 0.38 },
-  publishText: { color: '#fff', fontWeight: '700' },
-  content: { paddingBottom: 60 },
-  authorRow: { padding: 16, flexDirection: 'row', alignItems: 'center', gap: 11 },
-  avatar: { width: 46, height: 46, borderRadius: 23 },
-  avatarFallback: { backgroundColor: '#24262A', alignItems: 'center', justifyContent: 'center' },
-  authorName: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  visibility: { marginTop: 5, minHeight: 26, paddingHorizontal: 8, borderRadius: 6, backgroundColor: '#303236', flexDirection: 'row', alignItems: 'center', gap: 5 },
-  visibilityText: { color: '#DDD', fontSize: 11, fontWeight: '600' },
-  input: { minHeight: 160, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 18, color: '#fff', fontSize: 21, lineHeight: 29, textAlignVertical: 'top' },
-  mediaGrid: { marginHorizontal: 12, marginBottom: 14, flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
-  preview: { width: '49%', height: 190, borderRadius: 10, overflow: 'hidden', backgroundColor: '#111' },
-  previewSingle: { width: '100%', height: 360 },
-  remove: { position: 'absolute', top: 8, right: 8, width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.72)', alignItems: 'center', justifyContent: 'center' },
-  videoBadge: { position: 'absolute', left: 9, bottom: 9, flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 14, paddingHorizontal: 9, paddingVertical: 5, backgroundColor: 'rgba(0,0,0,0.65)' },
-  videoBadgeText: { color: '#fff', fontSize: 11, fontWeight: '600' },
-  optionsCard: { margin: 12, borderWidth: 1, borderColor: '#303236', borderRadius: 14, overflow: 'hidden' },
-  optionsTitle: { padding: 14, color: '#fff', fontSize: 15, fontWeight: '700', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#303236' },
-  optionButton: { minHeight: 58, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#25272A' },
-  optionIcon: { width: 38, alignItems: 'center' },
-  optionText: { flex: 1, color: '#EFEFEF', fontSize: 14, fontWeight: '600' },
-  progressCard: { marginHorizontal: 12, padding: 14, borderRadius: 12, backgroundColor: '#181A1D' },
-  progressTrack: { height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: '#333' },
-  progressFill: { height: '100%', backgroundColor: colors.primary },
-  progressText: { color: '#AAA', fontSize: 12, marginTop: 8 },
-  bgInputWrap: { minHeight: 220, marginHorizontal: 12, marginTop: 8, borderRadius: 14, alignItems: 'center', justifyContent: 'center', padding: 20 },
-  bgInput: { color: '#fff', fontSize: 24, fontWeight: '700', textAlign: 'center', lineHeight: 32 },
-  bgPicker: { marginTop: 10 },
-  bgSwatch: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent' },
-  bgSwatchActive: { borderColor: '#fff' },
-  contextRow: { paddingHorizontal: 16, paddingBottom: 8, gap: 3 },
-  contextText: { color: '#B8B8B8', fontSize: 13 },
-  pollCard: { marginHorizontal: 12, marginBottom: 12, padding: 12, borderRadius: 14, backgroundColor: '#181A1D', borderWidth: 1, borderColor: '#303236' },
-  pollHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-  pollTitle: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  pollQuestion: { color: '#fff', fontSize: 15, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#303236', marginBottom: 10 },
-  pollOption: { color: '#fff', fontSize: 14, backgroundColor: '#25272A', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 8 },
-  pollAdd: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6 },
-  pollAddText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
-  moodBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  moodSheet: { backgroundColor: '#1a1a2e', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 40 },
-  moodTitle: { color: '#fff', fontSize: 16, fontWeight: '700', marginBottom: 16, textAlign: 'center' },
-  moodGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-around', gap: 12 },
-  moodItem: { width: '22%', alignItems: 'center', paddingVertical: 10 },
-  moodLabel: { color: '#CCC', fontSize: 11, marginTop: 4 },
-  moodClear: { marginTop: 16, alignItems: 'center' },
-  moodClearText: { color: '#E57373', fontSize: 14, fontWeight: '600' },
 })

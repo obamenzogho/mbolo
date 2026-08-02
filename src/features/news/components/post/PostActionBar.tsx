@@ -56,9 +56,7 @@ function PostStatsComponent({
           onPress={() => onOpenReactions(post)}
           style={({ pressed }) => [styles.likeSummary, pressed && styles.pressed]}
         >
-          <View style={styles.likeBadge}>
-            <Ionicons name="thumbs-up" size={11} color="#FFFFFF" />
-          </View>
+          <Ionicons name="heart" size={14} color={postColors.like} />
           <Text style={styles.statText}>{formatCount(post.likes)}</Text>
         </Pressable>
       ) : (
@@ -112,8 +110,8 @@ function PostStatsComponent({
         >
           <Ionicons
             name={saved ? 'bookmark' : 'bookmark-outline'}
-            size={15}
-            color={saved ? postColors.accent : postColors.textSecondary}
+            size={19}
+            color={saved ? postColors.save : postColors.textSecondary}
           />
         </Pressable>
       </View>
@@ -129,6 +127,7 @@ function ActionButton({
   icon,
   label,
   active,
+  activeColor = postColors.accent,
   disabled,
   accessibilityLabel,
   onPress,
@@ -136,6 +135,8 @@ function ActionButton({
   icon: IoniconName
   label: string
   active?: boolean
+  /** Couleur de l'icône + libellé quand actif (défaut : accent). */
+  activeColor?: string
   disabled?: boolean
   accessibilityLabel: string
   onPress: () => void
@@ -169,12 +170,12 @@ function ActionButton({
         <Ionicons
           name={icon}
           size={20}
-          color={active ? postColors.accent : postColors.textSecondary}
+          color={active ? activeColor : postColors.textSecondary}
         />
       </Animated.View>
 
       <Text
-        style={[styles.actionText, active && styles.actionTextActive]}
+        style={[styles.actionText, active && { color: activeColor }]}
         numberOfLines={1}
       >
         {label}
@@ -212,9 +213,10 @@ function PostActionsComponent({
 
       <View style={styles.actions}>
         <ActionButton
-          icon={liked ? 'thumbs-up' : 'thumbs-up-outline'}
+          icon={liked ? 'heart' : 'heart-outline'}
           label={t.news.actions.like}
           active={liked}
+          activeColor={postColors.like}
           accessibilityLabel={
             liked ? t.news.actions.a11yUnlike : t.news.actions.a11yLike
           }
@@ -234,6 +236,7 @@ function PostActionsComponent({
           icon="repeat-outline"
           label={t.news.actions.repost}
           active={reposted}
+          activeColor={postColors.like}
           disabled={repostPending}
           accessibilityLabel={
             reposted ? t.news.actions.a11yReposted : t.news.actions.a11yRepost
@@ -268,14 +271,6 @@ const styles = StyleSheet.create({
     gap: postSpacing.inlineGap,
     paddingVertical: 4,
   },
-  likeBadge: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: postColors.accent,
-  },
   statText: {
     ...postType.stat,
     color: postColors.textSecondary,
@@ -293,18 +288,24 @@ const styles = StyleSheet.create({
   },
   actions: {
     minHeight: 48,
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 6,
+    justifyContent: 'space-between',
+    paddingHorizontal: postSpacing.gutter,
     paddingVertical: 4,
   },
   action: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 0,
+    minWidth: 0,
+    marginHorizontal: 4,
     height: 42,
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 7,
+    gap: 2,
     borderRadius: postRadius.pill,
   },
   actionActive: {
@@ -316,9 +317,6 @@ const styles = StyleSheet.create({
   actionText: {
     ...postType.action,
     color: postColors.textSecondary,
-  },
-  actionTextActive: {
-    color: postColors.accent,
   },
   pressed: {
     opacity: postMotion.pressedOpacity,

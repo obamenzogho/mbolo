@@ -4,8 +4,8 @@
 - local update mode - Enhanced architectural extraction
 
 ## Summary
-- 7989 nodes
-- 9944 edges
+- 8011 nodes
+- 9971 edges
 - 352 communities
 - 13 Firestore collections
 - Extraction: 100% EXTRACTED

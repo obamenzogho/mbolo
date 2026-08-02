@@ -24,7 +24,7 @@ export const AuthorInfo = memo(function AuthorInfo({ item, username, userPhotoUR
   const avatarURL = item.userPhotoURL || userPhotoURL
   const isOwn = item.userId === currentUserId
 
-  const { isFollowing } = useFollowFast(item.userId)
+  const { isFollowing, resolved: followResolved } = useFollowFast(item.userId)
   const { toggleFollow } = useFollowAction()
   const [followState, setFollowState] = useState<'idle' | 'done' | 'hidden'>('idle')
   const [expanded, setExpanded] = useState(false)
@@ -57,7 +57,7 @@ export const AuthorInfo = memo(function AuthorInfo({ item, username, userPhotoUR
 
   return (
     <View style={styles.root}>
-      {!isOwn && !isFollowing && followState !== 'hidden' && (
+      {!isOwn && followResolved && !isFollowing && followState !== 'hidden' && (
         <TouchableOpacity style={styles.followPill} onPress={handleFollow} activeOpacity={0.85}>
           <Ionicons
             name={followState === 'done' ? 'checkmark' : 'add'}

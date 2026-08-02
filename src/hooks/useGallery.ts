@@ -1,7 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import * as MediaLibrary from 'expo-media-library'
-import * as FileSystem from 'expo-file-system'
-import { Platform } from 'react-native'
 import { captureException } from '../lib/sentry'
 
 export interface GalleryAsset {
@@ -37,20 +35,39 @@ export const useGallery = () => {
   const [assets, setAssets] = useState<GalleryAsset[]>([])
   const [loading, setLoading] = useState(false)
   const [hasMore, setHasMore] = useState(true)
-  const [cursor, setCursor] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [selectedAssets, setSelectedAssets] = useState<GalleryAsset[]>([])
   const [isSelectionMode, setIsSelectionMode] = useState(false)
 
+  const cursorRef = useRef<string | null>(null)
+  const loadingRef = useRef(false)
+  const hasMoreRef = useRef(true)
+
   const loadAssets = useCallback(async (
     mediaType: 'all' | 'photo' | 'video' = 'all',
-    reset = false
+    reset = false,
+    albumId?: string,
   ) => {
-    if (loading || (!hasMore && !reset)) return
+    // Les garde-fous lisent des refs et non l'état : `loadAssets` est appelé
+    // depuis `onEndReached`, qui capture une version figée de la closure.
+    // Avec l'état, une pagination rapide relit un `hasMore` périmé.
+    if (loadingRef.current) return
+    if (!reset && !hasMoreRef.current) return
     if (permission?.status !== 'granted') return
 
+    // Un changement de filtre ou d'album repart de zéro : conserver le
+    // curseur précédent paginerait dans une autre collection.
+    if (reset) {
+      cursorRef.current = null
+      hasMoreRef.current = true
+      setHasMore(true)
+      setError(null)
+    }
+
+    loadingRef.current = true
     setLoading(true)
     try {
-      const options: any = {
+      const options: MediaLibrary.AssetsOptions = {
         first: 30,
         sortBy: [MediaLibrary.SortBy.creationTime],
       }
@@ -63,12 +80,16 @@ export const useGallery = () => {
         options.mediaType = [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video]
       }
 
-      if (!reset && cursor) {
-        options.after = cursor
+      if (albumId) {
+        options.album = albumId
+      }
+
+      if (!reset && cursorRef.current) {
+        options.after = cursorRef.current
       }
 
       const result = await MediaLibrary.getAssetsAsync(options)
-      const mappedAssets: GalleryAsset[] = result.assets.map((a: any) => ({
+      const mappedAssets: GalleryAsset[] = result.assets.map((a) => ({
         id: a.id,
         uri: a.uri,
         filename: a.filename || `media_${a.id}`,
@@ -78,19 +99,20 @@ export const useGallery = () => {
         creationTime: a.creationTime || Date.now(),
         duration: a.duration,
         modificationTime: a.modificationTime || a.creationTime || Date.now(),
-        localUri: (a as any).localUri,
       }))
 
       setAssets(prev => reset ? mappedAssets : [...prev, ...mappedAssets])
-      setCursor(result.endCursor)
+      cursorRef.current = result.endCursor
+      hasMoreRef.current = result.hasNextPage
       setHasMore(result.hasNextPage)
     } catch (e) {
       captureException(e instanceof Error ? e : new Error(String(e)), { context: 'loadAssets' })
-      console.error('loadAssets error:', e)
+      setError(e instanceof Error ? e.message : String(e))
     } finally {
+      loadingRef.current = false
       setLoading(false)
     }
-  }, [loading, hasMore, cursor, permission])
+  }, [permission])
 
   const loadAlbums = useCallback(async () => {
     if (permission?.status !== 'granted') return
@@ -105,7 +127,6 @@ export const useGallery = () => {
       setAlbums(mapped)
     } catch (e) {
       captureException(e instanceof Error ? e : new Error(String(e)), { context: 'loadAlbums' })
-      console.error('loadAlbums error:', e)
     }
   }, [permission])
 
@@ -130,21 +151,22 @@ export const useGallery = () => {
         localUri: (asset as any).localUri,
       }
 
+      /* Le rangement dans l'album Mbolo est un confort : le média est déjà
+         enregistré dans la pellicule, un échec ici ne doit pas le perdre. */
       try {
-        let mboloAlbum = await MediaLibrary.getAlbumAsync(MBOLO_ALBUM_NAME)
+        const mboloAlbum = await MediaLibrary.getAlbumAsync(MBOLO_ALBUM_NAME)
         if (!mboloAlbum) {
           await MediaLibrary.createAlbumAsync(MBOLO_ALBUM_NAME, asset, false)
         } else {
           await MediaLibrary.addAssetsToAlbumAsync([asset], mboloAlbum, false)
         }
       } catch (e) {
-        console.warn('Could not add to Mbolo album:', e)
+        captureException(e instanceof Error ? e : new Error(String(e)), { context: 'mboloAlbum' })
       }
 
       return mapped
     } catch (e) {
       captureException(e instanceof Error ? e : new Error(String(e)), { context: 'saveToGallery' })
-      console.error('saveToGallery error:', e)
       return null
     }
   }, [permission, requestPermission])
@@ -213,7 +235,6 @@ export const useGallery = () => {
       return true
     } catch (e) {
       captureException(e instanceof Error ? e : new Error(String(e)), { context: 'deleteAsset' })
-      console.error('deleteAsset error:', e)
       return false
     }
   }, [])
@@ -236,6 +257,7 @@ export const useGallery = () => {
     setIsSelectionMode,
     loadAssets,
     loadAlbums,
+    error,
     saveToGallery,
     saveMultipleToGallery,
     getThumbnail,

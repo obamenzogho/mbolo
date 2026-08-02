@@ -39,7 +39,22 @@ export interface NewsFeedPage {
   hasMore: boolean
 }
 
-function mapDocToPost(snapshot: PostSnapshot): NewsPost {
+/* Affichage progressif façon Facebook : les lots Firestore sont poussés
+   vers l'UI dès qu'ils sont prêts, au lieu d'attendre une page complète. */
+export interface NewsFeedBatch {
+  posts: NewsPost[]
+  /** Dernier lot : pending vidé au maximum, hasMore définitif. */
+  done: boolean
+}
+
+export interface NewsFeedFeedOptions {
+  /** Appelé à chaque lot de posts déjà rankés prêts à afficher. */
+  onBatch?: (batch: NewsFeedBatch) => void
+}
+
+/** Document Firestore → NewsPost. Partagé avec postMutations.loadPost :
+    un post s'hydrate à l'identique dans le fil et à l'édition. */
+export function mapDocToPost(snapshot: PostSnapshot): NewsPost {
   const data = snapshot.data() as Record<string, any>
   const createdAt =
     typeof data.createdAt?.toDate === 'function'
@@ -138,6 +153,12 @@ class NewsFeedSource {
 
   private isFirstFetch = true
   private loading = false
+
+  /* Précharge en cours : promesse de la page suivante. Séparée de `loading`
+     pour que fetchNext ne se bloque pas dessus — un scroll pendant la
+     précharge doit attendre puis servir, pas revenir à vide. */
+  private prefetchPromise: Promise<void> | null = null
+
   private hasMoreValue = true
 
   private publicSourceExhausted = false
@@ -153,6 +174,13 @@ class NewsFeedSource {
   }
 
   private tasteLoaded = false
+
+  /* Après le 1er flush : le ranking reste actif en interne, mais les lots
+     suivants arrivent "dans l'ordre" pour l'utilisateur (comportement FB). */
+  private frozenTaste: PostUserTaste = {
+    likedAuthors: {},
+    likedHashtags: {},
+  }
 
   get isLoading(): boolean {
     return this.loading
@@ -327,42 +355,69 @@ class NewsFeedSource {
     return snapshot.docs.map(mapDocToPost)
   }
 
-  private async fetchRawBatch(uid: string): Promise<NewsPost[]> {
-    const followingResults = await mapWithConcurrency(
-      this.followingCursors.filter((cursor) => !cursor.exhausted),
-      MAX_CONCURRENT_FOLLOWING_QUERIES,
-      (cursor) => this.fetchFollowingChunk(cursor),
+  private filterRawPost(post: NewsPost, seen: Set<string>): boolean {
+    if (seen.has(post.id)) {
+      return false
+    }
+
+    if (this.blockedIds.has(post.userId)) {
+      return false
+    }
+
+    if (!post.userId) {
+      return false
+    }
+
+    seen.add(post.id)
+    return true
+  }
+
+  /**
+   * Émet progressivement les lots au fur et à mesure que les requêtes
+   * se résolvent — ce qui permet un affichage immédiat des premiers posts,
+   * sans attendre la fin du batch complet.
+   */
+  private async collectBatch(
+    uid: string,
+    emit: (posts: NewsPost[]) => void,
+  ): Promise<void> {
+    const seen = new Set<string>()
+    const pending: Promise<void>[] = []
+
+    const push = (raw: NewsPost[]) => {
+      const fresh = raw.filter((post) => this.filterRawPost(post, seen))
+
+      if (fresh.length > 0) {
+        emit(fresh)
+      }
+    }
+
+    /* Les posts sources sont consommés lorsqu'ils sont prêts : pas de
+       Promise.all bloquant → les morceaux apparaissent les uns après
+       les autres, sans ordre garanti. */
+    for (const cursor of this.followingCursors.filter(
+      (entry) => !entry.exhausted,
+    )) {
+      pending.push(
+        this.fetchFollowingChunk(cursor).then((posts) => {
+          push(posts)
+        }),
+      )
+    }
+
+    pending.push(
+      this.fetchPublicPage().then((posts) => {
+        push(posts)
+      }),
     )
 
-    const results = await Promise.all([
-      this.fetchPublicPage(),
-      this.fetchOwnPage(uid),
-    ])
+    pending.push(
+      this.fetchOwnPage(uid).then((posts) => {
+        push(posts)
+      }),
+    )
 
-    const allPosts = [
-      ...results[0],
-      ...results[1],
-      ...followingResults.flat(),
-    ]
-
-    const seen = new Set<string>()
-
-    return allPosts.filter((post) => {
-      if (seen.has(post.id)) {
-        return false
-      }
-
-      if (this.blockedIds.has(post.userId)) {
-        return false
-      }
-
-      if (!post.userId) {
-        return false
-      }
-
-      seen.add(post.id)
-      return true
-    })
+    await Promise.all(pending)
   }
 
   private pushToPending(posts: NewsPost[]): void {
@@ -399,67 +454,163 @@ class NewsFeedSource {
     )
   }
 
-  async fetchNext(): Promise<NewsFeedPage | null> {
+  /**
+   * Récupère la prochaine page.
+   *
+   * - Si `onBatch` est fourni : les lots sont émis au fur et à mesure,
+   *   dès que les requêtes se résolvent (comportement Facebook). Le
+   *   retour contient `posts: []` car tout a déjà été poussé via le callback.
+   * - Sinon : comportement historique — une page complète rankée à la fois.
+   */
+  async fetchNext(
+    options?: NewsFeedFeedOptions,
+  ): Promise<NewsFeedPage | null> {
     if (this.loading || !this.hasMoreFlag) {
       return null
     }
 
+    /* Verrou pris avant toute attente : deux appels pendant une précharge
+       se sérialisent ici (le second voit `loading`) au lieu de doubler la
+       récupération. Une fois la précharge terminée, le buffer est chaud. */
+    this.loading = true
+
+    try {
+      /* Un échec de précharge ne fait pas échouer ce chargement (déjà loggé). */
+      if (this.prefetchPromise) {
+        await this.prefetchPromise.catch(() => {})
+      }
+
+      return await this.doFetchNext(options)
+    } finally {
+      this.loading = false
+
+      /* Préchargement invisible : la page suivante se charge pendant
+         que l'utilisateur lit la première. */
+      this.prefetchNext().catch((prefetchError) => {
+        captureException(
+          prefetchError instanceof Error
+            ? prefetchError
+            : new Error(String(prefetchError)),
+          { context: 'newsFeedSource.prefetch' },
+        )
+      })
+    }
+  }
+
+  private async doFetchNext(
+    options?: NewsFeedFeedOptions,
+  ): Promise<NewsFeedPage | null> {
     const uid = auth.currentUser?.uid
 
     if (!uid) {
       return null
     }
 
-    this.loading = true
+    const onBatch = options?.onBatch
+    const isFirst = this.isFirstFetch
+
+    const dedupe = (posts: NewsPost[]): NewsPost[] =>
+      posts.filter((post) => !this.pendingIds.has(post.id))
 
     try {
       await this.loadUserData(uid)
       await this.loadTaste(uid)
 
-      const isFirst = this.isFirstFetch
+      if (isFirst) {
+        this.frozenTaste = this.taste
+      }
 
-      // On remplit le buffer jusqu'à pouvoir servir une page complète.
-      while (
-        this.pendingPosts.length < PAGE_SIZE &&
-        this.hasRawSourcesRemaining()
-      ) {
-        const rawPosts = await this.fetchRawBatch(uid)
+      if (!onBatch) {
+        /* Mode historique : on remplit jusqu'à la taille de page. */
+        while (
+          this.pendingPosts.length < PAGE_SIZE &&
+          this.hasRawSourcesRemaining()
+        ) {
+          const batchSeen = new Set<string>()
+          let appended = 0
 
-        this.pushToPending(rawPosts)
+          await this.collectBatch(uid, (raw) => {
+            const unique = raw.filter(
+              (post) => this.filterRawPost(post, batchSeen),
+            )
 
-        // Évite une boucle infinie si Firestore ne renvoie rien.
-        if (rawPosts.length === 0 && !this.hasRawSourcesRemaining()) {
-          break
-        }
+            if (unique.length > 0) {
+              this.pushToPending(unique)
+              appended += unique.length
+            }
+          })
 
-        if (rawPosts.length === 0) {
-          const stillMoving = this.hasRawSourcesRemaining()
-
-          if (!stillMoving) {
+          if (appended === 0 && !this.hasRawSourcesRemaining()) {
             break
           }
         }
+
+        const posts = this.takePendingPage()
+
+        this.hasMoreValue =
+          this.pendingPosts.length > 0 || this.hasRawSourcesRemaining()
+        this.isFirstFetch = false
+
+        return { posts, isFirst, hasMore: this.hasMoreValue }
       }
 
-      const posts = this.pendingPosts.slice(0, PAGE_SIZE)
+      /* Mode progressif : chaque lot résolu est ranké puis émis. */
+      let emitted = 0
 
-      this.pendingPosts = this.pendingPosts.slice(PAGE_SIZE)
+      while (
+        emitted < PAGE_SIZE &&
+        this.hasRawSourcesRemaining()
+      ) {
+        let batchCount = 0
 
-      for (const post of posts) {
-        this.pendingIds.delete(post.id)
+        await this.collectBatch(uid, (raw) => {
+          const unique = dedupe(raw)
+
+          if (unique.length === 0) {
+            return
+          }
+
+          const ranked = rankPosts(
+            [...this.pendingPosts, ...unique],
+            this.frozenTaste,
+          )
+
+          for (const post of unique) {
+            this.pendingIds.add(post.id)
+          }
+
+          const available = PAGE_SIZE - emitted
+          const serve = ranked.slice(0, available)
+
+          this.pendingPosts = ranked.slice(available)
+
+          for (const post of serve) {
+            this.pendingIds.delete(post.id)
+          }
+
+          if (serve.length > 0) {
+            emitted += serve.length
+            batchCount += serve.length
+            onBatch({ posts: serve, done: false })
+          }
+        })
+
+        if (batchCount === 0 && !this.hasRawSourcesRemaining()) {
+          break
+        }
       }
+
+      /* Dernière salve : on vide le pending pour garder la meilleure
+         sélection possible sur cette page. */
+      const tail = this.takePendingPage()
 
       this.hasMoreValue =
-        this.pendingPosts.length > 0 ||
-        this.hasRawSourcesRemaining()
-
+        this.pendingPosts.length > 0 || this.hasRawSourcesRemaining()
       this.isFirstFetch = false
 
-      return {
-        posts,
-        isFirst,
-        hasMore: this.hasMoreValue,
-      }
+      onBatch({ posts: tail, done: true })
+
+      return { posts: [], isFirst, hasMore: this.hasMoreValue }
     } catch (error) {
       captureException(
         error instanceof Error ? error : new Error(String(error)),
@@ -469,8 +620,70 @@ class NewsFeedSource {
       )
 
       throw error
-    } finally {
-      this.loading = false
+    }
+  }
+
+  private takePendingPage(): NewsPost[] {
+    const posts = this.pendingPosts.slice(0, PAGE_SIZE)
+
+    this.pendingPosts = this.pendingPosts.slice(PAGE_SIZE)
+
+    for (const post of posts) {
+      this.pendingIds.delete(post.id)
+    }
+
+    return posts
+  }
+
+  /**
+   * Pré-remplit le buffer pour la page suivante (sans émettre de batch).
+   * Les queries suivantes aboutiront plus vite : les curseurs avancent.
+   *
+   * N'emprunte pas le verrou `loading` : un fetchNext arrivé pendant la
+   * précharge l'attend (cf. fetchNext) au lieu de revenir à vide.
+   */
+  private async prefetchNext(): Promise<void> {
+    if (this.loading || this.prefetchPromise || !this.hasMoreFlag) {
+      return
+    }
+
+    const uid = auth.currentUser?.uid
+
+    if (!uid) {
+      return
+    }
+
+    this.prefetchPromise = this.collectPrefetch(uid).finally(() => {
+      this.prefetchPromise = null
+    })
+
+    await this.prefetchPromise
+  }
+
+  private async collectPrefetch(uid: string): Promise<void> {
+    while (
+      this.pendingPosts.length < PAGE_SIZE &&
+      this.hasRawSourcesRemaining()
+    ) {
+      const seen = new Set<string>()
+      let appended = 0
+
+      await this.collectBatch(uid, (raw) => {
+        const unique = raw.filter(
+          (post) => this.filterRawPost(post, seen),
+        )
+
+        if (unique.length > 0) {
+          this.pushToPending(
+            unique.filter((post) => !this.pendingIds.has(post.id)),
+          )
+          appended += unique.length
+        }
+      })
+
+      if (appended === 0 && !this.hasRawSourcesRemaining()) {
+        break
+      }
     }
   }
 
@@ -484,6 +697,7 @@ class NewsFeedSource {
 
     this.isFirstFetch = true
     this.loading = false
+    this.prefetchPromise = null
     this.hasMoreValue = true
 
     this.publicSourceExhausted = false
@@ -498,6 +712,11 @@ class NewsFeedSource {
       likedHashtags: {},
     }
     this.tasteLoaded = false
+
+    this.frozenTaste = {
+      likedAuthors: {},
+      likedHashtags: {},
+    }
   }
 
   invalidateUserData(): void {

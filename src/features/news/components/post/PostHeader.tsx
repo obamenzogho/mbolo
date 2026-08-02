@@ -59,14 +59,17 @@ function PostHeaderComponent({
     : null
 
   // Pas de lecture pour ses propres posts : la pastille Suivre n'existe pas.
-  const { isFollowing } = useFollowFast(isOwner ? '' : post.userId)
+  const { isFollowing, resolved: followResolved } = useFollowFast(
+    isOwner ? '' : post.userId,
+  )
   const { toggleFollow } = useFollowAction()
   const [followState, setFollowState] = useState<'idle' | 'done' | 'hidden'>('idle')
   const followTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   useEffect(() => () => clearTimeout(followTimer.current), [])
 
-  const showFollow = !isOwner && !isFollowing && followState !== 'hidden'
+  const showFollow =
+    !isOwner && followResolved && !isFollowing && followState !== 'hidden'
 
   const handleFollow = () => {
     if (followState !== 'idle') return
