@@ -8,6 +8,7 @@ import { memo, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
+import { useI18n } from '@/i18n'
 import {
   POST_MAX_WIDTH,
   postColors,
@@ -22,13 +23,14 @@ interface PostVideoShareProps {
 }
 
 function PostVideoShareComponent({ share, onPress }: PostVideoShareProps) {
+  const { t } = useI18n()
   const [errored, setErrored] = useState(false)
   const hasThumb = Boolean(share.sharedThumbnailURL) && !errored
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Lire la vidéo partagée"
+      accessibilityLabel={t.news.compose.videoSharePlayA11y}
       onPress={onPress}
       style={({ pressed }) => [styles.container, pressed && styles.pressed]}
     >

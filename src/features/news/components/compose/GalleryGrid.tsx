@@ -23,7 +23,16 @@
    que `getAssetInfoAsync` résout, rendue par le `Image` de React Native. */
 
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
-import { Animated, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import {
+  Animated,
+  FlatList,
+  Image,
+  Linking,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import BottomSheet from '@/components/ui/BottomSheet'
 import OrbitLoader from '@/components/OrbitLoader'
@@ -217,6 +226,9 @@ function GalleryGridBase({ selectedUris, onToggle, onPickMboloVideo }: GalleryGr
     /* Une permission refusée sans possibilité de redemander ne se débloque
        qu'aux réglages : relancer la demande n'afficherait rien. */
     const denied = !permission.canAskAgain
+    const openSettings = () => {
+      Linking.openSettings()
+    }
     return (
       <View style={styles.gate}>
         <Ionicons name="images-outline" size={52} color={postColors.textTertiary} />
@@ -224,7 +236,7 @@ function GalleryGridBase({ selectedUris, onToggle, onPickMboloVideo }: GalleryGr
           {denied ? t.news.compose.galleryPermissionDenied : t.news.compose.galleryPermission}
         </Text>
         <Pressable
-          onPress={denied ? undefined : requestPermission}
+          onPress={denied ? openSettings : requestPermission}
           accessibilityRole="button"
           style={({ pressed }) => [styles.gateButton, pressed && styles.pressed]}
         >

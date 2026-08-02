@@ -111,6 +111,13 @@ export function useComposeDraft({
     }
   }, [enabled])
 
+  /* L'utilisateur a commencé son propre contenu : l'ancien brouillon est
+     obsolète, on retire la proposition de reprise pour ne pas écraser sa
+     saisie (la bannière ne doit pas survivre à un nouveau départ). */
+  useEffect(() => {
+    if (pending && hasContent) setPending(null)
+  }, [pending, hasContent])
+
   // L'autosauvegarde ne démarre qu'une fois le brouillon existant lu, sinon
   // le premier rendu (état vide) l'écraserait avant qu'on ait pu le proposer.
   useEffect(() => {

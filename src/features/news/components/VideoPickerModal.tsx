@@ -19,7 +19,8 @@ import { Ionicons } from '@expo/vector-icons'
 import OrbitLoader from '@/components/OrbitLoader'
 import { VideoThumbnailCell } from '@/components/VideoThumbnailCell'
 import { useProfileTabs } from '@/hooks/useProfileTabs'
-import { colors } from '@/lib/theme'
+import { useI18n } from '@/i18n'
+import { HIT_SLOP, postColors } from '../theme/postTokens'
 import type { Video as VideoType } from '@/types'
 
 interface VideoPickerModalProps {
@@ -32,6 +33,7 @@ interface VideoPickerModalProps {
 const NUM_COLUMNS = 3
 
 function VideoPickerModalComponent({ visible, userId, onClose, onSelect }: VideoPickerModalProps) {
+  const { t } = useI18n()
   const { gridVideos, loading, refreshing, onRefresh, loadMore, hasMore } = useProfileTabs({
     userId,
     tabs: ['grid'],
@@ -60,10 +62,16 @@ function VideoPickerModalComponent({ visible, userId, onClose, onSelect }: Video
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={styles.screen}>
         <View style={styles.header}>
-          <Pressable onPress={onClose} hitSlop={12} style={styles.headerButton}>
-            <Ionicons name="close" size={26} color="#fff" />
+          <Pressable
+            onPress={onClose}
+            hitSlop={HIT_SLOP}
+            accessibilityRole="button"
+            accessibilityLabel={t.news.compose.a11yClose}
+            style={styles.headerButton}
+          >
+            <Ionicons name="close" size={26} color={postColors.textPrimary} />
           </Pressable>
-          <Text style={styles.title}>Choisir une vidéo</Text>
+          <Text style={styles.title}>{t.news.compose.videoSharePickTitle}</Text>
           <View style={styles.headerButton} />
         </View>
 
@@ -73,8 +81,8 @@ function VideoPickerModalComponent({ visible, userId, onClose, onSelect }: Video
           </View>
         ) : gridVideos.length === 0 ? (
           <View style={styles.center}>
-            <Ionicons name="videocam-outline" size={44} color="#444" />
-            <Text style={styles.emptyText}>Tu n'as pas encore publié de vidéo.</Text>
+            <Ionicons name="videocam-outline" size={44} color={postColors.textTertiary} />
+            <Text style={styles.emptyText}>{t.news.compose.videoShareEmpty}</Text>
           </View>
         ) : (
           <FlatList
@@ -101,18 +109,18 @@ function VideoPickerModalComponent({ visible, userId, onClose, onSelect }: Video
 export const VideoPickerModal = memo(VideoPickerModalComponent)
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.black },
+  screen: { flex: 1, backgroundColor: postColors.canvas },
   header: {
     minHeight: 56,
     paddingHorizontal: 8,
     flexDirection: 'row',
     alignItems: 'center',
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#2A2B2E',
+    borderBottomColor: postColors.hairline,
   },
   headerButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
-  title: { flex: 1, color: '#fff', fontSize: 17, fontWeight: '700', textAlign: 'center' },
+  title: { flex: 1, color: postColors.textPrimary, fontSize: 17, fontWeight: '700', textAlign: 'center' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 },
-  emptyText: { color: '#888', fontSize: 14, textAlign: 'center' },
+  emptyText: { color: postColors.textSecondary, fontSize: 14, textAlign: 'center' },
   footer: { paddingVertical: 20 },
 })

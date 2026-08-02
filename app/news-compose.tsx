@@ -492,9 +492,10 @@ export default function NewsComposeScreen() {
 
     publish(state, {
       uid: user.uid,
-      displayName: user.displayName || user.email?.split('@')[0] || 'Utilisateur',
+      displayName:
+        user.displayName || user.email?.split('@')[0] || t.news.compose.userFallback,
     })
-  }, [handleError, publish, state, user])
+  }, [handleError, publish, state, user, t])
 
   if (loadingPost) {
     return (

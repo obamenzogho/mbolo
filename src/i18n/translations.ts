@@ -254,6 +254,9 @@ export const translations = {
         errorMediaDenied: 'Autorise l’accès aux photos pour continuer.',
 
         a11yClose: 'Fermer le composeur',
+        videoSharePickTitle: 'Choisir une vidéo',
+        videoSharePlayA11y: 'Lire la vidéo partagée',
+        userFallback: 'Utilisateur',
         a11yPublish: 'Publier la publication',
         a11yAudience: 'Choisir qui peut voir cette publication',
         a11yMode: 'Choisir le type de publication',
@@ -584,6 +587,9 @@ export const translations = {
         errorMediaDenied: 'Autorise l’accès aux photos pour continuer.',
 
         a11yClose: 'Fermer le composeur',
+        videoSharePickTitle: 'Choisir une vidéo',
+        videoSharePlayA11y: 'Lire la vidéo partagée',
+        userFallback: 'Utilisateur',
         a11yPublish: 'Publier la publication',
         a11yAudience: 'Choisir qui peut voir cette publication',
         a11yMode: 'Choisir le type de publication',
@@ -907,6 +913,9 @@ export const translations = {
         errorMediaDenied: 'Autorise l’accès aux photos pour continuer.',
 
         a11yClose: 'Fermer le composeur',
+        videoSharePickTitle: 'Choisir une vidéo',
+        videoSharePlayA11y: 'Lire la vidéo partagée',
+        userFallback: 'Utilisateur',
         a11yPublish: 'Publier la publication',
         a11yAudience: 'Choisir qui peut voir cette publication',
         a11yMode: 'Choisir le type de publication',
@@ -1230,6 +1239,9 @@ export const translations = {
         errorMediaDenied: 'Autorise l’accès aux photos pour continuer.',
 
         a11yClose: 'Fermer le composeur',
+        videoSharePickTitle: 'Choisir une vidéo',
+        videoSharePlayA11y: 'Lire la vidéo partagée',
+        userFallback: 'Utilisateur',
         a11yPublish: 'Publier la publication',
         a11yAudience: 'Choisir qui peut voir cette publication',
         a11yMode: 'Choisir le type de publication',
