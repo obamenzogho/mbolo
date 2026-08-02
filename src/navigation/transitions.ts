@@ -10,7 +10,11 @@ export const HAS_NATIVE_SWIPE_BACK = Platform.OS === 'ios'
 const gesture: NativeStackNavigationOptions = Platform.select<NativeStackNavigationOptions>({
   ios: {
     gestureEnabled: true,
-    fullScreenGestureEnabled: true,
+    // Plein écran, le geste natif se déclenche n'importe où sur l'écran —
+    // y compris pendant un scroll vertical avec une légère dérive
+    // horizontale. Limité au bord gauche, il redevient le geste natif iOS
+    // classique, sans conflit avec le scroll.
+    fullScreenGestureEnabled: false,
     animationMatchesGesture: true,
   },
   android: { gestureEnabled: true },
