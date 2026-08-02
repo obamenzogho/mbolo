@@ -35,8 +35,11 @@ function SelectScreenComponent({
 }: SelectScreenProps) {
   const { t } = useI18n()
 
-  return (
-    <View style={styles.screen}>
+  /* Aperçu + barre « Créer » passés en en-tête de la pellicule : tout défile
+     ensemble, donc la grille récupère la hauteur de l'écran dès qu'on
+     descend. Sous la caméra, ils reprennent leur place au-dessus. */
+  const header = (
+    <>
       {/* Aperçu carré du média retenu (ou invite). */}
       <View style={styles.previewWrap}>
         <View style={styles.preview}>
@@ -81,13 +84,25 @@ function SelectScreenComponent({
           onPress={onPickText}
         />
       </View>
+    </>
+  )
 
-      {/* La pellicule, ou la caméra. */}
-      {mode === 'gallery' ? (
-        <GalleryGrid selectedUris={selected ? [selected.uri] : []} onToggle={onToggle} />
-      ) : (
+  if (mode === 'camera') {
+    return (
+      <View style={styles.screen}>
+        {header}
         <ComposeCamera onCapture={onCapture} />
-      )}
+      </View>
+    )
+  }
+
+  return (
+    <View style={styles.screen}>
+      <GalleryGrid
+        selectedUris={selected ? [selected.uri] : []}
+        onToggle={onToggle}
+        header={header}
+      />
     </View>
   )
 }

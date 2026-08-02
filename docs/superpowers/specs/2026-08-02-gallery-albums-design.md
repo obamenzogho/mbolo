@@ -65,10 +65,14 @@ surchauffe. Dans `GalleryGrid` :
 
 **Changement d'album.** `albumId` devient un état ; `loadAssets` le lit et
 pose `options.album = albumId` quand il n'est pas nul — il entre donc dans les
-dépendances du `useCallback`. À la sélection : `cursorRef.current = null`,
-`hasMoreRef.current = true`, puis `loadAssets(true)`. Même remise à zéro que
-`useGallery.ts:60-65`. Pas de `setAssets([])` : `reset = true` remplace déjà
-le tableau.
+dépendances du `useCallback`, ce qui suffit à déclencher le rechargement. À la
+sélection : `cursorRef.current = null`, `hasMoreRef.current = true`, et
+`setAssets([])` — laisser les photos de l'ancien album sous le nom du nouveau
+serait faux le temps du chargement.
+
+Une remise à zéro passe outre le verrou `loadingRef`, sans quoi changer
+d'album pendant qu'une page charge laisserait la grille sur l'album
+précédent. Un compteur de requête rend la réponse périmée sans effet.
 
 **i18n.** Deux clés dans les 4 locales, à côté des `gallery*` existantes :
 `galleryAlbumAll` (« Toutes les photos ») et `galleryAlbums` (titre du menu).
