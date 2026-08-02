@@ -29,7 +29,7 @@ export interface UseSwipeBackOptions {
 
 export function useSwipeBack({
   enabled = true,
-  edgeOnly = false,
+  edgeOnly = true,
   backTo = '/(tabs)/feed',
   onBack,
 }: UseSwipeBackOptions = {}) {
