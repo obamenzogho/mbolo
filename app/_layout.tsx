@@ -1,5 +1,4 @@
 import '../src/lib/crash-debug'
-import '../global.css'
 
 import { NavigationHistoryProvider } from '../src/providers/NavigationHistoryProvider'
 import { initSentry, setSentryUser, setSentryRoute } from '../src/lib/sentry'
