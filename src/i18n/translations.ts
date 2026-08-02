@@ -154,6 +154,7 @@ export const translations = {
       },
       compose: {
         title: 'Créer une publication',
+        createTitle: 'Nouveau post',
         titleEdit: 'Modifier la publication',
         publish: 'Publier',
         save: 'Enregistrer',
@@ -209,6 +210,8 @@ export const translations = {
         locationDetecting: 'Recherche de ta position…',
         locationCurrent: 'Position actuelle',
         locationRemove: 'Retirer le lieu',
+        locationAdd: 'Ajouter un lieu',
+        commentsEnabled: 'Autoriser les commentaires',
 
         articleTitlePlaceholder: "Titre de l'article",
         articleLabel: 'Article',
@@ -252,6 +255,10 @@ export const translations = {
         errorLocation: 'Impossible de récupérer ta position.',
         errorLocationDenied: 'Autorise la localisation pour l’ajouter.',
         errorMediaDenied: 'Autorise l’accès aux photos pour continuer.',
+        errorUpload: "L'envoi du média a échoué.",
+        errorWrite: "L'enregistrement de la publication a échoué.",
+        errorAuth: 'Connecte-toi pour publier.',
+        errorUnported: 'Cette fonctionnalité arrive bientôt.',
 
         a11yClose: 'Fermer le composeur',
         videoSharePickTitle: 'Choisir une vidéo',
@@ -487,6 +494,7 @@ export const translations = {
       },
       compose: {
         title: 'Créer une publication',
+        createTitle: 'Nouveau post',
         titleEdit: 'Modifier la publication',
         publish: 'Publier',
         save: 'Enregistrer',
@@ -542,6 +550,8 @@ export const translations = {
         locationDetecting: 'Recherche de ta position…',
         locationCurrent: 'Position actuelle',
         locationRemove: 'Retirer le lieu',
+        locationAdd: 'Ajouter un lieu',
+        commentsEnabled: 'Autoriser les commentaires',
 
         articleTitlePlaceholder: "Titre de l'article",
         articleLabel: 'Article',
@@ -585,6 +595,10 @@ export const translations = {
         errorLocation: 'Impossible de récupérer ta position.',
         errorLocationDenied: 'Autorise la localisation pour l’ajouter.',
         errorMediaDenied: 'Autorise l’accès aux photos pour continuer.',
+        errorUpload: "L'envoi du média a échoué.",
+        errorWrite: "L'enregistrement de la publication a échoué.",
+        errorAuth: 'Connecte-toi pour publier.',
+        errorUnported: 'Cette fonctionnalité arrive bientôt.',
 
         a11yClose: 'Fermer le composeur',
         videoSharePickTitle: 'Choisir une vidéo',
@@ -813,6 +827,7 @@ export const translations = {
       },
       compose: {
         title: 'Créer une publication',
+        createTitle: 'Nouveau post',
         titleEdit: 'Modifier la publication',
         publish: 'Publier',
         save: 'Enregistrer',
@@ -868,6 +883,8 @@ export const translations = {
         locationDetecting: 'Recherche de ta position…',
         locationCurrent: 'Position actuelle',
         locationRemove: 'Retirer le lieu',
+        locationAdd: 'Ajouter un lieu',
+        commentsEnabled: 'Autoriser les commentaires',
 
         articleTitlePlaceholder: "Titre de l'article",
         articleLabel: 'Article',
@@ -911,6 +928,10 @@ export const translations = {
         errorLocation: 'Impossible de récupérer ta position.',
         errorLocationDenied: 'Autorise la localisation pour l’ajouter.',
         errorMediaDenied: 'Autorise l’accès aux photos pour continuer.',
+        errorUpload: "L'envoi du média a échoué.",
+        errorWrite: "L'enregistrement de la publication a échoué.",
+        errorAuth: 'Connecte-toi pour publier.',
+        errorUnported: 'Cette fonctionnalité arrive bientôt.',
 
         a11yClose: 'Fermer le composeur',
         videoSharePickTitle: 'Choisir une vidéo',
@@ -1139,6 +1160,7 @@ export const translations = {
       },
       compose: {
         title: 'Créer une publication',
+        createTitle: 'Nouveau post',
         titleEdit: 'Modifier la publication',
         publish: 'Publier',
         save: 'Enregistrer',
@@ -1194,6 +1216,8 @@ export const translations = {
         locationDetecting: 'Recherche de ta position…',
         locationCurrent: 'Position actuelle',
         locationRemove: 'Retirer le lieu',
+        locationAdd: 'Ajouter un lieu',
+        commentsEnabled: 'Autoriser les commentaires',
 
         articleTitlePlaceholder: "Titre de l'article",
         articleLabel: 'Article',
@@ -1237,6 +1261,10 @@ export const translations = {
         errorLocation: 'Impossible de récupérer ta position.',
         errorLocationDenied: 'Autorise la localisation pour l’ajouter.',
         errorMediaDenied: 'Autorise l’accès aux photos pour continuer.',
+        errorUpload: "L'envoi du média a échoué.",
+        errorWrite: "L'enregistrement de la publication a échoué.",
+        errorAuth: 'Connecte-toi pour publier.',
+        errorUnported: 'Cette fonctionnalité arrive bientôt.',
 
         a11yClose: 'Fermer le composeur',
         videoSharePickTitle: 'Choisir une vidéo',

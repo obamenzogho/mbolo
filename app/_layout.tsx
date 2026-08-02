@@ -141,7 +141,7 @@ function RootContent() {
       <Stack.Screen name="settings" options={slideRight} />
       <Stack.Screen name="post-detail" options={slideRight} />
       <Stack.Screen name="insights" options={slideRight} />
-      <Stack.Screen name="news-compose" options={slideRight} />
+      <Stack.Screen name="create" options={slideRight} />
       <Stack.Screen name="hashtag/[tag]" options={slideRight} />
       <Stack.Screen name="user/[userId]" options={slideRight} />
       <Stack.Screen name="u/[pseudo]" options={slideRight} />

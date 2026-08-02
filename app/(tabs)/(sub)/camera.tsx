@@ -92,7 +92,7 @@ export default function CameraScreen() {
       const video = await cameraRef.current.recordAsync()
       if (video?.uri) {
         router.push({
-          pathname: '/(tabs)/video-editor',
+          pathname: '/create',
           params: { mediaUri: video.uri, mediaType: 'video' },
         })
       }
@@ -133,7 +133,7 @@ export default function CameraScreen() {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 })
       if (photo?.uri) {
         router.push({
-          pathname: '/(tabs)/video-editor',
+          pathname: '/create',
           params: { mediaUri: photo.uri, mediaType: 'photo' },
         })
       }

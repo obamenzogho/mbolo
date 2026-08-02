@@ -155,7 +155,7 @@ export default function ShareModal({
     handleClose()
     const url = config.videoURL || `https://mbolo.app/post/${config.videoId}`
     router.push({
-      pathname: '/news-compose',
+      pathname: '/create',
       params: { sharedUrl: url },
     })
   }, [config, handleClose])

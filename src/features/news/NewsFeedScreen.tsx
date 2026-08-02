@@ -219,7 +219,7 @@ export default function NewsFeedScreen({
   )
 
   const editPost = useCallback((post: NewsPost) => {
-    router.push({ pathname: '/news-compose', params: { editPostId: post.id } })
+    router.push({ pathname: '/create', params: { editPostId: post.id } })
   }, [])
 
   const openOptions = useCallback(

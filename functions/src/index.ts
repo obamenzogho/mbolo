@@ -411,6 +411,9 @@ export * from './posts/onReactionWrite'
 export * from './posts/onEngagementWrite'
 export * from './posts/onPostCreate'
 
+/* ---------- VIDEO ANTI-SPAM (videos/*) ---------- */
+export * from './videos/onVideoCreate'
+
 /* ---------- DELETE ACCOUNT : callable ---------- */
 export const deleteAccount = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Must be signed in')

@@ -15,7 +15,7 @@ export function useCreateModal() {
 
 export function CreateModalProvider({ children }: { children: React.ReactNode }) {
   const openCreateModal = useCallback(() => {
-    router.push('/news-compose' as never)
+    router.push('/create')
   }, [])
 
   return (

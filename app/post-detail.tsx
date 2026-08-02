@@ -158,7 +158,7 @@ export default function PostDetailScreen() {
           text: 'Modifier',
           onPress: () =>
             router.push({
-              pathname: '/news-compose',
+              pathname: '/create',
               params: { editPostId: target.id },
             }),
         },

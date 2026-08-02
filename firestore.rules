@@ -378,6 +378,17 @@ service cloud.firestore {
         && request.auth.uid == userId;
     }
 
+    // Bibliothèque musicale « sound-first » : la bibliothèque embarquée est
+    // seedée côté serveur (source 'library', jamais écrite par le mobile) ;
+    // un utilisateur ne crée que ses propres pistes.
+    match /sounds/{soundId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.source == 'user'
+        && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
     match /reports/{reportId} {
       allow create: if isSignedIn()
         && request.resource.data.reportedBy == request.auth.uid
