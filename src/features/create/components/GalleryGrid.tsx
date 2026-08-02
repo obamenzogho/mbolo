@@ -35,6 +35,9 @@ interface GalleryGridProps {
   /* Rendu au-dessus de la grille, à l'intérieur de la liste : l'aperçu de
      `SelectScreen` défile ainsi avec la pellicule et libère l'écran. */
   header?: ReactElement | null
+  /* Index de sélection (1, 2, 3, 4) pour chaque URI. Si absent, on affiche
+     un checkmark simple (rétrocompatibilité). */
+  selectionOrder?: Map<string, number>
 }
 
 const COLUMNS = 3
@@ -51,7 +54,7 @@ function formatDuration(seconds: number): string {
   return `${m}:${r.toString().padStart(2, '0')}`
 }
 
-function GalleryGridComponent({ selectedUris, onToggle, header }: GalleryGridProps) {
+function GalleryGridComponent({ selectedUris, onToggle, header, selectionOrder }: GalleryGridProps) {
   const { t } = useI18n()
   const { width } = useWindowDimensions()
   const [permission, requestPermission] = MediaLibrary.usePermissions()
@@ -211,10 +214,11 @@ function GalleryGridComponent({ selectedUris, onToggle, header }: GalleryGridPro
         item={item}
         size={cellSize}
         selected={selectedUris.includes(item.uri)}
+        selectionIndex={selectionOrder?.get(item.uri)}
         onToggle={onToggle}
       />
     ),
-    [selectedUris, onToggle, cellSize],
+    [selectedUris, selectionOrder, onToggle, cellSize],
   )
 
   /* Permission non donnée : porte d'entrée vers la demande ou les réglages.
@@ -311,11 +315,13 @@ const GridCell = memo(function GridCell({
   item,
   size,
   selected,
+  selectionIndex,
   onToggle,
 }: {
   item: GalleryAsset
   size: number
   selected: boolean
+  selectionIndex?: number
   onToggle: (asset: GalleryAsset) => void
 }) {
   return (
@@ -340,7 +346,11 @@ const GridCell = memo(function GridCell({
       {selected ? <View style={styles.selectedOverlay} /> : null}
       {selected ? (
         <View style={styles.badge}>
-          <Ionicons name="checkmark" size={14} color="#fff" />
+          {selectionIndex !== undefined ? (
+            <Text style={styles.badgeNumber}>{selectionIndex}</Text>
+          ) : (
+            <Ionicons name="checkmark" size={14} color="#fff" />
+          )}
         </View>
       ) : null}
     </Pressable>
@@ -383,6 +393,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: createColors.accent,
   },
+  badgeNumber: { color: '#fff', fontSize: 11, fontWeight: '700' },
   gate: {
     flex: 1,
     alignItems: 'center',

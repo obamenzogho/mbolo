@@ -3,10 +3,13 @@
    Étape 1 du nouveau flux, portée du prototype createPost-instagram :
    fond noir, aperçu carré du média retenu en haut, barre « Créer » (Texte /
    Caméra), puis la pellicule. Le pari d'Instagram : la publication existe
-   déjà dans le téléphone, on la demande avant tout le reste. */
+   déjà dans le téléphone, on la demande avant tout le reste.
 
-import { memo } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+   Sélection multiple jusqu'à 4 médias, carrousel horizontal sous l'aperçu,
+   OrbitLoader pendant le chargement de l'image. */
+
+import { memo, useCallback, useMemo, useState } from 'react'
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { useI18n } from '@/i18n'
@@ -15,9 +18,14 @@ import type { SelectedMedia } from '@/features/news/hooks/useComposeState'
 import { GalleryGrid } from './GalleryGrid'
 import { ComposeCamera } from '@/features/news/components/compose/ComposeCamera'
 import { createColors, createType } from '../theme/createTokens'
+import OrbitLoader from '@/components/OrbitLoader'
+
+const MAX_MEDIA = 4
+const THUMB_SIZE = 56
+const THUMB_GAP = 4
 
 interface SelectScreenProps {
-  selected: SelectedMedia | null
+  media: SelectedMedia[]
   mode: 'gallery' | 'camera'
   onModeChange: (mode: 'gallery' | 'camera') => void
   onToggle: (asset: GalleryAsset) => void
@@ -26,7 +34,7 @@ interface SelectScreenProps {
 }
 
 function SelectScreenComponent({
-  selected,
+  media,
   mode,
   onModeChange,
   onToggle,
@@ -34,21 +42,48 @@ function SelectScreenComponent({
   onPickText,
 }: SelectScreenProps) {
   const { t } = useI18n()
+  const [focusedIndex, setFocusedIndex] = useState(0)
+  const [previewLoading, setPreviewLoading] = useState(false)
 
-  /* Aperçu + barre « Créer » passés en en-tête de la pellicule : tout défile
-     ensemble, donc la grille récupère la hauteur de l'écran dès qu'on
-     descend. Sous la caméra, ils reprennent leur place au-dessus. */
+  const focused = media[focusedIndex] ?? null
+
+  /* Map URI → numéro d'ordre (1, 2, 3, 4) pour les badges de la grille. */
+  const selectionOrder = useMemo(() => {
+    const map = new Map<string, number>()
+    media.forEach((m, idx) => map.set(m.uri, idx + 1))
+    return map
+  }, [media])
+
+  const handleLoadStart = useCallback(() => setPreviewLoading(true), [])
+  const handleLoadEnd = useCallback(() => setPreviewLoading(false), [])
+
+  const handleThumbPress = useCallback((idx: number) => {
+    setFocusedIndex(idx)
+  }, [])
+
+  /* Aperçu + barre « Créer » + carrousel passés en en-tête de la pellicule :
+     tout défile ensemble, donc la grille récupère la hauteur de l'écran dès
+     qu'on descend. Sous la caméra, l'en-tête reprend sa place au-dessus. */
   const header = (
     <>
-      {/* Aperçu carré du média retenu (ou invite). */}
+      {/* Aperçu carré du média focalisé (ou invite). */}
       <View style={styles.previewWrap}>
         <View style={styles.preview}>
-          {selected ? (
-            <Image
-              source={{ uri: selected.thumbnailUri ?? selected.uri }}
-              style={styles.previewMedia}
-              contentFit="cover"
-            />
+          {focused ? (
+            <>
+              <Image
+                source={{ uri: focused.thumbnailUri ?? focused.uri }}
+                style={styles.previewMedia}
+                contentFit="cover"
+                onLoadStart={handleLoadStart}
+                onLoadEnd={handleLoadEnd}
+              />
+              {previewLoading ? (
+                <View style={styles.loaderOverlay}>
+                  <OrbitLoader size={40} />
+                </View>
+              ) : null}
+            </>
           ) : (
             <View style={styles.previewEmpty}>
               <Ionicons
@@ -63,6 +98,41 @@ function SelectScreenComponent({
           )}
         </View>
       </View>
+
+      {/* Carrousel horizontal des médias sélectionnés. */}
+      {media.length > 0 ? (
+        <View style={styles.carouselWrap}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.carouselContent}
+          >
+            {media.map((m, idx) => (
+              <Pressable
+                key={m.uri}
+                onPress={() => handleThumbPress(idx)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: idx === focusedIndex }}
+                style={[
+                  styles.thumb,
+                  idx === focusedIndex && styles.thumbFocused,
+                ]}
+              >
+                <Image
+                  source={{ uri: m.thumbnailUri ?? m.uri }}
+                  style={styles.thumbImage}
+                  contentFit="cover"
+                />
+                {m.type === 'video' ? (
+                  <View style={styles.videoBadge}>
+                    <Ionicons name="play" size={10} color="#fff" />
+                  </View>
+                ) : null}
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
 
       {/* Barre « Créer » : Galerie / Caméra / Texte. */}
       <View style={styles.createBar}>
@@ -99,7 +169,8 @@ function SelectScreenComponent({
   return (
     <View style={styles.screen}>
       <GalleryGrid
-        selectedUris={selected ? [selected.uri] : []}
+        selectedUris={media.map((m) => m.uri)}
+        selectionOrder={selectionOrder}
         onToggle={onToggle}
         header={header}
       />
@@ -163,6 +234,43 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   emptyText: { color: createColors.textTertiary },
+  loaderOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: createColors.surface,
+  },
+  carouselWrap: {
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  carouselContent: {
+    paddingHorizontal: 12,
+    gap: THUMB_GAP,
+  },
+  thumb: {
+    width: THUMB_SIZE,
+    height: THUMB_SIZE,
+    borderRadius: 4,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  thumbFocused: {
+    borderColor: createColors.accent,
+  },
+  thumbImage: { width: '100%', height: '100%' },
+  videoBadge: {
+    position: 'absolute',
+    right: 3,
+    bottom: 3,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
   createBar: {
     flexDirection: 'row',
     justifyContent: 'space-evenly',
@@ -171,8 +279,6 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: createColors.hairline,
   },
-  /* Chaque bouton occupe un tiers de la largeur ; l'icône et son libellé
-     sont centrés sur la même largeur, donc le texte tombe pile sous l'icône. */
   createType: { flex: 1, alignItems: 'center', gap: 6 },
   createTypePressed: { opacity: 0.6 },
   createTypeCircle: {
@@ -188,8 +294,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.4)',
     backgroundColor: 'rgba(255,255,255,0.1)',
   },
-  /* textAlign + width 100% : le libellé reste centré sur la largeur du
-     bouton même s'il est plus court/long que l'icône. */
   createTypeLabel: {
     width: '100%',
     textAlign: 'center',

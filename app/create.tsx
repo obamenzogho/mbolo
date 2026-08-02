@@ -84,18 +84,32 @@ export default function CreateScreen() {
   const isCaptionStep = step === 'caption'
   const isPublishing = step === 'publishing'
 
-  /* Sélection unique : on remplace (une photo, une vidéo, ou un texte). */
+  /* Sélection multiple : add/remove avec cap à 4 médias. L'ordre d'ajout
+     détermine la numérotation (1, 2, 3, 4) affichée dans la grille. */
   const handleToggle = useCallback((asset: GalleryAsset) => {
-    const isVideo = asset.mediaType === 'video'
-    setMedia([
-      {
-        uri: asset.uri,
-        type: isVideo ? 'video' : 'image',
-        width: asset.width,
-        height: asset.height,
-        duration: asset.duration ?? null,
-      },
-    ])
+    setMedia((prev) => {
+      const idx = prev.findIndex((m) => m.uri === asset.uri)
+      if (idx !== -1) {
+        /* Déjà sélectionné → retrait. */
+        return prev.filter((_, i) => i !== idx)
+      }
+      if (prev.length >= 4) {
+        /* Cap atteint : on ignore le tap. */
+        return prev
+      }
+      /* Ajout à la fin. */
+      const isVideo = asset.mediaType === 'video'
+      return [
+        ...prev,
+        {
+          uri: asset.uri,
+          type: isVideo ? 'video' : 'image',
+          width: asset.width,
+          height: asset.height,
+          duration: asset.duration ?? null,
+        },
+      ]
+    })
   }, [])
 
   const handleCapture = useCallback((captured: SelectedMedia) => {
@@ -224,7 +238,7 @@ export default function CreateScreen() {
 
         {step === 'select' ? (
           <SelectScreen
-            selected={selected}
+            media={media}
             mode={mode}
             onModeChange={setMode}
             onToggle={handleToggle}
