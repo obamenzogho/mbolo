@@ -382,6 +382,12 @@ export const onReportCreate = onDocumentCreated('reports/{reportId}', async (eve
       }
     } else if (targetType === 'story') {
       await db.doc(`stories/${targetId}`).update({ moderationStatus: 'hidden' })
+    } else if (targetType === 'post') {
+      await db.doc(`posts/${targetId}`).update({
+        moderationStatus: 'hidden',
+        hiddenAt: FieldValue.serverTimestamp(),
+        hiddenReason: 'auto_report_threshold',
+      })
     } else if (targetType === 'user' && contentOwnerId) {
       await db.doc(`users/${contentOwnerId}`).update({
         moderationFlag: true,
@@ -403,6 +409,7 @@ export * from './search'
 /* ---------- POST AGGREGATES (posts/*) ---------- */
 export * from './posts/onReactionWrite'
 export * from './posts/onEngagementWrite'
+export * from './posts/onPostCreate'
 
 /* ---------- DELETE ACCOUNT : callable ---------- */
 export const deleteAccount = onCall(async (request) => {
@@ -415,6 +422,17 @@ export const deleteAccount = onCall(async (request) => {
 
   const videos = await db.collection('videos').where('userId', '==', uid).get()
   for (const v of videos.docs) await db.recursiveDelete(v.ref)
+
+  /* Posts : publications de l'utilisateur, sous-collections incluses
+     (comments, saves, reposts, shares, pollVotes). recursiveDelete cascade ;
+     syncPostToSearch (onDocumentWritten) retire ensuite chaque post de
+     Typesense. */
+  const posts = await db.collection('posts').where('userId', '==', uid).get()
+  for (const p of posts.docs) await db.recursiveDelete(p.ref)
+
+  /* Compteur anti-spam backend (posts/onPostCreate.ts) : donnée liée au
+     compte, elle part avec lui. */
+  await db.doc(`rateLimits/posts/${uid}`).delete().catch(() => {})
 
   for (const col of ['stories', 'reposts', 'shares', 'highlights']) {
     const snap = await db.collection(col).where('userId', '==', uid).get()

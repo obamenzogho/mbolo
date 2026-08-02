@@ -257,7 +257,12 @@ service cloud.firestore {
         // interdit de l'inventer côté client (l'update est bloqué plus bas).
         && (!('verified' in request.resource.data)
             || request.resource.data.verified ==
-               (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.verified == true));
+               (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.verified == true))
+        // Un post naît toujours visible : `hidden`/`blocked` appartiennent à la
+        // modération (Cloud Functions) et au signalement. Sans cette borne, un
+        // client pourrait masquer son propre contenu abusif en le créant hidden.
+        && (!('moderationStatus' in request.resource.data)
+            || request.resource.data.moderationStatus == 'visible');
 
       // 🔒 Les agrégats (likes/likedBy/comments/shares/saves/savedBy/
       // reactionCounts/reposts/repostedBy) sont possédés par les Cloud
@@ -269,7 +274,8 @@ service cloud.firestore {
           && request.resource.data.userId == resource.data.userId
           && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
             'likes', 'likedBy', 'comments', 'shares', 'saves', 'savedBy',
-            'reactionCounts', 'reposts', 'repostedBy', 'verified'
+            'reactionCounts', 'reposts', 'repostedBy', 'verified',
+            'moderationStatus', 'hiddenAt', 'hiddenReason'
           ]) )
         ||
         ( changedKeys().hasOnly(['likes', 'likedBy'])
