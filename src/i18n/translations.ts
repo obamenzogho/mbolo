@@ -173,7 +173,7 @@ export const translations = {
         audiencePrivateDesc: 'Visible par toi seul',
 
         modeGallery: 'Galerie',
-        modeCamera: 'Appareil photo',
+        modeCamera: 'Appareil',
         modeText: 'Texte',
         modePoll: 'Sondage',
 
@@ -513,7 +513,7 @@ export const translations = {
         audiencePrivateDesc: 'Visible par toi seul',
 
         modeGallery: 'Galerie',
-        modeCamera: 'Appareil photo',
+        modeCamera: 'Appareil',
         modeText: 'Texte',
         modePoll: 'Sondage',
 
@@ -846,7 +846,7 @@ export const translations = {
         audiencePrivateDesc: 'Visible par toi seul',
 
         modeGallery: 'Galerie',
-        modeCamera: 'Appareil photo',
+        modeCamera: 'Appareil',
         modeText: 'Texte',
         modePoll: 'Sondage',
 
@@ -1179,7 +1179,7 @@ export const translations = {
         audiencePrivateDesc: 'Visible par toi seul',
 
         modeGallery: 'Galerie',
-        modeCamera: 'Appareil photo',
+        modeCamera: 'Appareil',
         modeText: 'Texte',
         modePoll: 'Sondage',
 

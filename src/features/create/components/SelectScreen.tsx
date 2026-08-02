@@ -12,7 +12,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useI18n } from '@/i18n'
 import type { GalleryAsset } from '@/hooks/useGallery'
 import type { SelectedMedia } from '@/features/news/hooks/useComposeState'
-import { GalleryGrid } from '@/features/news/components/compose/GalleryGrid'
+import { GalleryGrid } from './GalleryGrid'
 import { ComposeCamera } from '@/features/news/components/compose/ComposeCamera'
 import { createColors, createType } from '../theme/createTokens'
 
@@ -84,7 +84,7 @@ function SelectScreenComponent({
 
       {/* La pellicule, ou la caméra. */}
       {mode === 'gallery' ? (
-        <GalleryGrid selectedUris={selected ? [selected.uri] : []} onToggle={onToggle} onPickMboloVideo={() => {}} />
+        <GalleryGrid selectedUris={selected ? [selected.uri] : []} onToggle={onToggle} />
       ) : (
         <ComposeCamera onCapture={onCapture} />
       )}
@@ -113,6 +113,7 @@ function CreateTypeButton({
         <Ionicons name={icon} size={22} color={createColors.textPrimary} />
       </View>
       <Text
+        numberOfLines={1}
         style={[
           styles.createTypeLabel,
           createType.createLabel,
@@ -149,13 +150,15 @@ const styles = StyleSheet.create({
   emptyText: { color: createColors.textTertiary },
   createBar: {
     flexDirection: 'row',
-    gap: 20,
+    justifyContent: 'space-evenly',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: createColors.hairline,
   },
-  createType: { alignItems: 'center', gap: 6 },
+  /* Chaque bouton occupe un tiers de la largeur ; l'icône et son libellé
+     sont centrés sur la même largeur, donc le texte tombe pile sous l'icône. */
+  createType: { flex: 1, alignItems: 'center', gap: 6 },
   createTypePressed: { opacity: 0.6 },
   createTypeCircle: {
     width: 56,
@@ -170,7 +173,13 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.4)',
     backgroundColor: 'rgba(255,255,255,0.1)',
   },
-  createTypeLabel: { color: createColors.textPrimary },
+  /* textAlign + width 100% : le libellé reste centré sur la largeur du
+     bouton même s'il est plus court/long que l'icône. */
+  createTypeLabel: {
+    width: '100%',
+    textAlign: 'center',
+    color: createColors.textPrimary,
+  },
 })
 
 export const SelectScreen = memo(SelectScreenComponent)
