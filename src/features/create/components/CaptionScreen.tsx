@@ -2,16 +2,21 @@
 
    Étape 2 du nouveau flux, portée du prototype createPost-instagram :
    écran clair, aperçu à gauche, légende puis réglages (visibilité,
-   commentaires, lieu). */
+   commentaires, lieu).
 
-import { memo } from 'react'
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
+   Affiche un carrousel horizontal des médias sélectionnés (jusqu'à 4). */
+
+import { memo, useCallback, useState } from 'react'
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { useI18n } from '@/i18n'
 import type { SelectedMedia } from '@/features/news/hooks/useComposeState'
 import type { NewsLocation, NewsPostVisibility } from '@/features/news/types'
-import { captionColors, createType } from '../theme/createTokens'
+import { captionColors, createColors, createType } from '../theme/createTokens'
+
+const THUMB_SIZE = 56
+const THUMB_GAP = 4
 
 interface CaptionScreenProps {
   media: SelectedMedia[]
@@ -45,15 +50,22 @@ function CaptionScreenComponent({
   onPressLocation,
 }: CaptionScreenProps) {
   const { t } = useI18n()
-  const selected = media[0]
+  const [focusedIndex, setFocusedIndex] = useState(0)
+
+  const focused = media[focusedIndex] ?? null
+
+  const handleThumbPress = useCallback((idx: number) => {
+    setFocusedIndex(idx)
+  }, [])
 
   return (
     <View style={styles.screen}>
       <View style={styles.editorRow}>
+        {/* Aperçu du média focalisé. */}
         <View style={styles.preview}>
-          {selected ? (
+          {focused ? (
             <Image
-              source={{ uri: selected.thumbnailUri ?? selected.uri }}
+              source={{ uri: focused.thumbnailUri ?? focused.uri }}
               style={styles.previewMedia}
               contentFit="cover"
             />
@@ -69,6 +81,41 @@ function CaptionScreenComponent({
           maxLength={1000}
         />
       </View>
+
+      {/* Carrousel horizontal des médias sélectionnés. */}
+      {media.length > 1 ? (
+        <View style={styles.carouselWrap}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.carouselContent}
+          >
+            {media.map((m, idx) => (
+              <Pressable
+                key={m.uri}
+                onPress={() => handleThumbPress(idx)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: idx === focusedIndex }}
+                style={[
+                  styles.thumb,
+                  idx === focusedIndex && styles.thumbFocused,
+                ]}
+              >
+                <Image
+                  source={{ uri: m.thumbnailUri ?? m.uri }}
+                  style={styles.thumbImage}
+                  contentFit="cover"
+                />
+                {m.type === 'video' ? (
+                  <View style={styles.videoBadge}>
+                    <Ionicons name="play" size={10} color="#fff" />
+                  </View>
+                ) : null}
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
 
       <Pressable
         onPress={onPressVisibility}
@@ -148,6 +195,38 @@ const styles = StyleSheet.create({
     color: captionColors.textPrimary,
     minHeight: 72,
     paddingTop: 2,
+  },
+  carouselWrap: {
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: captionColors.hairline,
+  },
+  carouselContent: {
+    paddingHorizontal: 16,
+    gap: THUMB_GAP,
+  },
+  thumb: {
+    width: THUMB_SIZE,
+    height: THUMB_SIZE,
+    borderRadius: 4,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  thumbFocused: {
+    borderColor: createColors.accent,
+  },
+  thumbImage: { width: '100%', height: '100%' },
+  videoBadge: {
+    position: 'absolute',
+    right: 3,
+    bottom: 3,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
   },
   row: {
     flexDirection: 'row',
