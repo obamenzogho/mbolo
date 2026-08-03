@@ -22,11 +22,12 @@ import { postMotion } from '@/features/news/theme/postTokens'
 import type { NewsLocation, NewsPostVisibility } from '@/features/news/types'
 import { useCreatePublish, type CreatePublishError } from '@/features/create/hooks/useCreatePublish'
 import { SelectScreen } from '@/features/create/components/SelectScreen'
+import { EditScreen } from '@/features/create/components/edit/EditScreen'
 import { CaptionScreen } from '@/features/create/components/CaptionScreen'
 import { createColors, captionColors, createType } from '@/features/create/theme/createTokens'
 import type { GalleryAsset } from '@/hooks/useGallery'
 
-type Step = 'select' | 'caption' | 'publishing'
+type Step = 'select' | 'edit' | 'caption' | 'publishing'
 
 const ERROR_KEYS: Record<CreatePublishError, string> = {
   upload: 'errorUpload',
@@ -54,6 +55,7 @@ export default function CreateScreen() {
   const [step, setStep] = useState<Step>('select')
   const [mode, setMode] = useState<'gallery' | 'camera'>('gallery')
   const [media, setMedia] = useState<SelectedMedia[]>([])
+  const [editingIndex, setEditingIndex] = useState(0)
   const [text, setText] = useState('')
   const [visibility, setVisibility] = useState<NewsPostVisibility>('public')
   const [commentsEnabled, setCommentsEnabled] = useState(true)
@@ -82,6 +84,7 @@ export default function CreateScreen() {
   const selected = media[0] ?? null
   const hasContent = media.length > 0 || text.trim().length > 0
   const isCaptionStep = step === 'caption'
+  const isEditStep = step === 'edit'
   const isPublishing = step === 'publishing'
 
   /* Sélection multiple : add/remove avec cap à 4 médias. L'ordre d'ajout
@@ -114,7 +117,8 @@ export default function CreateScreen() {
 
   const handleCapture = useCallback((captured: SelectedMedia) => {
     setMedia([captured])
-    setStep('caption')
+    setEditingIndex(0)
+    setStep('edit')
   }, [])
 
   const startTextPost = useCallback(() => {
@@ -181,7 +185,10 @@ export default function CreateScreen() {
 
   const handleBack = useCallback(() => {
     if (step === 'caption') {
-      setMode('gallery')
+      setStep('edit')
+      return
+    }
+    if (step === 'edit') {
       setStep('select')
       return
     }
@@ -190,10 +197,36 @@ export default function CreateScreen() {
 
   const headerColor = isCaptionStep ? captionColors : createColors
 
+  /* Titre de l'en-tête selon l'étape. */
+  const headerTitle = isEditStep
+    ? 'Edit'
+    : t.news.compose.createTitle
+
+  /* Icône du bouton retour : close en sélection, flèche sinon. */
+  const backIcon = step === 'select' ? 'close' : 'arrow-back'
+
+  /* Comportement du bouton droit. */
+  const handleRightPress = useCallback(() => {
+    if (isCaptionStep) {
+      handlePublish()
+    } else if (isEditStep) {
+      setStep('caption')
+    } else {
+      /* select → edit */
+      setEditingIndex(0)
+      setStep('edit')
+    }
+  }, [isCaptionStep, isEditStep, handlePublish])
+
+  const rightDisabled = isCaptionStep ? !hasContent : isEditStep ? false : media.length === 0
+  const rightLabel = isCaptionStep
+    ? t.news.compose.publish
+    : t.news.compose.next
+
   return (
     <View style={[styles.screen, isCaptionStep && styles.screenLight]}>
       <SafeAreaView edges={['top']} style={styles.safe}>
-        {/* En-tête du flux : sombre à la sélection, clair à la légende. */}
+        {/* En-tête du flux : sombre à la sélection/édition, clair à la légende. */}
         <View style={[styles.header, { borderBottomColor: headerColor.hairline }]}>
           <Pressable
             onPress={handleBack}
@@ -202,7 +235,7 @@ export default function CreateScreen() {
             style={({ pressed }) => [styles.headerBtn, pressed && styles.pressed]}
           >
             <Ionicons
-              name={isCaptionStep ? 'arrow-back' : 'close'}
+              name={backIcon}
               size={26}
               color={headerColor.textPrimary}
             />
@@ -216,22 +249,22 @@ export default function CreateScreen() {
             ]}
             numberOfLines={1}
           >
-            {t.news.compose.createTitle}
+            {headerTitle}
           </Text>
 
           <Pressable
-            onPress={isCaptionStep ? handlePublish : () => setStep('caption')}
-            disabled={isCaptionStep ? !hasContent : media.length === 0}
+            onPress={handleRightPress}
+            disabled={rightDisabled}
             accessibilityRole="button"
             style={({ pressed }) => [styles.headerBtn, pressed && styles.pressed]}
           >
             <Text
               style={[
                 styles.headerAction,
-                (isCaptionStep ? !hasContent : media.length === 0) && styles.headerActionDisabled,
+                rightDisabled && styles.headerActionDisabled,
               ]}
             >
-              {isCaptionStep ? t.news.compose.publish : t.news.compose.next}
+              {rightLabel}
             </Text>
           </Pressable>
         </View>
@@ -244,6 +277,17 @@ export default function CreateScreen() {
             onToggle={handleToggle}
             onCapture={handleCapture}
             onPickText={startTextPost}
+          />
+        ) : isEditStep && media[editingIndex] ? (
+          <EditScreen
+            media={media[editingIndex]}
+            onMediaChange={(updated) => {
+              setMedia((prev) => {
+                const next = [...prev]
+                next[editingIndex] = updated
+                return next
+              })
+            }}
           />
         ) : isPublishing ? (
           <PublishProgress progress={progress} />
