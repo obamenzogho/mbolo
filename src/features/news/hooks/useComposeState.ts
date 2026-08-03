@@ -33,6 +33,46 @@ export interface SelectedMedia {
   duration?: number | null
   /** Vignette locale : l'URI d'une vidéo ne s'affiche pas dans <Image>. */
   thumbnailUri?: string
+
+  /* ── Champs d'édition (optionnels, portés du prototype createPost-instagram) ──
+     Les anciens chemins (caméra, composeur riche) ne les remplissent pas :
+     valeur par défaut = pas d'édition. Voir src/features/create/types/editing.ts
+     pour les types complets. */
+
+  /** Paramètres de recadrage / rotation. */
+  crop?: {
+    aspect: number   // 0 = original, 1 = carré, 0.8 = 4:5…
+    rotation: number // degrés (straighten + increments 90°)
+    flipH: boolean
+    flipV: boolean
+  }
+  /** Filtre Instagram appliqué (id du filtre, ex 'clarendon'). */
+  filterId?: string
+  /** Intensité du filtre (0-100). */
+  filterIntensity?: number
+  /** Ajustements manuels (brightness, contrast, etc.). */
+  adjustments?: {
+    brightness: number
+    contrast: number
+    saturation: number
+    warmth: number
+    fade: number
+    highlights: number
+    shadows: number
+    tint: number
+    sharpen: number
+    vignette: number
+  }
+  /** Effet appliqué (id, ex 'ef-vintage'). */
+  effectId?: string
+  /** Intensité de l'effet (0-100). */
+  effectIntensity?: number
+  /** Overlays texte, sticker, dessin. */
+  overlay?: Array<
+    | { id: string; kind: 'stroke'; points: { x: number; y: number }[]; color: string; size: number }
+    | { id: string; kind: 'text'; text: string; x: number; y: number; color: string; fontId: string; size: number }
+    | { id: string; kind: 'sticker'; emoji: string; x: number; y: number; scale: number }
+  >
 }
 
 export interface ComposeState {
