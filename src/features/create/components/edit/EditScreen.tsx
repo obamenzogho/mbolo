@@ -4,9 +4,9 @@
    Edit (adjustments), Effect, Draw, Text, Sticker.
 
    Layout (de haut en bas) :
-   1. Preview — prend ~55% de l'espace, image centrée
-   2. Tabs — barre horizontale fine (textes uppercase)
-   3. Panel — prend l'espace restant, contenu scrollable
+   1. Preview — flex:1, prend tout l'espace restant
+   2. Tabs — barre horizontale fine (hauteur fixe ~44px)
+   3. Panel — contenu du tab actif (hauteur variable, scrollable)
 
    Modifie directement les champs d'édition de SelectedMedia via
    onMediaChange. L'application réelle des filtres/ajustements se
@@ -159,23 +159,21 @@ export const EditScreen = memo(function EditScreen({
   ])
 
   /* ── Dimensions du preview ───────────────────────────────────────
-     Le preview prend ~55% de la hauteur disponible. L'image est
+     Le preview prend flex:1 (tout l'espace restant). L'image est
      centrée dans cet espace avec un max-width de 330px. */
-  const availableHeight = screenHeight - 60 // header
-  const previewHeight = Math.round(availableHeight * 0.55)
   const previewMaxW = Math.min(screenWidth - 24, 330)
 
   return (
     <View style={styles.root}>
-      {/* Aperçu — hauteur fixe, pas flex */}
-      <View style={[styles.previewWrap, { height: previewHeight }]}>
+      {/* Aperçu — flex:1, prend tout l'espace au-dessus des onglets */}
+      <View style={styles.previewWrap}>
         <EditPreview
           uri={media.uri}
           crop={crop}
           adjustments={adjustments}
           effectId={effectId}
           containerWidth={previewMaxW}
-          containerHeight={previewHeight - 24}
+          containerHeight={screenHeight * 0.6}
         />
       </View>
 
@@ -202,14 +200,10 @@ export const EditScreen = memo(function EditScreen({
         </ScrollView>
       </View>
 
-      {/* Panneau — prend l'espace restant, scrollable si besoin */}
-      <ScrollView
-        style={styles.panelScroll}
-        contentContainerStyle={styles.panelContent}
-        showsVerticalScrollIndicator={false}
-      >
+      {/* Panneau — prend l'espace restant en bas, scrollable */}
+      <View style={styles.panel}>
         {panel}
-      </ScrollView>
+      </View>
     </View>
   )
 })
@@ -219,14 +213,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: createColors.canvas,
   },
-  /* Preview : hauteur calculée dynamiquement, contenu centré */
+  /* Preview : flex:1 pour prendre tout l'espace disponible */
   previewWrap: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 12,
     paddingVertical: 8,
+    minHeight: 150,
   },
-  /* Tabs : barre fine sans bordure visible (la séparation est subtile) */
+  /* Tabs : barre fine avec séparation subtile */
   tabsContainer: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: createColors.hairline,
@@ -253,11 +249,9 @@ const styles = StyleSheet.create({
   tabLabelActive: {
     color: createColors.textPrimary,
   },
-  /* Panel : scrollable, padding uniforme */
-  panelScroll: {
+  /* Panel : prend l'espace restant, scrollable si besoin */
+  panel: {
     flex: 1,
-  },
-  panelContent: {
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 20,
