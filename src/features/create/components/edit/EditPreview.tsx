@@ -3,9 +3,12 @@
    Affiche l'image avec les transformations de base (aspect ratio,
    rotation, flip). Les filtres/ajustements sont approximés par des
    overlays pour le preview ; l'application réelle se fait au moment
-   de l'upload via expo-image-manipulator. */
+   de l'upload via expo-image-manipulator.
 
-import { memo, useMemo } from 'react'
+   Le composant mesure son conteneur via onLayout pour s'adapter
+   à l'espace réellement disponible (pas une valeur fixe). */
+
+import { memo, useCallback, useMemo, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { Image } from 'expo-image'
 import type { CropState, Adjustments, EffectOverlay } from '../../types/editing'
@@ -16,9 +19,6 @@ interface EditPreviewProps {
   crop: CropState
   adjustments?: Adjustments
   effectId?: string
-  /** Dimensions du conteneur parent (pour calculer l'aspect). */
-  containerWidth: number
-  containerHeight: number
 }
 
 export const EditPreview = memo(function EditPreview({
@@ -26,14 +26,26 @@ export const EditPreview = memo(function EditPreview({
   crop,
   adjustments,
   effectId,
-  containerWidth,
-  containerHeight,
 }: EditPreviewProps) {
-  /* Calcul de la taille de l'image en respectant l'aspect ratio. */
+  /* Mesure du conteneur réel via onLayout. */
+  const [box, setBox] = useState({ width: 0, height: 0 })
+
+  const onLayout = useCallback((e: { nativeEvent: { layout: { width: number; height: number } } }) => {
+    const { width, height } = e.nativeEvent.layout
+    if (width > 0 && height > 0) {
+      setBox({ width, height })
+    }
+  }, [])
+
+  /* Calcul de la taille de l'image en respectant l'aspect ratio
+     et les limites du conteneur réel. */
   const { width, height } = useMemo(() => {
+    if (box.width === 0 || box.height === 0) {
+      return { width: 0, height: 0 }
+    }
     const ratio = crop.aspect > 0 ? crop.aspect : 1 // fallback: carré si original
-    const maxW = containerWidth
-    const maxH = containerHeight
+    const maxW = box.width
+    const maxH = box.height
     let w = maxW
     let h = maxW / ratio
     if (h > maxH) {
@@ -41,7 +53,7 @@ export const EditPreview = memo(function EditPreview({
       w = maxH * ratio
     }
     return { width: Math.round(w), height: Math.round(h) }
-  }, [crop.aspect, containerWidth, containerHeight])
+  }, [crop.aspect, box.width, box.height])
 
   /* Transformation CSS approximée pour le preview. */
   const transform = useMemo(() => {
@@ -60,21 +72,23 @@ export const EditPreview = memo(function EditPreview({
   }, [effect.overlay])
 
   return (
-    <View style={[styles.container, { width, height }]}>
-      <Image
-        source={{ uri }}
-        style={[
-          styles.image,
-          { width, height },
-          transform ? { transform: [{ rotate: '0deg' }, { scale: 1 }] } : undefined,
-        ]}
-        contentFit="cover"
-        transition={0}
-      />
-
-      {/* Overlay d'effet */}
-      {overlayStyle ? (
-        <View style={[styles.effectOverlay, { width, height }, overlayStyle]} />
+    <View style={styles.container} onLayout={onLayout}>
+      {width > 0 && height > 0 ? (
+        <>
+          <Image
+            source={{ uri }}
+            style={[
+              styles.image,
+              { width, height },
+              transform ? { transform: [{ rotate: '0deg' }, { scale: 1 }] } : undefined,
+            ]}
+            contentFit="cover"
+            transition={0}
+          />
+          {overlayStyle ? (
+            <View style={[styles.effectOverlay, { width, height }, overlayStyle]} />
+          ) : null}
+        </>
       ) : null}
     </View>
   )
@@ -85,12 +99,10 @@ function getOverlayStyle(type: EffectOverlay): object {
     case 'grain':
       return {
         backgroundColor: 'rgba(128,128,128,0.15)',
-        // Pas de vrai grain sans Skia — on approxime avec une texture
       }
     case 'leak':
       return {
         backgroundColor: 'transparent',
-        // Gradient radial approximé
         borderBottomColor: 'rgba(255,138,0,0.3)',
       }
     case 'prism':
@@ -104,9 +116,12 @@ function getOverlayStyle(type: EffectOverlay): object {
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 4,
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
     overflow: 'hidden',
     backgroundColor: '#171717',
+    borderRadius: 4,
   },
   image: {
     borderRadius: 4,

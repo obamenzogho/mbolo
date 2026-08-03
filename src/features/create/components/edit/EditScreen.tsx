@@ -13,7 +13,7 @@
    fait au moment de l'upload via expo-image-manipulator. */
 
 import { memo, useCallback, useMemo, useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import type { SelectedMedia } from '@/features/news/hooks/useComposeState'
 import type { CropState, Adjustments, OverlayEl } from '../../types/editing'
 import { DEFAULT_CROP, DEFAULT_ADJUSTMENTS } from '../../types/editing'
@@ -50,7 +50,6 @@ export const EditScreen = memo(function EditScreen({
 }: EditScreenProps) {
   const [tab, setTab] = useState<Tab>('crop')
   const [selectedOverlayId, setSelectedOverlayId] = useState<string | null>(null)
-  const { width: screenWidth, height: screenHeight } = useWindowDimensions()
 
   const crop: CropState = media.crop ?? DEFAULT_CROP
   const adjustments: Adjustments = media.adjustments ?? DEFAULT_ADJUSTMENTS
@@ -159,9 +158,8 @@ export const EditScreen = memo(function EditScreen({
   ])
 
   /* ── Dimensions du preview ───────────────────────────────────────
-     Le preview prend flex:1 (tout l'espace restant). L'image est
-     centrée dans cet espace avec un max-width de 330px. */
-  const previewMaxW = Math.min(screenWidth - 24, 330)
+     Le preview prend flex:1 (tout l'espace restant). EditPreview
+     mesure lui-même son conteneur via onLayout. */
 
   return (
     <View style={styles.root}>
@@ -172,8 +170,6 @@ export const EditScreen = memo(function EditScreen({
           crop={crop}
           adjustments={adjustments}
           effectId={effectId}
-          containerWidth={previewMaxW}
-          containerHeight={screenHeight * 0.6}
         />
       </View>
 
@@ -213,7 +209,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: createColors.canvas,
   },
-  /* Preview : flex:1 pour prendre tout l'espace disponible */
+  /* Preview : flex:1 pour prendre tout l'espace disponible.
+     overflow hidden empêche l'image de déborder sur les onglets
+     quand le crop change l'aspect ratio. */
   previewWrap: {
     flex: 1,
     alignItems: 'center',
@@ -221,6 +219,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     minHeight: 150,
+    overflow: 'hidden',
   },
   /* Tabs : barre fine avec séparation subtile */
   tabsContainer: {
