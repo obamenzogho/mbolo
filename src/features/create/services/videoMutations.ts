@@ -8,7 +8,14 @@
    `videoURL` est un fichier rendu (ffmpeg) uploadé sur Cloudinary : le feed
    n'applique aucun montage à la lecture. */
 
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
+import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  serverTimestamp,
+  updateDoc,
+} from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { captureException } from '@/lib/sentry'
 import type { NewsPostVisibility } from '@/features/news/types'
@@ -26,6 +33,7 @@ export interface VideoDraft {
   hashtags: string[]
   visibility: NewsPostVisibility
   commentsEnabled: boolean
+  durationMs?: number
   place?: string
   lat?: number
   lng?: number
@@ -59,5 +67,91 @@ export async function createVideo(draft: VideoDraft): Promise<string | null> {
       { context: 'news.createVideo' },
     )
     return null
+  }
+}
+
+export interface VideoUpdateDraft {
+  videoURL?: string
+  thumbnailURL?: string
+  coverURL?: string
+  description: string
+  hashtags: string[]
+  visibility: NewsPostVisibility
+  commentsEnabled: boolean
+  place?: string
+  lat?: number
+  lng?: number
+  geohash?: string
+  soundId?: string
+  durationMs?: number
+}
+
+export interface StoredVideo {
+  id: string
+  userId: string
+  videoURL: string
+  thumbnailURL?: string
+  coverURL?: string
+  description: string
+  hashtags: string[]
+  visibility: NewsPostVisibility
+  commentsEnabled: boolean
+  durationMs?: number
+}
+
+export async function loadVideo(
+  videoId: string,
+): Promise<StoredVideo | null> {
+  try {
+    const snapshot = await getDoc(doc(db, 'videos', videoId))
+
+    if (!snapshot.exists()) return null
+
+    const data = snapshot.data()
+
+    return {
+      id: snapshot.id,
+      userId: data.userId,
+      videoURL: data.videoURL,
+      thumbnailURL: data.thumbnailURL,
+      coverURL: data.coverURL,
+      description: data.description ?? '',
+      hashtags: Array.isArray(data.hashtags) ? data.hashtags : [],
+      visibility: data.visibility ?? 'public',
+      commentsEnabled: data.commentsEnabled !== false,
+      durationMs: data.durationMs,
+    }
+  } catch (error) {
+    captureException(
+      error instanceof Error ? error : new Error(String(error)),
+      { context: 'news.loadVideo', videoId },
+    )
+
+    return null
+  }
+}
+
+export async function updateVideo(
+  videoId: string,
+  draft: VideoUpdateDraft,
+): Promise<boolean> {
+  try {
+    const fields = Object.fromEntries(
+      Object.entries({
+        ...draft,
+        updatedAt: serverTimestamp(),
+      }).filter(([, value]) => value !== undefined),
+    )
+
+    await updateDoc(doc(db, 'videos', videoId), fields)
+
+    return true
+  } catch (error) {
+    captureException(
+      error instanceof Error ? error : new Error(String(error)),
+      { context: 'news.updateVideo', videoId },
+    )
+
+    return false
   }
 }

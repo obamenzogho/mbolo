@@ -14,12 +14,13 @@ import { uploadToCloudinary, generateThumbnailURL } from '@/lib/cloudinary'
 import { captureException } from '@/lib/sentry'
 import {
   createPost,
+  updatePost,
   extractHashtags,
   loadPostAuthor,
   type PostAuthor,
 } from '@/features/news/services/postMutations'
 import type { NewsPostMedia } from '@/features/news/types'
-import { createVideo } from '../services/videoMutations'
+import { createVideo, updateVideo } from '../services/videoMutations'
 import type { CreateDraft } from '../types'
 import { renderMedia, clearRenderCache } from '../utils/renderMedia'
 
@@ -44,6 +45,15 @@ interface PublishOptions {
 
 /** Succès `{ kind, id }`, ou la raison d'échec. */
 export type CreatePublishOutcome = CreateResult | CreatePublishError
+
+export interface EditTarget {
+  kind: 'post' | 'video'
+  id: string
+}
+
+export type UpdateOutcome =
+  | CreateResult
+  | CreatePublishError
 
 export function useCreatePublish() {
   const lastPublishAt = useRef(0)
@@ -107,6 +117,7 @@ export function useCreatePublish() {
             lat: draft.location?.lat,
             lng: draft.location?.lng,
             soundId: draft.soundId,
+            durationMs: video.duration ?? undefined,
           })
 
           if (!id) return 'write'
@@ -170,7 +181,150 @@ export function useCreatePublish() {
     [],
   )
 
-  return { publish }
+  const update = useCallback(
+    async (
+      target: EditTarget,
+      draft: CreateDraft,
+      author: CreateAuthor,
+      options: PublishOptions = {},
+    ): Promise<UpdateOutcome> => {
+      if (!author.uid) return 'auth'
+
+      const step = (progress: number) => {
+        options.onProgress?.(progress)
+      }
+
+      if (target.kind === 'video') {
+        const media = draft.media[0]
+
+        if (!media || media.type !== 'video') {
+          return 'write'
+        }
+
+        let rendered
+
+        try {
+          rendered = await renderMedia(media, {
+            overlayUri: media.overlayUri ?? null,
+            onProgress: (progress) => step(progress * 0.25),
+          })
+        } catch {
+          return 'render'
+        }
+
+        let videoURL: string | null = null
+
+        try {
+          videoURL = await uploadToCloudinary(rendered.uri, 'video', {
+            folder: 'reels',
+            timeout: 180000,
+            onProgress: (progress) => {
+              step(0.25 + progress * 0.6)
+            },
+          })
+        } catch {
+          return 'upload'
+        }
+
+        if (!videoURL) return 'upload'
+
+        const trimStart = media.video?.trimStart ?? 0
+        const coverTime = Math.max(
+          0,
+          (media.video?.coverTime ?? 1000) - trimStart,
+        )
+
+        const thumbnailURL =
+          generateThumbnailURL(videoURL, {
+            startOffset: coverTime / 1000,
+          }) || undefined
+
+        const updated = await updateVideo(target.id, {
+          videoURL,
+          thumbnailURL,
+          description: draft.text.trim(),
+          hashtags: extractHashtags(draft.text),
+          visibility: draft.visibility,
+          commentsEnabled: draft.commentsEnabled,
+          durationMs: media.duration ?? undefined,
+        })
+
+        if (!updated) return 'write'
+
+        step(1)
+
+        return {
+          kind: 'video',
+          id: target.id,
+        }
+      }
+
+      const renderedMedia: NewsPostMedia[] = []
+
+      for (const item of draft.media) {
+        let rendered
+
+        try {
+          rendered = await renderMedia(item, {
+            overlayUri: item.overlayUri ?? null,
+            onProgress: (progress) => step(progress * 0.5),
+          })
+        } catch {
+          return 'render'
+        }
+
+        let url: string | null = null
+
+        try {
+          url = await uploadToCloudinary(rendered.uri, 'image', {
+            onProgress: (progress) => step(0.5 + progress * 0.4),
+          })
+        } catch {
+          return 'upload'
+        }
+
+        if (!url) return 'upload'
+
+        renderedMedia.push({
+          url,
+          type: 'image',
+          width: rendered.width,
+          height: rendered.height,
+        })
+      }
+
+      const updated = await updatePost(target.id, {
+        text: draft.text.trim(),
+        format:
+          renderedMedia.length === 0
+            ? 'text'
+            : renderedMedia.length === 1
+              ? 'image'
+              : 'carousel',
+        media: renderedMedia,
+        visibility: draft.visibility,
+        commentsEnabled: draft.commentsEnabled,
+        background: 'none',
+        location: draft.location,
+        mood: null,
+        poll: null,
+        article: null,
+        videoShare: null,
+      })
+
+      if (!updated) return 'write'
+
+      step(1)
+
+      return {
+        kind: 'post',
+        id: target.id,
+      }
+    },
+    [],
+  )
+
+  return { publish, update }
 }
 
 export type { PostAuthor }

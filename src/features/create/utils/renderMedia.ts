@@ -36,6 +36,13 @@ export interface RenderResult {
   height: number
 }
 
+export class RenderMediaError extends Error {
+  constructor(message = 'Le rendu du média a échoué') {
+    super(message)
+    this.name = 'RenderMediaError'
+  }
+}
+
 /** Exécute FFmpeg et résout avec le code de retour. */
 function run(
   args: string[],
@@ -75,7 +82,6 @@ export async function renderPhoto(
   media: SelectedMedia,
   options: RenderOptions = {},
 ): Promise<RenderResult> {
-  const fallback = { uri: media.uri, width: media.width ?? 0, height: media.height ?? 0 }
   const input = {
     width: media.width ?? 1080,
     height: media.height ?? 1080,
@@ -89,7 +95,9 @@ export async function renderPhoto(
     maxSize: options.maxSize ?? 1440,
   }
 
-  if (!needsRender({ ...input, overlayCount: media.overlay?.length ?? 0 })) return fallback
+  if (!needsRender({ ...input, overlayCount: media.overlay?.length ?? 0 })) {
+    return { uri: media.uri, width: media.width ?? 0, height: media.height ?? 0 }
+  }
 
   try {
     await ensureDir()
@@ -110,12 +118,15 @@ export async function renderPhoto(
 
     const ok = await run(args, 0, options)
     options.onProgress?.(1)
-    return ok ? { uri: out, width, height } : fallback
+    if (!ok) {
+      throw new RenderMediaError('Impossible de rendre la photo')
+    }
+    return { uri: out, width, height }
   } catch (error) {
     captureException(error instanceof Error ? error : new Error(String(error)), {
       context: 'create.renderPhoto',
     })
-    return fallback
+    throw new RenderMediaError('Erreur inattendue lors du rendu photo')
   }
 }
 
@@ -125,7 +136,6 @@ export async function renderVideo(
   media: SelectedMedia,
   options: RenderOptions = {},
 ): Promise<RenderResult> {
-  const fallback = { uri: media.uri, width: media.width ?? 0, height: media.height ?? 0 }
   const video = media.video
   const trimStart = Math.max(0, video?.trimStart ?? 0)
   const trimEnd = video?.trimEnd ?? media.duration ?? 0
@@ -146,7 +156,7 @@ export async function renderVideo(
 
   const muted = video?.muted ?? false
   if (!trimmed && !muted && !needsRender({ ...input, overlayCount: media.overlay?.length ?? 0 })) {
-    return fallback
+    return { uri: media.uri, width: media.width ?? 0, height: media.height ?? 0 }
   }
 
   try {
@@ -177,12 +187,15 @@ export async function renderVideo(
 
     const ok = await run(args, durationMs, options)
     options.onProgress?.(1)
-    return ok ? { uri: out, width, height } : fallback
+    if (!ok) {
+      throw new RenderMediaError('Impossible de rendre la vidéo')
+    }
+    return { uri: out, width, height }
   } catch (error) {
     captureException(error instanceof Error ? error : new Error(String(error)), {
       context: 'create.renderVideo',
     })
-    return fallback
+    throw new RenderMediaError('Erreur inattendue lors du rendu vidéo')
   }
 }
 

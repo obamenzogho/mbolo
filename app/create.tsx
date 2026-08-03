@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { auth } from '@/lib/firebase'
+import * as FileSystem from 'expo-file-system/legacy'
 import { useI18n } from '@/i18n'
 import { getCurrentPlace } from '@/features/location/locationService'
 import { PublishProgress } from '@/features/news/components/compose/PublishProgress'
@@ -20,7 +21,9 @@ import { VisibilitySheet } from '@/features/news/components/compose/VisibilitySh
 import type { SelectedMedia } from '@/features/news/hooks/useComposeState'
 import { postMotion } from '@/features/news/theme/postTokens'
 import type { NewsLocation, NewsPostVisibility } from '@/features/news/types'
-import { useCreatePublish, type CreatePublishError } from '@/features/create/hooks/useCreatePublish'
+import { loadPost } from '@/features/news/services/postMutations'
+import { loadVideo } from '@/features/create/services/videoMutations'
+import { useCreatePublish, type CreatePublishError, type EditTarget } from '@/features/create/hooks/useCreatePublish'
 import { SelectScreen } from '@/features/create/components/SelectScreen'
 import { EditScreen } from '@/features/create/components/edit/EditScreen'
 import { CaptionScreen } from '@/features/create/components/CaptionScreen'
@@ -42,13 +45,17 @@ export default function CreateScreen() {
   const { t } = useI18n()
   const user = auth.currentUser
 
-  /* Depuis la caméra : on arrive média en main, on va droit à la légende.
-     `editPostId` / `sharedUrl` (anciens chemins du composeur) ne sont pas
-     encore portés : on le dit clairement plutôt que de laisser un écran vide. */
-  const { mediaUri, mediaType, editPostId, sharedUrl } = useLocalSearchParams<{
+  const {
+    mediaUri,
+    mediaType,
+    editPostId,
+    editVideoId,
+    sharedUrl,
+  } = useLocalSearchParams<{
     mediaUri?: string
     mediaType?: string
     editPostId?: string
+    editVideoId?: string
     sharedUrl?: string
   }>()
 
@@ -63,23 +70,155 @@ export default function CreateScreen() {
   const [visibilityOpen, setVisibilityOpen] = useState(false)
   const [detectingLocation, setDetectingLocation] = useState(false)
   const [progress, setProgress] = useState(0)
+  const [editTarget, setEditTarget] = useState<EditTarget | null>(null)
+  const [loadingExisting, setLoadingExisting] = useState(false)
 
-  const { publish } = useCreatePublish()
+  const { publish, update } = useCreatePublish()
 
-  /* Média capturé avant l'arrivée (caméra) : pré-rempli, on saute le choix. */
-  useEffect(() => {
-    if (editPostId || sharedUrl) {
-      Alert.alert(
-        t.news.compose.errorTitle,
-        t.news.compose.errorUnported,
-        [{ text: 'OK', onPress: () => router.back() }],
-      )
-      return
+  async function cacheRemoteMedia(
+    uri: string,
+    id: string,
+    extension: string,
+  ): Promise<string> {
+    const base =
+      FileSystem.cacheDirectory ??
+      FileSystem.documentDirectory
+
+    if (!base) {
+      throw new Error('Répertoire cache indisponible')
     }
-    if (!mediaUri) return
-    setMedia([{ uri: mediaUri, type: mediaType === 'video' ? 'video' : 'image' }])
-    setStep('caption')
-  }, [mediaUri, mediaType, editPostId, sharedUrl, router, t])
+
+    const destination = `${base}mbolo-edit-${id}.${extension}`
+
+    const result = await FileSystem.downloadAsync(uri, destination)
+
+    return result.uri
+  }
+
+  /* Hydratation à l'arrivée : édition d'un post/vidéo existant, média
+     capturé caméra, ou rien. Le partage externe reste non porté. */
+  useEffect(() => {
+    let cancelled = false
+
+    async function hydrate() {
+      if (sharedUrl) {
+        Alert.alert(
+          t.news.compose.errorTitle,
+          t.news.compose.errorUnported,
+          [{ text: 'OK', onPress: () => router.back() }],
+        )
+        return
+      }
+
+      if (editPostId) {
+        setLoadingExisting(true)
+
+        try {
+          const existing = await loadPost(editPostId)
+
+          if (!existing || existing.userId !== auth.currentUser?.uid) {
+            throw new Error('Publication inaccessible')
+          }
+
+          const localMedia = await Promise.all(
+            existing.media.map(async (item, index) => ({
+              uri: await cacheRemoteMedia(
+                item.url,
+                `${editPostId}-${index}`,
+                item.type === 'video' ? 'mp4' : 'jpg',
+              ),
+              type: item.type === 'video' ? 'video' as const : 'image' as const,
+              width: item.width,
+              height: item.height,
+              duration: item.duration ?? null,
+            })),
+          )
+
+          if (cancelled) return
+
+          setEditTarget({ kind: 'post', id: editPostId })
+          setMedia(localMedia)
+          setText(existing.text)
+          setVisibility(existing.visibility)
+          setCommentsEnabled(existing.commentsEnabled)
+          setEditingIndex(0)
+          setStep(localMedia.length > 0 ? 'edit' : 'caption')
+        } catch {
+          Alert.alert(
+            'Erreur',
+            'Impossible de charger cette publication.',
+            [{ text: 'OK', onPress: () => router.back() }],
+          )
+        } finally {
+          if (!cancelled) setLoadingExisting(false)
+        }
+
+        return
+      }
+
+      if (editVideoId) {
+        setLoadingExisting(true)
+
+        try {
+          const existing = await loadVideo(editVideoId)
+
+          if (!existing || existing.userId !== auth.currentUser?.uid) {
+            throw new Error('Vidéo inaccessible')
+          }
+
+          const localUri = await cacheRemoteMedia(
+            existing.videoURL,
+            editVideoId,
+            'mp4',
+          )
+
+          if (cancelled) return
+
+          setEditTarget({ kind: 'video', id: editVideoId })
+          setMedia([
+            {
+              uri: localUri,
+              type: 'video',
+              thumbnailUri: existing.thumbnailURL,
+              duration: existing.durationMs ?? null,
+            },
+          ])
+          setText(existing.description)
+          setVisibility(existing.visibility)
+          setCommentsEnabled(existing.commentsEnabled)
+          setEditingIndex(0)
+          setStep('edit')
+        } catch {
+          Alert.alert(
+            'Erreur',
+            'Impossible de charger cette vidéo.',
+            [{ text: 'OK', onPress: () => router.back() }],
+          )
+        } finally {
+          if (!cancelled) setLoadingExisting(false)
+        }
+
+        return
+      }
+
+      if (!mediaUri) return
+
+      setMedia([
+        {
+          uri: mediaUri,
+          type: mediaType === 'video' ? 'video' : 'image',
+        },
+      ])
+      setEditingIndex(0)
+      setStep('edit')
+    }
+
+    void hydrate()
+
+    return () => {
+      cancelled = true
+    }
+  }, [mediaUri, mediaType, editPostId, editVideoId, sharedUrl, router, t])
 
   const selected = media[0] ?? null
   const hasContent = media.length > 0 || text.trim().length > 0
@@ -164,15 +303,16 @@ export default function CreateScreen() {
     setStep('publishing')
     setProgress(0)
 
-    const outcome = await publish(
-      { text, media, visibility, commentsEnabled, location },
-      {
-        uid: user.uid,
-        displayName:
-          user.displayName || user.email?.split('@')[0] || t.news.compose.userFallback,
-      },
-      { onProgress: setProgress },
-    )
+    const author = {
+      uid: user.uid,
+      displayName:
+        user.displayName || user.email?.split('@')[0] || t.news.compose.userFallback,
+    }
+    const draft = { text, media, visibility, commentsEnabled, location }
+
+    const outcome = editTarget
+      ? await update(editTarget, draft, author, { onProgress: setProgress })
+      : await publish(draft, author, { onProgress: setProgress })
 
     if (typeof outcome === 'object') {
       router.back()
@@ -181,7 +321,7 @@ export default function CreateScreen() {
 
     setStep('caption')
     handleError(outcome)
-  }, [user, text, media, visibility, commentsEnabled, location, publish, router, t, handleError])
+  }, [user, text, media, visibility, commentsEnabled, location, editTarget, publish, update, router, t, handleError])
 
   const handleBack = useCallback(() => {
     if (step === 'caption') {

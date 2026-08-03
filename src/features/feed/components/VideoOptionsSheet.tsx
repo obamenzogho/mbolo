@@ -8,6 +8,7 @@ import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from '@gorhom/botto
 import { Ionicons } from '@expo/vector-icons'
 import * as Clipboard from 'expo-clipboard'
 import { doc, deleteDoc } from 'firebase/firestore'
+import { useRouter } from 'expo-router'
 import { db, auth } from '../../../lib/firebase'
 import { captureException } from '../../../lib/sentry'
 import { colors } from '../../../lib/theme'
@@ -27,6 +28,7 @@ export default function VideoOptionsSheet({ videoId, isOwner, contentOwnerId, co
   const [reportOpen, setReportOpen] = useState(false)
   const insets = useSafeAreaInsets()
   const hasOpenedRef = useRef(false)
+  const router = useRouter()
 
   const handleClose = useCallback(() => {
     hasOpenedRef.current = false
@@ -65,6 +67,14 @@ export default function VideoOptionsSheet({ videoId, isOwner, contentOwnerId, co
       { text: 'Confirmer', onPress: () => handleClose() },
     ])
   }, [handleClose])
+
+  const handleEdit = useCallback(() => {
+    handleClose()
+    router.push({
+      pathname: '/create',
+      params: { editVideoId: videoId },
+    })
+  }, [videoId, handleClose, router])
 
   const handleDelete = useCallback(() => {
     Alert.alert('Supprimer la vidéo', 'Cette action est irréversible.', [
@@ -149,6 +159,10 @@ export default function VideoOptionsSheet({ videoId, isOwner, contentOwnerId, co
         {isOwner && (
           <>
             <View style={styles.separator} />
+            <TouchableOpacity style={styles.optionRow} onPress={handleEdit}>
+              <Ionicons name="create-outline" size={22} color={colors.textPrimary} />
+              <Text style={styles.optionText}>Modifier</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.optionRow} onPress={handleDelete}>
               <Ionicons name="trash-outline" size={22} color={colors.error} />
               <Text style={[styles.optionText, { color: colors.error }]}>Supprimer la vidéo</Text>

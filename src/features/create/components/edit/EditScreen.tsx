@@ -14,6 +14,7 @@
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { captureRef } from 'react-native-view-shot'
 import type { SelectedMedia } from '@/features/news/hooks/useComposeState'
 import type { CropState, Adjustments, OverlayEl, VideoEdit } from '../../types/editing'
 import { DEFAULT_CROP, DEFAULT_ADJUSTMENTS, DEFAULT_VIDEO_EDIT } from '../../types/editing'
@@ -44,7 +45,7 @@ export const EditScreen = memo(function EditScreen({
   const isVideo = media.type === 'video'
   const [tab, setTab] = useState<Tab>(isVideo ? 'trim' : 'crop')
   const [selectedOverlayId, setSelectedOverlayId] = useState<string | null>(null)
-  const overlayRef = useRef<unknown>(null)
+  const overlayRef = useRef<View>(null)
 
   const crop: CropState = media.crop ?? DEFAULT_CROP
   const adjustments: Adjustments = media.adjustments ?? DEFAULT_ADJUSTMENTS
@@ -53,6 +54,7 @@ export const EditScreen = memo(function EditScreen({
   const effectId = media.effectId ?? 'ef-none'
   const effectIntensity = media.effectIntensity ?? 100
   const overlay: OverlayEl[] = (media.overlay as OverlayEl[]) ?? []
+  const overlayKey = JSON.stringify(overlay)
   const videoEdit: VideoEdit = { ...DEFAULT_VIDEO_EDIT, ...(media.video ?? {}) }
 
   /* Onglets conditionnels : une vidéo a tout à faire d'un trim, rien à
@@ -110,6 +112,45 @@ export const EditScreen = memo(function EditScreen({
     (els: OverlayEl[]) => onMediaChange({ ...media, overlay: els }),
     [media, onMediaChange],
   )
+
+  /* Capture la couche overlay (texte/sticker/dessin) en PNG transparent
+     chaque fois qu'elle change. Le PNG est stocké dans media.overlayUri
+     et composité par FFmpeg au moment de l'upload. */
+  useEffect(() => {
+    let cancelled = false
+    const frame = requestAnimationFrame(async () => {
+      /* Cas vide : si des overlays existaient, il faut vider overlayUri
+         pour que FFmpeg ne composite pas un PNG périmé. On traite ça en
+         premier, avant de tester la ref (qui est null quand la couche
+         n'est pas rendue). */
+      if (overlay.length === 0) {
+        if (media.overlayUri) {
+          onMediaChange({ ...media, overlayUri: null })
+        }
+        return
+      }
+      if (!overlayRef.current) return
+
+      try {
+        const uri = await captureRef(overlayRef, {
+          format: 'png',
+          quality: 1,
+          result: 'tmpfile',
+        })
+
+        if (!cancelled) {
+          onMediaChange({ ...media, overlayUri: uri })
+        }
+      } catch (error) {
+        console.warn('[overlay capture]', error)
+      }
+    })
+
+    return () => {
+      cancelled = true
+      cancelAnimationFrame(frame)
+    }
+  }, [overlayKey])
 
   const updateVideoEdit = useCallback(
     (v: VideoEdit) => onMediaChange({ ...media, video: v }),

@@ -131,7 +131,7 @@ export const EditPreview = memo(function EditPreview({
             <View
               ref={overlayRef as React.RefObject<View>}
               collapsable={false}
-              pointerEvents="none"
+              pointerEvents="auto"
               style={[styles.overlayLayer, overlayFrame]}
             >
               {overlay!.map((el) => (
