@@ -3,6 +3,11 @@
    Port du prototype createPost-instagram. 7 onglets : Crop, Filter,
    Edit (adjustments), Effect, Draw, Text, Sticker.
 
+   Layout (de haut en bas) :
+   1. Preview — prend ~55% de l'espace, image centrée
+   2. Tabs — barre horizontale fine (textes uppercase)
+   3. Panel — prend l'espace restant, contenu scrollable
+
    Modifie directement les champs d'édition de SelectedMedia via
    onMediaChange. L'application réelle des filtres/ajustements se
    fait au moment de l'upload via expo-image-manipulator. */
@@ -45,7 +50,7 @@ export const EditScreen = memo(function EditScreen({
 }: EditScreenProps) {
   const [tab, setTab] = useState<Tab>('crop')
   const [selectedOverlayId, setSelectedOverlayId] = useState<string | null>(null)
-  const { width: screenWidth } = useWindowDimensions()
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions()
 
   const crop: CropState = media.crop ?? DEFAULT_CROP
   const adjustments: Adjustments = media.adjustments ?? DEFAULT_ADJUSTMENTS
@@ -153,49 +158,58 @@ export const EditScreen = memo(function EditScreen({
     updateOverlay,
   ])
 
-  /* ── Preview dimensions ───────────────────────────────────────── */
-  const previewMaxW = screenWidth - 24 // padding 12 each side
-  const previewMaxH = previewMaxW * 1.2 // espace pour le preview
+  /* ── Dimensions du preview ───────────────────────────────────────
+     Le preview prend ~55% de la hauteur disponible. L'image est
+     centrée dans cet espace avec un max-width de 330px. */
+  const availableHeight = screenHeight - 60 // header
+  const previewHeight = Math.round(availableHeight * 0.55)
+  const previewMaxW = Math.min(screenWidth - 24, 330)
 
   return (
     <View style={styles.root}>
-      {/* Aperçu */}
-      <View style={styles.previewWrap}>
+      {/* Aperçu — hauteur fixe, pas flex */}
+      <View style={[styles.previewWrap, { height: previewHeight }]}>
         <EditPreview
           uri={media.uri}
           crop={crop}
           adjustments={adjustments}
           effectId={effectId}
-          containerWidth={Math.min(previewMaxW, 330)}
-          containerHeight={Math.min(previewMaxH, 400)}
+          containerWidth={previewMaxW}
+          containerHeight={previewHeight - 24}
         />
       </View>
 
-      {/* Onglets */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.tabsRow}
-      >
-        {TABS.map((t) => (
-          <Pressable
-            key={t.id}
-            onPress={() => setTab(t.id)}
-            style={[styles.tab, tab === t.id && styles.tabActive]}
-          >
-            <Text
-              style={[styles.tabLabel, tab === t.id && styles.tabLabelActive]}
+      {/* Onglets — barre fine, hauteur fixe */}
+      <View style={styles.tabsContainer}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabsRow}
+        >
+          {TABS.map((t) => (
+            <Pressable
+              key={t.id}
+              onPress={() => setTab(t.id)}
+              style={[styles.tab, tab === t.id && styles.tabActive]}
             >
-              {t.label}
-            </Text>
-          </Pressable>
-        ))}
-      </ScrollView>
-
-      {/* Panneau de l'onglet actif */}
-      <View style={styles.panel}>
-        {panel}
+              <Text
+                style={[styles.tabLabel, tab === t.id && styles.tabLabelActive]}
+              >
+                {t.label}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
       </View>
+
+      {/* Panneau — prend l'espace restant, scrollable si besoin */}
+      <ScrollView
+        style={styles.panelScroll}
+        contentContainerStyle={styles.panelContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {panel}
+      </ScrollView>
     </View>
   )
 })
@@ -205,23 +219,25 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: createColors.canvas,
   },
+  /* Preview : hauteur calculée dynamiquement, contenu centré */
   previewWrap: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 12,
-    minHeight: 200,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
-  tabsRow: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    gap: 16,
+  /* Tabs : barre fine sans bordure visible (la séparation est subtile) */
+  tabsContainer: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: createColors.hairline,
   },
+  tabsRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 20,
+  },
   tab: {
-    paddingHorizontal: 2,
-    paddingBottom: 6,
+    paddingBottom: 4,
   },
   tabActive: {
     borderBottomWidth: 2,
@@ -237,10 +253,13 @@ const styles = StyleSheet.create({
   tabLabelActive: {
     color: createColors.textPrimary,
   },
-  panel: {
+  /* Panel : scrollable, padding uniforme */
+  panelScroll: {
+    flex: 1,
+  },
+  panelContent: {
     paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 16,
-    minHeight: 100,
+    paddingTop: 12,
+    paddingBottom: 20,
   },
 })
