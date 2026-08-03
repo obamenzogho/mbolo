@@ -68,7 +68,7 @@ export const AdjustTab = memo(function AdjustTab({
             >
               <Ionicons
                 name={t.icon}
-                size={22}
+                size={26}
                 color={active ? createColors.textPrimary : createColors.textSecondary}
               />
               <Text
@@ -117,21 +117,21 @@ const styles = StyleSheet.create({
   toolBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    gap: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     borderRadius: 6,
-    minWidth: 52,
+    minWidth: 56,
   },
   toolLabel: {
-    fontSize: 10,
+    fontSize: 11,
     color: createColors.textSecondary,
   },
   toolLabelActive: {
     color: createColors.textPrimary,
   },
   toolValue: {
-    fontSize: 9,
+    fontSize: 10,
     color: createColors.accent,
   },
   sliderRow: {

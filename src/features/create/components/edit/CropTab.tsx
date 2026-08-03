@@ -77,7 +77,7 @@ export const CropTab = memo(function CropTab({ crop, onChange }: CropTabProps) {
         ))}
 
         <Pressable onPress={rotate90} style={styles.toolBtn}>
-          <Ionicons name="refresh" size={20} color={createColors.textSecondary} />
+          <Ionicons name="refresh" size={26} color={createColors.textSecondary} />
           <Text style={styles.toolLabel}>Rotate</Text>
         </Pressable>
 
@@ -87,7 +87,7 @@ export const CropTab = memo(function CropTab({ crop, onChange }: CropTabProps) {
         >
           <Ionicons
             name="swap-horizontal"
-            size={20}
+            size={26}
             color={crop.flipH ? createColors.accent : createColors.textSecondary}
           />
           <Text
@@ -106,7 +106,7 @@ export const CropTab = memo(function CropTab({ crop, onChange }: CropTabProps) {
         >
           <Ionicons
             name="swap-vertical"
-            size={20}
+            size={26}
             color={crop.flipV ? createColors.accent : createColors.textSecondary}
           />
           <Text
@@ -141,23 +141,23 @@ export const CropTab = memo(function CropTab({ crop, onChange }: CropTabProps) {
 
 function AspectGlyph({ kind, active }: { kind: string; active: boolean }) {
   const color = active ? createColors.accent : createColors.textSecondary
-  const size = 20
+  const size = 26
 
   if (kind === 'free') {
     return (
       <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-        <Ionicons name="crop-outline" size={18} color={color} />
+        <Ionicons name="crop-outline" size={24} color={color} />
       </View>
     )
   }
 
   const dims: Record<string, [number, number]> = {
-    square: [14, 14],
-    portrait: [11, 17],
-    landscape: [17, 9],
-    wide: [18, 8],
+    square: [16, 16],
+    portrait: [13, 20],
+    landscape: [20, 11],
+    wide: [22, 10],
   }
-  const [w, h] = dims[kind] ?? [14, 14]
+  const [w, h] = dims[kind] ?? [16, 16]
 
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
@@ -183,17 +183,17 @@ const styles = StyleSheet.create({
   toolBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 3,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 6,
-    minWidth: 52,
+    minWidth: 56,
   },
   toolBtnActive: {
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
   toolLabel: {
-    fontSize: 10,
+    fontSize: 11,
     color: createColors.textSecondary,
   },
   toolLabelActive: {
