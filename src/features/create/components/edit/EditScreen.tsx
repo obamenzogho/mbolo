@@ -12,13 +12,15 @@
    onMediaChange. L'application réelle des filtres/ajustements se
    fait au moment de l'upload via expo-image-manipulator. */
 
-import { memo, useCallback, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import type { SelectedMedia } from '@/features/news/hooks/useComposeState'
-import type { CropState, Adjustments, OverlayEl } from '../../types/editing'
-import { DEFAULT_CROP, DEFAULT_ADJUSTMENTS } from '../../types/editing'
+import type { CropState, Adjustments, OverlayEl, VideoEdit } from '../../types/editing'
+import { DEFAULT_CROP, DEFAULT_ADJUSTMENTS, DEFAULT_VIDEO_EDIT } from '../../types/editing'
 import { createColors } from '../../theme/createTokens'
 import { EditPreview } from './EditPreview'
+import { useEditPreviewProxy } from '../../hooks/useEditPreviewProxy'
+import { useVideoFrame } from '../../hooks/useVideoFrame'
 import { CropTab } from './CropTab'
 import { FilterTab } from './FilterTab'
 import { AdjustTab } from './AdjustTab'
@@ -26,18 +28,9 @@ import { EffectTab } from './EffectTab'
 import { DrawTab } from './DrawTab'
 import { TextTab } from './TextTab'
 import { StickerTab } from './StickerTab'
+import { TrimTab } from './TrimTab'
 
-type Tab = 'crop' | 'filter' | 'edit' | 'effect' | 'draw' | 'text' | 'sticker'
-
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'crop', label: 'Recadrer' },
-  { id: 'filter', label: 'Filtre' },
-  { id: 'edit', label: 'Ajuster' },
-  { id: 'effect', label: 'Effet' },
-  { id: 'draw', label: 'Dessin' },
-  { id: 'text', label: 'Texte' },
-  { id: 'sticker', label: 'Autocollant' },
-]
+type Tab = 'trim' | 'crop' | 'filter' | 'edit' | 'effect' | 'draw' | 'text' | 'sticker'
 
 interface EditScreenProps {
   media: SelectedMedia
@@ -48,8 +41,10 @@ export const EditScreen = memo(function EditScreen({
   media,
   onMediaChange,
 }: EditScreenProps) {
-  const [tab, setTab] = useState<Tab>('crop')
+  const isVideo = media.type === 'video'
+  const [tab, setTab] = useState<Tab>(isVideo ? 'trim' : 'crop')
   const [selectedOverlayId, setSelectedOverlayId] = useState<string | null>(null)
+  const overlayRef = useRef<unknown>(null)
 
   const crop: CropState = media.crop ?? DEFAULT_CROP
   const adjustments: Adjustments = media.adjustments ?? DEFAULT_ADJUSTMENTS
@@ -58,6 +53,26 @@ export const EditScreen = memo(function EditScreen({
   const effectId = media.effectId ?? 'ef-none'
   const effectIntensity = media.effectIntensity ?? 100
   const overlay: OverlayEl[] = (media.overlay as OverlayEl[]) ?? []
+  const videoEdit: VideoEdit = { ...DEFAULT_VIDEO_EDIT, ...(media.video ?? {}) }
+
+  /* Onglets conditionnels : une vidéo a tout à faire d'un trim, rien à
+     faire d'un recadrage libre en plus du reste. */
+  const TABS = useMemo(() => {
+    const base: { id: Tab; label: string }[] = [
+      { id: 'crop', label: 'Recadrer' },
+      { id: 'filter', label: 'Filtre' },
+      { id: 'edit', label: 'Ajuster' },
+      { id: 'effect', label: 'Effet' },
+      { id: 'draw', label: 'Dessin' },
+      { id: 'text', label: 'Texte' },
+      { id: 'sticker', label: 'Autocollant' },
+    ]
+    return isVideo ? [{ id: 'trim' as Tab, label: 'Découper' }, ...base] : base
+  }, [isVideo])
+
+  /* Vidéo : on filtre une frame fixe. Photo : l'image elle-même. */
+  const videoFrame = useVideoFrame(isVideo ? media.uri : null, media.video?.coverTime ?? 1000)
+  const preview = useEditPreviewProxy(media, isVideo ? videoFrame : media.uri)
 
   /* ── Helpers de mise à jour ───────────────────────────────────── */
 
@@ -96,10 +111,30 @@ export const EditScreen = memo(function EditScreen({
     [media, onMediaChange],
   )
 
+  const updateVideoEdit = useCallback(
+    (v: VideoEdit) => onMediaChange({ ...media, video: v }),
+    [media, onMediaChange],
+  )
+
+  /* Changer de média peut retirer l'onglet actif (trim n'existe que sur
+     une vidéo) : on retombe sur le premier onglet disponible. */
+  useEffect(() => {
+    if (!TABS.some((t) => t.id === tab)) setTab(TABS[0].id)
+  }, [TABS, tab])
+
   /* ── Rendu du panneau inférieur ───────────────────────────────── */
 
   const panel = useMemo(() => {
     switch (tab) {
+      case 'trim':
+        return (
+          <TrimTab
+            uri={media.uri}
+            durationMs={media.duration ?? 0}
+            value={videoEdit}
+            onChange={updateVideoEdit}
+          />
+        )
       case 'crop':
         return <CropTab crop={crop} onChange={updateCrop} />
       case 'filter':
@@ -151,10 +186,10 @@ export const EditScreen = memo(function EditScreen({
     }
   }, [
     tab, crop, filterId, filterIntensity, effectId, effectIntensity,
-    adjustments, overlay, selectedOverlayId, media.uri,
+    adjustments, overlay, videoEdit, selectedOverlayId, media.uri,
     updateCrop, updateFilterId, updateFilterIntensity,
     updateAdjustments, updateEffectId, updateEffectIntensity,
-    updateOverlay,
+    updateOverlay, updateVideoEdit,
   ])
 
   /* ── Dimensions du preview ───────────────────────────────────────
@@ -178,9 +213,12 @@ export const EditScreen = memo(function EditScreen({
       <View style={styles.previewWrap}>
         <EditPreview
           uri={media.uri}
+          previewUri={preview.uri}
+          rendering={preview.rendering}
           crop={crop}
           adjustments={adjustments}
-          effectId={effectId}
+          overlay={overlay}
+          overlayRef={overlayRef}
           showCropOverlay={tab === 'crop'}
           onTransformChange={tab === 'crop' ? handleTransformChange : undefined}
         />

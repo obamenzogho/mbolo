@@ -21,7 +21,7 @@ import {
 import type { NewsPostMedia } from '@/features/news/types'
 import { createVideo } from '../services/videoMutations'
 import type { CreateDraft } from '../types'
-import { applyEdit, hasEdits } from '../utils/applyEdit'
+import { renderMedia, clearRenderCache } from '../utils/renderMedia'
 
 /** 15 s entre deux créations : garde-fou applicatif (le serveur garde le sien). */
 const PUBLISH_COOLDOWN_MS = 15_000
@@ -67,7 +67,15 @@ export function useCreatePublish() {
       if (draft.media.length === 1 && draft.media[0].type === 'video') {
         try {
           const video = draft.media[0]
-          const videoUrl = await uploadToCloudinary(video.uri, 'video', {
+
+          /* Rendu local (trim + filtres + overlays) avant l'upload : 0→15% de la
+             barre de progression, l'upload prend les 60% suivants. */
+          const rendered = await renderMedia(video, {
+            overlayUri: video.overlayUri ?? null,
+            onProgress: (p) => step(p * 0.15),
+          })
+
+          const videoUrl = await uploadToCloudinary(rendered.uri, 'video', {
             folder: 'reels',
             timeout: 180000,
             onProgress: (p) => step(0.15 + p * 0.6),
@@ -77,12 +85,20 @@ export function useCreatePublish() {
 
           const postAuthor = await loadPostAuthor(author.uid, author.displayName)
 
+          /* renderVideo a déjà trimé la vidéo : la couverture choisie
+             dans l'original doit être recalée sur le clip final, sinon
+             la vignette pointe vers le mauvais instant. */
+          const cover = Math.max(
+            0,
+            (video.video?.coverTime ?? 1000) - (video.video?.trimStart ?? 0),
+          )
+
           const id = await createVideo({
             userId: author.uid,
             userName: postAuthor.userName,
             userPhotoURL: postAuthor.userPhotoURL || undefined,
             videoURL: videoUrl,
-            thumbnailURL: generateThumbnailURL(videoUrl) || undefined,
+            thumbnailURL: generateThumbnailURL(videoUrl, { startOffset: cover / 1000 }) || undefined,
             description: draft.text.trim(),
             hashtags: extractHashtags(draft.text),
             visibility: draft.visibility,
@@ -96,6 +112,7 @@ export function useCreatePublish() {
           if (!id) return 'write'
           step(1)
           lastPublishAt.current = Date.now()
+          void clearRenderCache()
           return { kind: 'video', id }
         } catch (error) {
           captureException(
@@ -110,35 +127,14 @@ export function useCreatePublish() {
       try {
         const media: NewsPostMedia[] = []
         for (const item of draft.media) {
-          /* Appliquer les transformations d'édition avant l'upload. */
-          let finalUri = item.uri
-          if (hasEdits({ crop: item.crop, adjustments: item.adjustments })) {
-            finalUri = await applyEdit({
-              uri: item.uri,
-              width: item.width,
-              height: item.height,
-              crop: item.crop,
-              adjustments: item.adjustments,
-              cropTransform: item.cropTransform,
-            })
-          }
+          const rendered = await renderMedia(item, { overlayUri: item.overlayUri ?? null })
 
-          const url = await uploadToCloudinary(finalUri, 'image', {
+          const url = await uploadToCloudinary(rendered.uri, 'image', {
             timeout: 120000,
-            onProgress: (p) =>
-              step(
-                (draft.media.length > 0
-                  ? p / draft.media.length
-                  : 0) * 0.6,
-              ),
+            onProgress: (p) => step((draft.media.length > 0 ? p / draft.media.length : 0) * 0.6),
           })
           if (!url) return 'upload'
-          media.push({
-            url,
-            type: 'image',
-            width: item.width,
-            height: item.height,
-          })
+          media.push({ url, type: 'image', width: rendered.width, height: rendered.height })
         }
         step(0.75)
 
@@ -161,6 +157,7 @@ export function useCreatePublish() {
         if (!id) return 'write'
         step(1)
         lastPublishAt.current = Date.now()
+        void clearRenderCache()
         return { kind: 'post', id }
       } catch (error) {
         captureException(

@@ -54,6 +54,13 @@ export interface SelectedMedia {
     translateX: number
     translateY: number
   }
+  /** Édition vidéo : trim, son, couverture. Voir create/types/editing.ts. */
+  video?: {
+    trimStart: number
+    trimEnd: number
+    muted: boolean
+    coverTime: number
+  }
   /** Filtre Instagram appliqué (id du filtre, ex 'clarendon'). */
   filterId?: string
   /** Intensité du filtre (0-100). */
@@ -81,6 +88,8 @@ export interface SelectedMedia {
     | { id: string; kind: 'text'; text: string; x: number; y: number; color: string; fontId: string; size: number }
     | { id: string; kind: 'sticker'; emoji: string; x: number; y: number; scale: number }
   >
+  /** Chemin du PNG transparent des overlays, capturé via react-native-view-shot. */
+  overlayUri?: string | null
 }
 
 export interface ComposeState {

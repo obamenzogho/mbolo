@@ -4,40 +4,54 @@
    rotation, flip). Le crop style Instagram déplace l'image derrière
    un cadre fixe.
 
-   Le composant mesure son conteneur via onLayout pour s'adapter
-   à l'espace réellement disponible. */
+   Les filtres / effets / ajustements ne sont PAS approchés ici : le proxy
+   (useEditPreviewProxy) rend une vraie miniature avec le même filterGraph
+   que la publication, garantissant le WYSIWYG. `previewUri` est cette
+   miniature ; `rendering` permet un voile discret pendant le rendu.
+
+   La couche overlay (texte / stickers / dessin) est rendue dans une
+   View transparente référencée par `overlayRef` : EditScreen la capture
+   en PNG via react-native-view-shot pour la graver dans le fichier
+   final avec FFmpeg. PAS de backgroundColor sur cette couche, sinon
+   l'alpha est perdue et l'overlay masque toute l'image. */
 
 import { memo, useCallback, useMemo, useState } from 'react'
-import { StyleSheet, View } from 'react-native'
+import { StyleSheet, Text, View } from 'react-native'
 import { Image } from 'expo-image'
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-} from 'react-native-reanimated'
-import type { CropState, Adjustments, EffectOverlay } from '../../types/editing'
-import { getEffect } from '../../types/editing'
+import type { CropState, Adjustments, OverlayEl } from '../../types/editing'
 import { CropOverlay } from './CropOverlay'
 
 interface EditPreviewProps {
   uri: string
+  /** Aperçu filtré (proxy FFmpeg). Défaut : l'image source. */
+  previewUri?: string
+  /** Rendu en cours — voile discret plutôt qu'un flash. */
+  rendering?: boolean
   crop: CropState
   adjustments?: Adjustments
-  effectId?: string
   /** Afficher les guides de recadrage. */
   showCropOverlay?: boolean
   /** Callback quand la transformation de l'image change. */
   onTransformChange?: (transform: { scale: number; translateX: number; translateY: number }) => void
+  /** Overlays à afficher (texte / stickers / dessin). */
+  overlay?: OverlayEl[]
+  /** Ref de la couche overlay, remontée à EditScreen pour capture. */
+  overlayRef?: React.RefObject<unknown>
 }
 
 export const EditPreview = memo(function EditPreview({
   uri,
+  previewUri,
+  rendering = false,
   crop,
   adjustments,
-  effectId,
   showCropOverlay = false,
   onTransformChange,
+  overlay,
+  overlayRef,
 }: EditPreviewProps) {
+  const displayUri = previewUri ?? uri
+
   /* Mesure du conteneur réel via onLayout. */
   const [box, setBox] = useState({ width: 0, height: 0 })
 
@@ -77,19 +91,23 @@ export const EditPreview = memo(function EditPreview({
     return r.length > 0 ? r.join(' ') : undefined
   }, [crop.rotation, crop.flipH, crop.flipV])
 
-  /* Overlay d'effet (grain, leak, prism). */
-  const effect = getEffect(effectId ?? 'ef-none')
-  const overlayStyle = useMemo(() => {
-    if (!effect.overlay) return null
-    return getOverlayStyle(effect.overlay)
-  }, [effect.overlay])
+  /* Position de la couche overlay : exactement sur l'image centrée. */
+  const overlayFrame = useMemo(() => {
+    if (box.width === 0 || frameSize.width === 0) return null
+    return {
+      left: (box.width - frameSize.width) / 2,
+      top: (box.height - frameSize.height) / 2,
+      width: frameSize.width,
+      height: frameSize.height,
+    }
+  }, [box.width, box.height, frameSize])
 
   return (
     <View style={styles.container} onLayout={onLayout}>
       {frameSize.width > 0 && frameSize.height > 0 ? (
         <>
           <Image
-            source={{ uri }}
+            source={{ uri: displayUri }}
             style={[
               styles.image,
               { width: frameSize.width, height: frameSize.height },
@@ -98,9 +116,6 @@ export const EditPreview = memo(function EditPreview({
             contentFit="cover"
             transition={0}
           />
-          {overlayStyle ? (
-            <View style={[styles.effectOverlay, { width: frameSize.width, height: frameSize.height }, overlayStyle]} />
-          ) : null}
           {showCropOverlay && onTransformChange ? (
             <CropOverlay
               frameWidth={frameSize.width}
@@ -109,23 +124,97 @@ export const EditPreview = memo(function EditPreview({
               onTransformChange={onTransformChange}
             />
           ) : null}
+
+          {/* Couche overlay (texte / stickers / dessin) — capturée en
+              PNG pour FFmpeg. Sans backgroundColor, collapsable désactivé. */}
+          {overlayFrame && (overlay?.length ?? 0) > 0 ? (
+            <View
+              ref={overlayRef as React.RefObject<View>}
+              collapsable={false}
+              pointerEvents="none"
+              style={[styles.overlayLayer, overlayFrame]}
+            >
+              {overlay!.map((el) => (
+                <OverlayElement key={el.id} el={el} frame={frameSize} />
+              ))}
+            </View>
+          ) : null}
+
+          {/* Voile discret pendant un rendu FFmpeg en cours. */}
+          {rendering ? <View style={styles.veil} /> : null}
         </>
       ) : null}
     </View>
   )
 })
 
-function getOverlayStyle(type: EffectOverlay): object {
-  switch (type) {
-    case 'grain':
-      return { backgroundColor: 'rgba(128,128,128,0.15)' }
-    case 'leak':
-      return { backgroundColor: 'transparent', borderBottomColor: 'rgba(255,138,0,0.3)' }
-    case 'prism':
-      return { backgroundColor: 'rgba(0,120,255,0.1)' }
-    default:
-      return {}
+/* ── Rendu d'un élément overlay (texte / sticker / dessin) ────────── */
+
+function OverlayElement({ el, frame }: { el: OverlayEl; frame: { width: number; height: number } }) {
+  if (el.kind === 'text') {
+    const fontSize = Math.max(14, el.size * frame.width)
+    return (
+      <Text
+        style={{
+          position: 'absolute',
+          left: el.x * frame.width,
+          top: el.y * frame.height,
+          color: el.color,
+          fontSize,
+          fontWeight: '700',
+          transform: [
+            { translateX: -fontSize * 0.3 },
+            { translateY: -fontSize * 0.5 },
+          ],
+          textShadowColor: 'rgba(0,0,0,0.5)',
+          textShadowRadius: 2,
+        }}
+      >
+        {el.text}
+      </Text>
+    )
   }
+
+  if (el.kind === 'sticker') {
+    const size = Math.max(20, el.scale * frame.width)
+    return (
+      <Text
+        style={{
+          position: 'absolute',
+          left: el.x * frame.width - size / 2,
+          top: el.y * frame.height - size / 2,
+          fontSize: size,
+        }}
+      >
+        {el.emoji}
+      </Text>
+    )
+  }
+
+  /* stroke : série de points le long du tracé. */
+  if (el.kind === 'stroke') {
+    const r = Math.max(2, el.size / 2)
+    return (
+      <>
+        {el.points.map((p, i) => (
+          <View
+            key={i}
+            style={{
+              position: 'absolute',
+              left: p.x * frame.width - r,
+              top: p.y * frame.height - r,
+              width: r * 2,
+              height: r * 2,
+              borderRadius: r,
+              backgroundColor: el.color,
+            }}
+          />
+        ))}
+      </>
+    )
+  }
+
+  return null
 }
 
 const styles = StyleSheet.create({
@@ -139,8 +228,11 @@ const styles = StyleSheet.create({
   image: {
     borderRadius: 4,
   },
-  effectOverlay: {
+  overlayLayer: {
+    position: 'absolute',
+  },
+  veil: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: 4,
+    backgroundColor: 'rgba(0,0,0,0.25)',
   },
 })

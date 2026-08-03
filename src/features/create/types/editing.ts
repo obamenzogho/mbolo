@@ -162,3 +162,22 @@ export function getFilter(id: string): FilterDef {
 export function getEffect(id: string): EffectDef {
   return EFFECTS.find((e) => e.id === id) ?? EFFECTS[0]
 }
+
+/* ── Édition vidéo ──────────────────────────────────────────────── */
+
+export interface VideoEdit {
+  /** Début du trim, en millisecondes. */
+  trimStart: number
+  /** Fin du trim, en millisecondes. 0 = jusqu'à la fin. */
+  trimEnd: number
+  muted: boolean
+  /** Instant de la vignette de couverture, en millisecondes. */
+  coverTime: number
+}
+
+export const DEFAULT_VIDEO_EDIT: VideoEdit = {
+  trimStart: 0,
+  trimEnd: 0,
+  muted: false,
+  coverTime: 1000,
+}

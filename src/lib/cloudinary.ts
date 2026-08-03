@@ -146,13 +146,22 @@ export function getCloudinaryConfig() {
 
 const CLOUDINARY_BASE = 'res.cloudinary.com'
 
-export function generateThumbnailURL(videoURL: string | null | undefined): string | null {
+export function generateThumbnailURL(
+  videoURL: string | null | undefined,
+  options?: { startOffset?: number },
+): string | null {
   if (!videoURL) return null
   if (videoURL.startsWith('file://')) return null
   if (!videoURL.includes(CLOUDINARY_BASE)) return null
   try {
+    /* `so_<s>` sélectionne la frame au second s dans la transformation
+       Cloudinary. Défaut 0 = première frame (comportement historique). */
+    const so =
+      options?.startOffset && options.startOffset > 0
+        ? `so_${options.startOffset},`
+        : ''
     return videoURL
-      .replace('/upload/', '/upload/so_0,f_jpg,w_400,h_711,c_fill/')
+      .replace('/upload/', `/upload/${so}f_jpg,w_400,h_711,c_fill/`)
       .replace(/\.(mp4|mov|webm|avi)(\?.*)?$/, '.jpg')
   } catch {
     return null
