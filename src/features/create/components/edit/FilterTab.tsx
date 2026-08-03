@@ -69,7 +69,7 @@ export const FilterTab = memo(function FilterTab({
       {/* Slider d'intensité */}
       {filterId !== 'none' ? (
         <View style={styles.sliderRow}>
-          <Text style={styles.sliderLabel}>Intensity</Text>
+          <Text style={styles.sliderLabel}>Intensité</Text>
           <StraightenSlider
             value={filterIntensity}
             min={0}

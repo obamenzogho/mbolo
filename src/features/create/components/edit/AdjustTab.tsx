@@ -17,15 +17,15 @@ interface AdjustTabProps {
 }
 
 const TOOLS: { id: keyof Adjustments; label: string; icon: keyof typeof Ionicons.glyphMap; min: number }[] = [
-  { id: 'brightness', label: 'Bright', icon: 'sunny-outline', min: -100 },
-  { id: 'contrast', label: 'Contrast', icon: 'contrast-outline', min: -100 },
-  { id: 'saturation', label: 'Saturn', icon: 'color-fill-outline', min: -100 },
-  { id: 'warmth', label: 'Warmth', icon: 'thermometer-outline', min: -100 },
-  { id: 'fade', label: 'Fade', icon: 'water-outline', min: -100 },
-  { id: 'highlights', label: 'Highlight', icon: 'flashlight-outline', min: -100 },
-  { id: 'shadows', label: 'Shadow', icon: 'moon-outline', min: -100 },
-  { id: 'tint', label: 'Tint', icon: 'color-palette-outline', min: -100 },
-  { id: 'sharpen', label: 'Sharpen', icon: 'triangle-outline', min: -100 },
+  { id: 'brightness', label: 'Luminosité', icon: 'sunny-outline', min: -100 },
+  { id: 'contrast', label: 'Contraste', icon: 'contrast-outline', min: -100 },
+  { id: 'saturation', label: 'Saturation', icon: 'color-fill-outline', min: -100 },
+  { id: 'warmth', label: 'Chaleur', icon: 'thermometer-outline', min: -100 },
+  { id: 'fade', label: 'Décoloré', icon: 'water-outline', min: -100 },
+  { id: 'highlights', label: 'Hautes lumières', icon: 'flashlight-outline', min: -100 },
+  { id: 'shadows', label: 'Ombres', icon: 'moon-outline', min: -100 },
+  { id: 'tint', label: 'Teinte', icon: 'color-palette-outline', min: -100 },
+  { id: 'sharpen', label: 'Netteté', icon: 'triangle-outline', min: -100 },
   { id: 'vignette', label: 'Vignette', icon: 'radio-button-off-outline', min: 0 },
 ]
 

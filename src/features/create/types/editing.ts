@@ -16,6 +16,10 @@ export interface CropState {
   rotation: number
   flipH: boolean
   flipV: boolean
+  /** Position X du centre de la zone de recadrage (0-1, relatif à l'image). */
+  cropX: number
+  /** Position Y du centre de la zone de recadrage (0-1, relatif à l'image). */
+  cropY: number
 }
 
 export const DEFAULT_CROP: CropState = {
@@ -23,14 +27,16 @@ export const DEFAULT_CROP: CropState = {
   rotation: 0,
   flipH: false,
   flipV: false,
+  cropX: 0.5,  // centré
+  cropY: 0.5,  // centré
 }
 
 export const ASPECT_OPTIONS = [
   { id: 'original', label: 'Original', ratio: 0, icon: 'free' as const },
-  { id: 'square', label: '1:1', ratio: 1, icon: 'square' as const },
-  { id: 'portrait', label: '4:5', ratio: 0.8, icon: 'portrait' as const },
-  { id: 'landscape', label: '1.91:1', ratio: 1.91, icon: 'landscape' as const },
-  { id: 'wide', label: '16:9', ratio: 16 / 9, icon: 'wide' as const },
+  { id: 'square', label: 'Carré', ratio: 1, icon: 'square' as const },
+  { id: 'portrait', label: 'Portrait', ratio: 0.8, icon: 'portrait' as const },
+  { id: 'landscape', label: 'Paysage', ratio: 1.91, icon: 'landscape' as const },
+  { id: 'wide', label: 'Large', ratio: 16 / 9, icon: 'wide' as const },
 ] as const
 
 /* ── Ajustements manuels ────────────────────────────────────────── */

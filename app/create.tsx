@@ -199,7 +199,7 @@ export default function CreateScreen() {
 
   /* Titre de l'en-tête selon l'étape. */
   const headerTitle = isEditStep
-    ? 'Edit'
+    ? 'Édition'
     : t.news.compose.createTitle
 
   /* Icône du bouton retour : close en sélection, flèche sinon. */

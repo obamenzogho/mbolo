@@ -80,7 +80,7 @@ export const StickerTab = memo(function StickerTab({
       {selSticker ? (
         <View style={styles.controls}>
           <View style={styles.row}>
-            <Text style={styles.label}>Size</Text>
+            <Text style={styles.label}>Taille</Text>
             <StraightenSlider
               value={Math.round(selSticker.scale * 100)}
               min={6}
@@ -89,7 +89,7 @@ export const StickerTab = memo(function StickerTab({
             />
           </View>
           <Pressable onPress={removeSticker} style={styles.deleteBtn}>
-            <Text style={styles.deleteBtnText}>Delete</Text>
+            <Text style={styles.deleteBtnText}>Supprimer</Text>
           </Pressable>
         </View>
       ) : null}

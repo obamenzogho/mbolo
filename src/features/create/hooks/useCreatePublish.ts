@@ -21,6 +21,7 @@ import {
 import type { NewsPostMedia } from '@/features/news/types'
 import { createVideo } from '../services/videoMutations'
 import type { CreateDraft } from '../types'
+import { applyEdit, hasEdits } from '../utils/applyEdit'
 
 /** 15 s entre deux créations : garde-fou applicatif (le serveur garde le sien). */
 const PUBLISH_COOLDOWN_MS = 15_000
@@ -109,7 +110,20 @@ export function useCreatePublish() {
       try {
         const media: NewsPostMedia[] = []
         for (const item of draft.media) {
-          const url = await uploadToCloudinary(item.uri, 'image', {
+          /* Appliquer les transformations d'édition avant l'upload. */
+          let finalUri = item.uri
+          if (hasEdits({ crop: item.crop, adjustments: item.adjustments })) {
+            finalUri = await applyEdit({
+              uri: item.uri,
+              width: item.width,
+              height: item.height,
+              crop: item.crop,
+              adjustments: item.adjustments,
+              cropTransform: item.cropTransform,
+            })
+          }
+
+          const url = await uploadToCloudinary(finalUri, 'image', {
             timeout: 120000,
             onProgress: (p) =>
               step(

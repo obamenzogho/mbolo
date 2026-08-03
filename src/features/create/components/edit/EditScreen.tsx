@@ -30,13 +30,13 @@ import { StickerTab } from './StickerTab'
 type Tab = 'crop' | 'filter' | 'edit' | 'effect' | 'draw' | 'text' | 'sticker'
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'crop', label: 'Crop' },
-  { id: 'filter', label: 'Filter' },
-  { id: 'edit', label: 'Edit' },
-  { id: 'effect', label: 'Effect' },
-  { id: 'draw', label: 'Draw' },
-  { id: 'text', label: 'Text' },
-  { id: 'sticker', label: 'Sticker' },
+  { id: 'crop', label: 'Recadrer' },
+  { id: 'filter', label: 'Filtre' },
+  { id: 'edit', label: 'Ajuster' },
+  { id: 'effect', label: 'Effet' },
+  { id: 'draw', label: 'Dessin' },
+  { id: 'text', label: 'Texte' },
+  { id: 'sticker', label: 'Autocollant' },
 ]
 
 interface EditScreenProps {
@@ -161,6 +161,17 @@ export const EditScreen = memo(function EditScreen({
      Le preview prend flex:1 (tout l'espace restant). EditPreview
      mesure lui-même son conteneur via onLayout. */
 
+  /* Callback quand la transformation de l'image change (pan/zoom). */
+  const handleTransformChange = useCallback(
+    (transform: { scale: number; translateX: number; translateY: number }) => {
+      onMediaChange({
+        ...media,
+        cropTransform: transform,
+      })
+    },
+    [media, onMediaChange],
+  )
+
   return (
     <View style={styles.root}>
       {/* Aperçu — flex:1, prend tout l'espace au-dessus des onglets */}
@@ -170,6 +181,8 @@ export const EditScreen = memo(function EditScreen({
           crop={crop}
           adjustments={adjustments}
           effectId={effectId}
+          showCropOverlay={tab === 'crop'}
+          onTransformChange={tab === 'crop' ? handleTransformChange : undefined}
         />
       </View>
 
@@ -210,14 +223,9 @@ const styles = StyleSheet.create({
     backgroundColor: createColors.canvas,
   },
   /* Preview : flex:1 pour prendre tout l'espace disponible.
-     overflow hidden empêche l'image de déborder sur les onglets
-     quand le crop change l'aspect ratio. */
+     EditPreview utilise absoluteFill pour se positionner. */
   previewWrap: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
     minHeight: 150,
     overflow: 'hidden',
   },

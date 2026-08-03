@@ -39,7 +39,7 @@ export const DrawTab = memo(function DrawTab({
     <View style={styles.container}>
       {/* Brush size */}
       <View style={styles.row}>
-        <Text style={styles.label}>Brush</Text>
+        <Text style={styles.label}>Pinceau</Text>
         <StraightenSlider
           value={brushSize}
           min={2}
@@ -51,7 +51,7 @@ export const DrawTab = memo(function DrawTab({
 
       {/* Color */}
       <View style={styles.row}>
-        <Text style={styles.label}>Color</Text>
+        <Text style={styles.label}>Couleur</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -78,16 +78,16 @@ export const DrawTab = memo(function DrawTab({
           disabled={strokes.length === 0}
           style={[styles.actionBtn, strokes.length === 0 && styles.actionDisabled]}
         >
-          <Text style={styles.actionText}>Undo</Text>
+          <Text style={styles.actionText}>Annuler</Text>
         </Pressable>
         <Pressable
           onPress={clearStrokes}
           disabled={strokes.length === 0}
           style={[styles.actionBtn, strokes.length === 0 && styles.actionDisabled]}
         >
-          <Text style={styles.actionText}>Clear</Text>
+          <Text style={styles.actionText}>Effacer</Text>
         </Pressable>
-        <Text style={styles.hint}>Draw on your photo</Text>
+        <Text style={styles.hint}>Dessine sur ta photo</Text>
       </View>
     </View>
   )

@@ -57,7 +57,7 @@ export const EffectTab = memo(function EffectTab({
 
       {effectId !== 'ef-none' ? (
         <View style={styles.sliderRow}>
-          <Text style={styles.sliderLabel}>Strength</Text>
+          <Text style={styles.sliderLabel}>Puissance</Text>
           <StraightenSlider
             value={effectIntensity}
             min={0}

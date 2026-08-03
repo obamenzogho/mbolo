@@ -43,7 +43,7 @@ export const CropTab = memo(function CropTab({ crop, onChange }: CropTabProps) {
   )
 
   const reset = useCallback(
-    () => onChange({ ...DEFAULT_CROP }),
+    () => onChange({ ...DEFAULT_CROP, cropX: 0.5, cropY: 0.5 }),
     [onChange],
   )
 
@@ -78,7 +78,7 @@ export const CropTab = memo(function CropTab({ crop, onChange }: CropTabProps) {
 
         <Pressable onPress={rotate90} style={styles.toolBtn}>
           <Ionicons name="refresh" size={26} color={createColors.textSecondary} />
-          <Text style={styles.toolLabel}>Rotate</Text>
+          <Text style={styles.toolLabel}>Tourner</Text>
         </Pressable>
 
         <Pressable
@@ -96,7 +96,7 @@ export const CropTab = memo(function CropTab({ crop, onChange }: CropTabProps) {
               crop.flipH && styles.toolLabelActive,
             ]}
           >
-            Flip H
+            Retourner H
           </Text>
         </Pressable>
 
@@ -115,14 +115,14 @@ export const CropTab = memo(function CropTab({ crop, onChange }: CropTabProps) {
               crop.flipV && styles.toolLabelActive,
             ]}
           >
-            Flip V
+            Retourner V
           </Text>
         </Pressable>
       </ScrollView>
 
       {/* Straighten slider */}
       <View style={styles.sliderRow}>
-        <Text style={styles.sliderLabel}>Straighten</Text>
+        <Text style={styles.sliderLabel}>Redresser</Text>
         <StraightenSlider
           value={crop.rotation}
           min={-45}

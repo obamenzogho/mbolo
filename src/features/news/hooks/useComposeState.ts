@@ -45,6 +45,14 @@ export interface SelectedMedia {
     rotation: number // degrés (straighten + increments 90°)
     flipH: boolean
     flipV: boolean
+    cropX: number    // 0-1, position X du centre (0.5 = centré)
+    cropY: number    // 0-1, position Y du centre (0.5 = centré)
+  }
+  /** Transformation de l'image pendant le recadrage (pan/zoom). */
+  cropTransform?: {
+    scale: number
+    translateX: number
+    translateY: number
   }
   /** Filtre Instagram appliqué (id du filtre, ex 'clarendon'). */
   filterId?: string

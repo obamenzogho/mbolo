@@ -84,7 +84,7 @@ export const TextTab = memo(function TextTab({
   return (
     <View style={styles.container}>
       <Pressable onPress={addText} style={styles.addBtn}>
-        <Text style={styles.addBtnText}>+ Add text</Text>
+        <Text style={styles.addBtnText}>+ Ajouter du texte</Text>
       </Pressable>
 
       {selText ? (
@@ -92,14 +92,14 @@ export const TextTab = memo(function TextTab({
           <TextInput
             value={selText.text}
             onChangeText={updateText}
-            placeholder="Type something…"
+            placeholder="Écris quelque chose…"
             placeholderTextColor={createColors.textTertiary}
             style={styles.input}
           />
 
           {/* Couleur */}
           <View style={styles.row}>
-            <Text style={styles.label}>Color</Text>
+            <Text style={styles.label}>Couleur</Text>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -122,16 +122,16 @@ export const TextTab = memo(function TextTab({
           {/* Police + supprimer */}
           <View style={styles.row}>
             <Pressable onPress={cycleFont} style={styles.fontBtn}>
-              <Text style={styles.fontBtnText}>Font: {FONTS.find((f) => f.id === selText.fontId)?.name}</Text>
+              <Text style={styles.fontBtnText}>Police : {FONTS.find((f) => f.id === selText.fontId)?.name}</Text>
             </Pressable>
             <Pressable onPress={removeText} style={styles.deleteBtn}>
-              <Text style={styles.deleteBtnText}>Delete</Text>
+              <Text style={styles.deleteBtnText}>Supprimer</Text>
             </Pressable>
           </View>
         </>
       ) : (
         <Text style={styles.hint}>
-          Add text, drag it, or tap any text on the photo to edit it
+          Ajoute du texte, déplace-le, ou tape sur un texte pour le modifier
         </Text>
       )}
     </View>
