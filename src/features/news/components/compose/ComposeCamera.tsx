@@ -19,14 +19,8 @@
    laisse l'orchestrateur décider de la suite. */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  Gesture,
-  GestureDetector,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import { CameraView, useCameraPermissions } from 'expo-camera'
 import { useIsFocused } from '@react-navigation/native'
 import * as Haptics from 'expo-haptics'
