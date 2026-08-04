@@ -334,10 +334,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  /* Bouton retour caméra */
+  /* Bouton retour caméra — aligné avec l'icône flash du topBar (padding 14 + centre du bouton 22) */
   cameraBackBtn: {
     position: 'absolute',
-    top: 48,
+    top: 16,
     left: 12,
     width: 40,
     height: 40,
@@ -346,10 +346,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.4)',
   },
-  /* Bouton « Suivant » caméra */
+  /* Bouton « Suivant » caméra — même ligne que le bouton retour */
   cameraNextBtn: {
     position: 'absolute',
-    top: 48,
+    top: 16,
     right: 12,
     paddingHorizontal: 16,
     height: 40,
