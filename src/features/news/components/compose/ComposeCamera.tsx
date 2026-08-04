@@ -94,17 +94,22 @@ export function ComposeCamera({ onCapture, topBarInset }: ComposeCameraProps) {
   useEffect(() => clearTimer, [clearTimer])
 
   /* ── Zoom geste pince ─────────────────────────────────────────── */
+  /* On stocke le zoom au début du geste pour appliquer e.scale (cumulatif)
+     par rapport à cette valeur de départ, et non par rapport à l'état
+     courant — sinon le zoom se compounding exponentiellement. */
+  const baseZoomRef = useRef(1)
+
   const pinchGesture = useMemo(
     () =>
       Gesture.Pinch()
-        .onUpdate((e) => {
-          setZoom((prev) => {
-            const next = prev * e.scale
-            return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, next))
-          })
+        .onStart(() => {
+          baseZoomRef.current = zoom
         })
-        .onEnd(() => {}),
-    [],
+        .onUpdate((e) => {
+          const next = baseZoomRef.current * e.scale
+          setZoom(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, next)))
+        }),
+    [zoom],
   )
 
   /* Double-tap = reset zoom */
