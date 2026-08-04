@@ -76,13 +76,14 @@ export function ComposeCamera({ onCapture, topBarInset }: ComposeCameraProps) {
   const elapsedRef = useRef(0)
 
   /* ── Nouvel état caméra studio ─────────────────────────────────── */
-  const [zoom, setZoom] = useState(1)
   const [showGrid, setShowGrid] = useState(false)
   const [aspectRatio, setAspectRatio] = useState<AspectRatioValue>('9:16')
   const [captureSpeed, setCaptureSpeed] = useState<CaptureSpeed>('1')
   const [isBursting, setIsBursting] = useState(false)
   const [burstCount, setBurstCount] = useState(0)
   const burstCountRef = useRef(0)
+  /* zoom = 0→1 pour expo-camera (0 = pas de zoom, 1 = zoom max). */
+  const [zoomLevel, setZoomLevel] = useState(0)
 
   /* ── Timer enregistrement ─────────────────────────────────────── */
   const clearTimer = useCallback(() => {
@@ -94,7 +95,7 @@ export function ComposeCamera({ onCapture, topBarInset }: ComposeCameraProps) {
 
   /* ── Zoom par double-tap (1x ↔ 2x) ─────────────────────────────── */
   const handleDoubleTap = useCallback(() => {
-    setZoom((prev) => (prev >= 2 ? 1 : 2))
+    setZoomLevel((prev) => (prev > 0 ? 0 : 0.2))
   }, [])
 
   /* ── Stop recording ───────────────────────────────────────────── */
@@ -265,7 +266,7 @@ export function ComposeCamera({ onCapture, topBarInset }: ComposeCameraProps) {
           facing={facing}
           mode={captureMode === 'video' ? 'video' : 'picture'}
           flash={flash}
-          zoom={zoom}
+          zoom={zoomLevel}
         />
       ) : null}
 
@@ -273,7 +274,7 @@ export function ComposeCamera({ onCapture, topBarInset }: ComposeCameraProps) {
       <CameraOverlay
         showGrid={showGrid}
         aspectRatio={aspectRatio}
-        zoom={zoom}
+        zoom={zoomLevel}
         showZoomIndicator
       />
 
