@@ -221,16 +221,15 @@ function SelectScreenComponent({
   if (mode === 'camera') {
     return (
       <View style={styles.screen}>
-        <GalleryHeader
-          albumLabel={albumLabel}
-          pickerOpen={pickerOpen}
-          onTogglePicker={handleTogglePicker}
-          selectionMode={selectionMode}
-          onToggleMode={toggleSelectionMode}
-          onCamera={() => onModeChange('camera')}
-          onText={onPickText}
-        />
         <ComposeCamera onCapture={onCapture} />
+        <Pressable
+          onPress={() => onModeChange('gallery')}
+          accessibilityRole="button"
+          accessibilityLabel="Retour à la galerie"
+          style={({ pressed }) => [styles.cameraBackBtn, pressed && { opacity: 0.6 }]}
+        >
+          <Ionicons name="arrow-back" size={24} color="#fff" />
+        </Pressable>
       </View>
     )
   }
@@ -310,6 +309,19 @@ const styles = StyleSheet.create({
     height: 36,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  /* Bouton retour caméra */
+  cameraBackBtn: {
+    position: 'absolute',
+    top: 48,
+    left: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
 
   /* Dropdown album */
