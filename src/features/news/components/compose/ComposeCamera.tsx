@@ -96,22 +96,28 @@ export function ComposeCamera({ onCapture, topBarInset }: ComposeCameraProps) {
 
   /* ── Zoom geste pince ─────────────────────────────────────────── */
   /* zoomLevel est 0→1 pour expo-camera (0 = pas de zoom, 1 = max).
-     On stocke le zoom au début du geste et on applique e.scale (cumulatif)
-     par rapport à cette valeur de départ — jamais par rapport à l'état
-     courant, sinon le zoom se compounding exponentiellement. */
+     Le geste est créé UNE SEULE FOIS (deps vides) et lit/écrit le zoom via
+     des refs : si on dépendait de `zoomLevel`, le geste serait recréé à
+     chaque mise à jour de zoom pendant qu'il est actif, ce qui fait crasher
+     react-native-gesture-handler sur iOS. */
   const baseZoomRef = useRef(0)
+  const zoomLevelRef = useRef(0)
+  const applyZoom = useCallback((next: number) => {
+    const clamped = Math.min(1, Math.max(0, next))
+    zoomLevelRef.current = clamped
+    setZoomLevel(clamped)
+  }, [])
 
   const pinchGesture = useMemo(
     () =>
       Gesture.Pinch()
         .onStart(() => {
-          baseZoomRef.current = zoomLevel
+          baseZoomRef.current = zoomLevelRef.current
         })
         .onUpdate((e) => {
-          const next = baseZoomRef.current * e.scale
-          setZoomLevel(Math.min(1, Math.max(0, next)))
+          applyZoom(baseZoomRef.current * e.scale)
         }),
-    [zoomLevel],
+    [applyZoom],
   )
 
   /* Double-tap = reset zoom */
@@ -120,9 +126,9 @@ export function ComposeCamera({ onCapture, topBarInset }: ComposeCameraProps) {
       Gesture.Tap()
         .numberOfTaps(2)
         .onEnd(() => {
-          setZoomLevel(0)
+          applyZoom(0)
         }),
-    [],
+    [applyZoom],
   )
 
   const composedGestures = useMemo(
