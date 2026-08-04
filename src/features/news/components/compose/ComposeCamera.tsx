@@ -18,9 +18,8 @@
    Le composant ne navigue pas : il remonte le média par `onCapture` et
    laisse l'orchestrateur décider de la suite. */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import { CameraView, useCameraPermissions } from 'expo-camera'
 import { useIsFocused } from '@react-navigation/native'
 import * as Haptics from 'expo-haptics'
@@ -93,37 +92,10 @@ export function ComposeCamera({ onCapture, topBarInset }: ComposeCameraProps) {
 
   useEffect(() => clearTimer, [clearTimer])
 
-  /* ── Zoom geste pince ─────────────────────────────────────────── */
-  /* On stocke le zoom au début du geste pour appliquer e.scale (cumulatif)
-     par rapport à cette valeur de départ, et non par rapport à l'état
-     courant — sinon le zoom se compounding exponentiellement. */
-  const baseZoomRef = useRef(1)
-
-  const pinchGesture = useMemo(
-    () =>
-      Gesture.Pinch()
-        .onStart(() => {
-          baseZoomRef.current = zoom
-        })
-        .onUpdate((e) => {
-          const next = baseZoomRef.current * e.scale
-          setZoom(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, next)))
-        }),
-    [zoom],
-  )
-
-  /* Double-tap = reset zoom */
-  const doubleTapGesture = useMemo(
-    () =>
-      Gesture.Tap()
-        .numberOfTaps(2)
-        .onEnd(() => {
-          setZoom(1)
-        }),
-    [],
-  )
-
-  const composedGestures = Gesture.Race(doubleTapGesture, pinchGesture)
+  /* ── Zoom par double-tap (1x ↔ 2x) ─────────────────────────────── */
+  const handleDoubleTap = useCallback(() => {
+    setZoom((prev) => (prev >= 2 ? 1 : 2))
+  }, [])
 
   /* ── Stop recording ───────────────────────────────────────────── */
   const stopRecording = useCallback(() => {
@@ -285,21 +257,17 @@ export function ComposeCamera({ onCapture, topBarInset }: ComposeCameraProps) {
 
   return (
     <View style={styles.root}>
-      {/* ── CameraView + gesture zoom ──────────────────────────────── */}
-      <GestureDetector gesture={composedGestures}>
-        <View style={StyleSheet.absoluteFill}>
-          {isFocused && permission?.granted ? (
-            <CameraView
-              ref={cameraRef}
-              style={StyleSheet.absoluteFill}
-              facing={facing}
-              mode={captureMode === 'video' ? 'video' : 'picture'}
-              flash={flash}
-              zoom={zoom}
-            />
-          ) : null}
-        </View>
-      </GestureDetector>
+      {/* ── CameraView ─────────────────────────────────────────────── */}
+      {isFocused && permission?.granted ? (
+        <CameraView
+          ref={cameraRef}
+          style={StyleSheet.absoluteFill}
+          facing={facing}
+          mode={captureMode === 'video' ? 'video' : 'picture'}
+          flash={flash}
+          zoom={zoom}
+        />
+      ) : null}
 
       {/* ── Overlays (grid, ratio mask, zoom indicator) ────────────── */}
       <CameraOverlay
