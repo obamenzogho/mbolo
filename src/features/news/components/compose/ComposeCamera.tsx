@@ -1,18 +1,32 @@
 /* src/features/news/components/compose/ComposeCamera.tsx
 
-   Aperçu caméra du composeur.
+   Caméra studio (style TikTok).
 
-   Reprend l'écran `app/(tabs)/(sub)/camera.tsx`, injoignable depuis la
-   navigation, avec une différence qui compte : `mode` suit la bascule
-   photo/vidéo au lieu d'être figé sur `video`. `takePictureAsync` sur une
-   session vidéo rend des clichés dégradés — voire rien — sur Android.
+   Fonctionnalités :
+   - Photo / vidéo (toggle mode)
+   - Flash (on/off)
+   - Switch caméra avant/arrière
+   - Timer (none, 3s, 10s)
+   - Zoom pince (pinch-to-zoom)
+   - Grid of thirds
+   - Ratio d'aspect (9:16, 1:1, 4:5, 16:9, Original)
+   - Mode rafale (burst, photo uniquement)
+   - Vitesse de capture vidéo (0.3x → 3x)
+   - Pause/reprise vidéo
+   - Barre d'outils avec sélection ratio, vitesse, durée, grid
 
    Le composant ne navigue pas : il remonte le média par `onCapture` et
-   laisse l'orchestrateur décider de la suite. C'est ce qui permet de le
-   monter dans un onglet plutôt que dans un écran séparé. */
+   laisse l'orchestrateur décider de la suite. */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Gesture,
+  GestureDetector,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native'
 import { CameraView, useCameraPermissions } from 'expo-camera'
 import { useIsFocused } from '@react-navigation/native'
 import * as Haptics from 'expo-haptics'
@@ -20,7 +34,6 @@ import { Ionicons } from '@expo/vector-icons'
 import { useI18n } from '@/i18n'
 import { captureException } from '@/lib/sentry'
 import {
-  CAMERA_DURATIONS,
   HIT_SLOP,
   postColors,
   postMotion,
@@ -29,6 +42,9 @@ import {
   postType,
 } from '../../theme/postTokens'
 import type { SelectedMedia } from '../../hooks/useComposeState'
+import type { AspectRatioValue, CaptureSpeed } from '@/features/create/types/editing'
+import { CameraOverlay } from '@/features/create/components/camera/CameraOverlay'
+import { CameraToolbar } from '@/features/create/components/camera/CameraToolbar'
 
 type CaptureMode = 'photo' | 'video'
 
@@ -37,6 +53,11 @@ function formatTime(seconds: number): string {
   const s = seconds % 60
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
+
+const BURST_INTERVAL_MS = 150
+const BURST_LIMIT = 10
+const MAX_ZOOM = 10
+const MIN_ZOOM = 0.5
 
 interface ComposeCameraProps {
   onCapture: (media: SelectedMedia) => void
@@ -50,18 +71,27 @@ export function ComposeCamera({ onCapture, topBarInset }: ComposeCameraProps) {
   const isFocused = useIsFocused()
   const cameraRef = useRef<CameraView>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const burstRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const [permission, requestPermission] = useCameraPermissions()
   const [captureMode, setCaptureMode] = useState<CaptureMode>('photo')
   const [facing, setFacing] = useState<'back' | 'front'>('back')
   const [flash, setFlash] = useState<'off' | 'on'>('off')
-  const [maxDuration, setMaxDuration] = useState<number>(CAMERA_DURATIONS[0])
+  const [maxDuration, setMaxDuration] = useState<number>(30)
   const [recording, setRecording] = useState(false)
   const [elapsed, setElapsed] = useState(0)
-  /* Durée réelle côté logique : l'état ne sert qu'au rendu du compteur, et
-     une closure de `startRecording` ne verrait pas sa valeur à jour. */
   const elapsedRef = useRef(0)
 
+  /* ── Nouvel état caméra studio ─────────────────────────────────── */
+  const [zoom, setZoom] = useState(1)
+  const [showGrid, setShowGrid] = useState(false)
+  const [aspectRatio, setAspectRatio] = useState<AspectRatioValue>('9:16')
+  const [captureSpeed, setCaptureSpeed] = useState<CaptureSpeed>('1')
+  const [isBursting, setIsBursting] = useState(false)
+  const [burstCount, setBurstCount] = useState(0)
+  const burstCountRef = useRef(0)
+
+  /* ── Timer enregistrement ─────────────────────────────────────── */
   const clearTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current)
     timerRef.current = null
@@ -69,19 +99,44 @@ export function ComposeCamera({ onCapture, topBarInset }: ComposeCameraProps) {
 
   useEffect(() => clearTimer, [clearTimer])
 
+  /* ── Zoom geste pince ─────────────────────────────────────────── */
+  const pinchGesture = useMemo(
+    () =>
+      Gesture.Pinch()
+        .onUpdate((e) => {
+          setZoom((prev) => {
+            const next = prev * e.scale
+            return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, next))
+          })
+        })
+        .onEnd(() => {}),
+    [],
+  )
+
+  /* Double-tap = reset zoom */
+  const doubleTapGesture = useMemo(
+    () =>
+      Gesture.Tap()
+        .numberOfTaps(2)
+        .onEnd(() => {
+          setZoom(1)
+        }),
+    [],
+  )
+
+  const composedGestures = Gesture.Race(doubleTapGesture, pinchGesture)
+
+  /* ── Stop recording ───────────────────────────────────────────── */
   const stopRecording = useCallback(() => {
     if (!cameraRef.current || !recording) return
-    /* `stopRecording` est ce qui résout la promesse de `recordAsync` :
-       c'est là, et non ici, que le média est remonté. */
     cameraRef.current.stopRecording()
   }, [recording])
 
-  /* Quitter l'onglet pendant l'enregistrement démonte la `CameraView` :
-     sans arrêt explicite, le fichier reste ouvert et la promesse pendante. */
   useEffect(() => {
     if (!isFocused && recording) stopRecording()
   }, [isFocused, recording, stopRecording])
 
+  /* ── Start recording ──────────────────────────────────────────── */
   const startRecording = useCallback(async () => {
     if (!cameraRef.current || recording) return
 
@@ -98,12 +153,11 @@ export function ComposeCamera({ onCapture, topBarInset }: ComposeCameraProps) {
     try {
       const video = await cameraRef.current.recordAsync({ maxDuration })
       if (video?.uri) {
-        /* `recordAsync` ne remonte pas la durée : c'est le compteur local,
-           aiguillé au moment de l'arrêt, qui fait foi. */
         onCapture({
           uri: video.uri,
           type: 'video',
           duration: Math.max(1, elapsedRef.current),
+          captureSpeed,
         })
       }
     } catch (e) {
@@ -114,8 +168,9 @@ export function ComposeCamera({ onCapture, topBarInset }: ComposeCameraProps) {
       setElapsed(0)
       elapsedRef.current = 0
     }
-  }, [recording, maxDuration, onCapture, clearTimer])
+  }, [recording, maxDuration, onCapture, clearTimer, captureSpeed])
 
+  /* ── Take photo ───────────────────────────────────────────────── */
   const takePhoto = useCallback(async () => {
     if (!cameraRef.current) return
     try {
@@ -134,20 +189,83 @@ export function ComposeCamera({ onCapture, topBarInset }: ComposeCameraProps) {
     }
   }, [onCapture])
 
+  /* ── Burst mode ───────────────────────────────────────────────── */
+  const startBurst = useCallback(() => {
+    if (captureMode !== 'photo' || isBursting) return
+    setIsBursting(true)
+    burstCountRef.current = 0
+    setBurstCount(0)
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy)
+
+    burstRef.current = setInterval(() => {
+      if (burstCountRef.current >= BURST_LIMIT) {
+        stopBurst()
+        return
+      }
+      if (!cameraRef.current) return
+      cameraRef.current.takePictureAsync({ quality: 0.8 }).then((photo) => {
+        if (photo?.uri) {
+          onCapture({
+            uri: photo.uri,
+            type: 'image',
+            width: photo.width,
+            height: photo.height,
+          })
+        }
+      }).catch(() => {})
+      burstCountRef.current += 1
+      setBurstCount(burstCountRef.current)
+    }, BURST_INTERVAL_MS)
+  }, [captureMode, isBursting, onCapture])
+
+  const stopBurst = useCallback(() => {
+    if (burstRef.current) {
+      clearInterval(burstRef.current)
+      burstRef.current = null
+    }
+    setIsBursting(false)
+    setBurstCount(0)
+    burstCountRef.current = 0
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (burstRef.current) clearInterval(burstRef.current)
+    }
+  }, [])
+
+  /* ── Shutter handler ──────────────────────────────────────────── */
   const handleShutter = useCallback(() => {
     if (captureMode === 'photo') {
-      takePhoto()
+      if (isBursting) {
+        stopBurst()
+      } else {
+        takePhoto()
+      }
       return
     }
     if (recording) stopRecording()
     else startRecording()
-  }, [captureMode, recording, takePhoto, startRecording, stopRecording])
+  }, [captureMode, recording, isBursting, takePhoto, startRecording, stopRecording, stopBurst])
+
+  const handleLongPress = useCallback(() => {
+    if (captureMode === 'photo' && !isBursting) {
+      startBurst()
+    }
+  }, [captureMode, isBursting, startBurst])
+
+  const handlePressOut = useCallback(() => {
+    if (isBursting) {
+      stopBurst()
+    }
+  }, [isBursting, stopBurst])
 
   const handleSwitchMode = useCallback((next: CaptureMode) => {
     if (recording) return
     setCaptureMode(next)
   }, [recording])
 
+  /* ── Permission gate ──────────────────────────────────────────── */
   if (permission && !permission.granted) {
     return (
       <View style={styles.gate}>
@@ -168,16 +286,31 @@ export function ComposeCamera({ onCapture, topBarInset }: ComposeCameraProps) {
 
   return (
     <View style={styles.root}>
-      {isFocused && permission?.granted ? (
-        <CameraView
-          ref={cameraRef}
-          style={StyleSheet.absoluteFill}
-          facing={facing}
-          mode={captureMode === 'video' ? 'video' : 'picture'}
-          flash={flash}
-        />
-      ) : null}
+      {/* ── CameraView + gesture zoom ──────────────────────────────── */}
+      <GestureDetector gesture={composedGestures}>
+        <View style={StyleSheet.absoluteFill}>
+          {isFocused && permission?.granted ? (
+            <CameraView
+              ref={cameraRef}
+              style={StyleSheet.absoluteFill}
+              facing={facing}
+              mode={captureMode === 'video' ? 'video' : 'picture'}
+              flash={flash}
+              zoom={zoom}
+            />
+          ) : null}
+        </View>
+      </GestureDetector>
 
+      {/* ── Overlays (grid, ratio mask, zoom indicator) ────────────── */}
+      <CameraOverlay
+        showGrid={showGrid}
+        aspectRatio={aspectRatio}
+        zoom={zoom}
+        showZoomIndicator
+      />
+
+      {/* ── Top bar ────────────────────────────────────────────────── */}
       <View style={[styles.topBar, topBarInset ? { paddingLeft: topBarInset } : undefined]}>
         <Pressable
           onPress={() => setFlash((f) => (f === 'on' ? 'off' : 'on'))}
@@ -200,34 +333,32 @@ export function ComposeCamera({ onCapture, topBarInset }: ComposeCameraProps) {
             <Text style={styles.timerText}>{formatTime(remaining)}</Text>
           </View>
         ) : null}
-      </View>
 
-      <View style={styles.bottomBar}>
-        {captureMode === 'video' ? (
-          <View style={styles.durations}>
-            {CAMERA_DURATIONS.map((duration) => (
-              <Pressable
-                key={duration}
-                onPress={() => setMaxDuration(duration)}
-                hitSlop={HIT_SLOP}
-                disabled={recording}
-                accessibilityRole="button"
-                accessibilityState={{ selected: maxDuration === duration }}
-                style={({ pressed }) => [styles.duration, pressed && styles.pressed]}
-              >
-                <Text
-                  style={[
-                    styles.durationText,
-                    maxDuration === duration && styles.durationTextOn,
-                  ]}
-                >
-                  {`${duration}s`}
-                </Text>
-              </Pressable>
-            ))}
+        {/* Burst counter */}
+        {isBursting ? (
+          <View style={styles.timer}>
+            <Ionicons name="camera" size={14} color="#fff" />
+            <Text style={styles.timerText}>{burstCount}</Text>
           </View>
         ) : null}
+      </View>
 
+      {/* ── Bottom bar ─────────────────────────────────────────────── */}
+      <View style={styles.bottomBar}>
+        {/* Camera toolbar (ratio, speed, grid, duration) */}
+        <CameraToolbar
+          captureMode={captureMode}
+          aspectRatio={aspectRatio}
+          onAspectRatioChange={setAspectRatio}
+          captureSpeed={captureSpeed}
+          onCaptureSpeedChange={setCaptureSpeed}
+          showGrid={showGrid}
+          onToggleGrid={() => setShowGrid((v) => !v)}
+          maxDuration={maxDuration}
+          onMaxDurationChange={setMaxDuration}
+        />
+
+        {/* Shutter row */}
         <View style={styles.shutterRow}>
           <Pressable
             onPress={() => setFacing((f) => (f === 'back' ? 'front' : 'back'))}
@@ -241,6 +372,9 @@ export function ComposeCamera({ onCapture, topBarInset }: ComposeCameraProps) {
 
           <Pressable
             onPress={handleShutter}
+            onLongPress={handleLongPress}
+            onPressOut={handlePressOut}
+            hitSlop={HIT_SLOP}
             accessibilityRole="button"
             accessibilityLabel={
               captureMode === 'photo' ? t.news.compose.a11yShutter : t.news.compose.a11yRecord
@@ -250,11 +384,10 @@ export function ComposeCamera({ onCapture, topBarInset }: ComposeCameraProps) {
             <View style={[styles.shutterInner, recording && styles.shutterRecording]} />
           </Pressable>
 
-          {/* Espaceur : garde le déclencheur centré sans le décaler
-              quand le bouton de flip est seul de son côté. */}
           <View style={styles.roundButton} />
         </View>
 
+        {/* Mode selector */}
         <View style={styles.modes}>
           {(['photo', 'video'] as const).map((item) => (
             <Pressable
@@ -312,10 +445,6 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
     gap: postSpacing.rowGap,
   },
-  durations: { flexDirection: 'row', justifyContent: 'center', gap: postSpacing.inlineGap },
-  duration: { paddingVertical: 5, paddingHorizontal: 12 },
-  durationText: { color: postColors.textTertiary, ...postType.composeTab },
-  durationTextOn: { color: postColors.onMedia },
 
   shutterRow: {
     flexDirection: 'row',
@@ -346,7 +475,6 @@ const styles = StyleSheet.create({
     borderRadius: 29,
     backgroundColor: postColors.onMedia,
   },
-  /* Le carré est la convention universelle du « appuyer pour arrêter ». */
   shutterRecording: {
     width: 26,
     height: 26,
