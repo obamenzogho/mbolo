@@ -18,8 +18,9 @@
    Le composant ne navigue pas : il remonte le média par `onCapture` et
    laisse l'orchestrateur décider de la suite. */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import { CameraView, useCameraPermissions } from 'expo-camera'
 import { useIsFocused } from '@react-navigation/native'
 import * as Haptics from 'expo-haptics'
@@ -93,10 +94,41 @@ export function ComposeCamera({ onCapture, topBarInset }: ComposeCameraProps) {
 
   useEffect(() => clearTimer, [clearTimer])
 
-  /* ── Zoom par double-tap (1x ↔ 2x) ─────────────────────────────── */
-  const handleDoubleTap = useCallback(() => {
-    setZoomLevel((prev) => (prev > 0 ? 0 : 0.2))
-  }, [])
+  /* ── Zoom geste pince ─────────────────────────────────────────── */
+  /* zoomLevel est 0→1 pour expo-camera (0 = pas de zoom, 1 = max).
+     On stocke le zoom au début du geste et on applique e.scale (cumulatif)
+     par rapport à cette valeur de départ — jamais par rapport à l'état
+     courant, sinon le zoom se compounding exponentiellement. */
+  const baseZoomRef = useRef(0)
+
+  const pinchGesture = useMemo(
+    () =>
+      Gesture.Pinch()
+        .onStart(() => {
+          baseZoomRef.current = zoomLevel
+        })
+        .onUpdate((e) => {
+          const next = baseZoomRef.current * e.scale
+          setZoomLevel(Math.min(1, Math.max(0, next)))
+        }),
+    [zoomLevel],
+  )
+
+  /* Double-tap = reset zoom */
+  const doubleTapGesture = useMemo(
+    () =>
+      Gesture.Tap()
+        .numberOfTaps(2)
+        .onEnd(() => {
+          setZoomLevel(0)
+        }),
+    [],
+  )
+
+  const composedGestures = useMemo(
+    () => Gesture.Race(doubleTapGesture, pinchGesture),
+    [doubleTapGesture, pinchGesture],
+  )
 
   /* ── Stop recording ───────────────────────────────────────────── */
   const stopRecording = useCallback(() => {
@@ -129,7 +161,6 @@ export function ComposeCamera({ onCapture, topBarInset }: ComposeCameraProps) {
           uri: video.uri,
           type: 'video',
           duration: Math.max(1, elapsedRef.current),
-          captureSpeed,
         })
       }
     } catch (e) {
@@ -259,16 +290,20 @@ export function ComposeCamera({ onCapture, topBarInset }: ComposeCameraProps) {
   return (
     <View style={styles.root}>
       {/* ── CameraView ─────────────────────────────────────────────── */}
-      {isFocused && permission?.granted ? (
-        <CameraView
-          ref={cameraRef}
-          style={StyleSheet.absoluteFill}
-          facing={facing}
-          mode={captureMode === 'video' ? 'video' : 'picture'}
-          flash={flash}
-          zoom={zoomLevel}
-        />
-      ) : null}
+      <GestureDetector gesture={composedGestures}>
+        <View style={StyleSheet.absoluteFill}>
+          {isFocused && permission?.granted ? (
+            <CameraView
+              ref={cameraRef}
+              style={StyleSheet.absoluteFill}
+              facing={facing}
+              mode={captureMode === 'video' ? 'video' : 'picture'}
+              flash={flash}
+              zoom={zoomLevel}
+            />
+          ) : null}
+        </View>
+      </GestureDetector>
 
       {/* ── Overlays (grid, ratio mask, zoom indicator) ────────────── */}
       <CameraOverlay
