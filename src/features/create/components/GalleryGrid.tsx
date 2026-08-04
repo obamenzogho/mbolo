@@ -284,12 +284,6 @@ function GalleryGridComponent({
 
   return (
     <View style={styles.root}>
-      <AlbumPickerButton
-        albums={albums}
-        currentId={albumId}
-        open={pickerOpen}
-        onToggleOpen={handleTogglePicker}
-      />
       <FlatList
         data={assets}
         keyExtractor={(item) => item.id}
@@ -397,6 +391,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   durationText: { color: '#fff', fontSize: 10, fontWeight: '500' },
+  singleSelectedOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
   selectedOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.35)',
