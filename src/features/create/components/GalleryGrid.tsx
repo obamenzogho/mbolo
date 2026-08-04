@@ -298,10 +298,10 @@ const GridCell = memo(function GridCell({
         </View>
       ) : null}
 
-      {selectionMode === 'multi' && selected ? <View style={styles.selectedOverlay} /> : null}
-      {selectionMode === 'multi' && selected ? (
+      {selected ? <View style={styles.selectedOverlay} /> : null}
+      {selected ? (
         <View style={styles.badge}>
-          {selectionIndex !== undefined ? (
+          {selectionMode === 'multi' && selectionIndex !== undefined ? (
             <Text style={styles.badgeNumber}>{selectionIndex}</Text>
           ) : (
             <Ionicons name="checkmark" size={14} color="#fff" />
