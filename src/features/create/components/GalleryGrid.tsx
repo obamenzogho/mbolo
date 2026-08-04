@@ -8,9 +8,10 @@
    `getAssetInfoAsync` par cellule, donc aucun surcoût ni surchauffe.
 
    La sélection est portée par le flux (`selectedUris`), pas par ce
-   composant : l'écran garde la règle « une photo ou une vidéo ». */
+   composant. L'album est géré par le parent (`SelectScreen`) via la prop
+   `albumId`. */
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import {
   FlatList,
   Linking,
@@ -24,10 +25,8 @@ import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import * as MediaLibrary from 'expo-media-library'
 import { useI18n } from '@/i18n'
-import { captureException } from '@/lib/sentry'
 import type { GalleryAsset } from '@/hooks/useGallery'
 import { createColors } from '../theme/createTokens'
-import { AlbumPickerButton, AlbumPickerList, type AlbumOption } from './AlbumPicker'
 
 interface GalleryGridProps {
   selectedUris: string[]
@@ -40,14 +39,13 @@ interface GalleryGridProps {
   /* Index de sélection (1, 2, 3, 4) pour chaque URI. Si absent, on affiche
      un checkmark simple (rétrocompatibilité). */
   selectionOrder?: Map<string, number>
+  /* ID de l'album sélectionné. Si null, affiche toute la pellicule. */
+  albumId?: string | null
 }
 
 const COLUMNS = 3
 const GAP = 2
 const PAGE_SIZE = 60
-
-/* Albums système sans intérêt ici : ils ne contiennent rien de publiable. */
-const HIDDEN_ALBUMS = new Set(['Hidden', 'Recently Deleted', 'Masqué', 'Supprimés récemment'])
 
 function formatDuration(seconds: number): string {
   const s = Math.round(seconds)
@@ -62,6 +60,7 @@ function GalleryGridComponent({
   selectionMode = 'single',
   onSelectImmediate,
   selectionOrder,
+  albumId,
 }: GalleryGridProps) {
   const { t } = useI18n()
   const { width } = useWindowDimensions()
@@ -69,9 +68,6 @@ function GalleryGridComponent({
   const [assets, setAssets] = useState<GalleryAsset[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [rawAlbums, setRawAlbums] = useState<MediaLibrary.Album[]>([])
-  const [albumId, setAlbumId] = useState<string | null>(null)
-  const [pickerOpen, setPickerOpen] = useState(false)
 
   const cursorRef = useRef<string | null>(null)
   const loadingRef = useRef(false)
@@ -80,6 +76,19 @@ function GalleryGridComponent({
 
   const granted = permission?.status === 'granted'
   const askedRef = useRef(false)
+
+  /* Réinitialiser la grille quand l'album change. */
+  const prevAlbumIdRef = useRef(albumId)
+  useEffect(() => {
+    if (prevAlbumIdRef.current !== albumId) {
+      prevAlbumIdRef.current = albumId
+      cursorRef.current = null
+      hasMoreRef.current = true
+      setAssets([])
+      /* Le rechargement est déclenché par la dépendance `albumId` de
+         loadAssets ci-dessous. */
+    }
+  }, [albumId])
 
   /* Une seule demande par montage : l'objet `permission` change d'identité à
      chaque rendu, sans ce garde la demande repartirait en boucle. */
@@ -94,9 +103,6 @@ function GalleryGridComponent({
   const loadAssets = useCallback(
     async (reset = false) => {
       if (!granted) return
-      /* Une remise à zéro passe outre un chargement en cours : sans ça, un
-         changement d'album pendant une page laisserait la grille sur
-         l'album précédent. Le jeton rend l'ancienne requête sans effet. */
       if (!reset && loadingRef.current) return
       if (!reset && !hasMoreRef.current) return
 
@@ -112,8 +118,6 @@ function GalleryGridComponent({
         if (albumId) {
           options.album = albumId
         }
-        /* `after` non renseigné : on ne le passe PAS — `after: undefined`
-           explicite peut faire échouer la requête nativement. */
         if (!reset && cursorRef.current) {
           options.after = cursorRef.current
         }
@@ -141,8 +145,6 @@ function GalleryGridComponent({
         if (token !== requestRef.current) return
         setError(e instanceof Error ? e.message : String(e))
       } finally {
-        /* Une requête périmée ne relâche pas le verrou : celle qui l'a
-           remplacée est encore en vol et en est propriétaire. */
         if (token === requestRef.current) {
           loadingRef.current = false
           setLoading(false)
@@ -152,64 +154,10 @@ function GalleryGridComponent({
     [granted, albumId],
   )
 
-  /* Chargement initial une seule fois : `usePermissions` renvoie un objet
-     neuf à chaque rendu, donc dépendre de lui rechargerait la pellicule en
-     boucle. Le booléen `granted` ne change qu'à l'octroi réel. */
+  /* Chargement initial + rechargement quand albumId change. */
   useEffect(() => {
     if (granted) loadAssets(true)
   }, [granted, loadAssets])
-
-  /* Les albums ne changent pas en cours de session : un seul chargement.
-     Un échec ne remonte pas d'erreur — la pellicule complète reste lisible,
-     seul le sélecteur disparaît. */
-  useEffect(() => {
-    if (!granted) return
-    let alive = true
-    MediaLibrary.getAlbumsAsync({ includeSmartAlbums: true })
-      .then((found) => {
-        if (alive) setRawAlbums(found)
-      })
-      .catch((error) => {
-        captureException(error instanceof Error ? error : new Error(String(error)), {
-          context: 'create.galleryAlbums',
-        })
-      })
-    return () => {
-      alive = false
-    }
-  }, [granted])
-
-  /* Dépendance sur la chaîne, pas sur `t` : `getTranslation` renvoie un objet
-     neuf à chaque rendu, la mémoïsation serait sans effet. */
-  const allLabel = t.news.compose.galleryAlbumAll
-  const albums = useMemo<AlbumOption[]>(
-    () => [
-      { id: null, title: allLabel, assetCount: 0 },
-      ...rawAlbums
-        .filter((a) => a.assetCount > 0 && !HIDDEN_ALBUMS.has(a.title))
-        .map((a) => ({ id: a.id, title: a.title, assetCount: a.assetCount })),
-    ],
-    [rawAlbums, allLabel],
-  )
-
-  /* Changer d'album repart de zéro : le curseur de l'album précédent n'a
-     aucun sens dans le nouveau. On vide aussi la grille — laisser les photos
-     de l'ancien album sous le nom du nouveau serait un mensonge le temps du
-     chargement. Le rechargement vient de l'effet ci-dessus, `loadAssets`
-     changeant d'identité avec `albumId`. */
-  const handleSelectAlbum = useCallback(
-    (id: string | null) => {
-      setPickerOpen(false)
-      if (id === albumId) return
-      cursorRef.current = null
-      hasMoreRef.current = true
-      setAssets([])
-      setAlbumId(id)
-    },
-    [albumId],
-  )
-
-  const handleTogglePicker = useCallback(() => setPickerOpen((v) => !v), [])
 
   const handleEndReached = useCallback(() => {
     loadAssets(false)
@@ -235,9 +183,7 @@ function GalleryGridComponent({
     [selectedUris, selectionOrder, onToggle, cellSize, selectionMode, onSelectImmediate],
   )
 
-  /* Permission non donnée : porte d'entrée vers la demande ou les réglages.
-     L'en-tête est conservé — l'aperçu vient de `SelectScreen` et n'a pas à
-     s'évanouir parce que la pellicule est inaccessible. */
+  /* Permission non donnée : porte d'entrée vers la demande ou les réglages. */
   if (permission && !granted) {
     const denied = !permission.canAskAgain
     const openSettings = () => Linking.openSettings()
@@ -304,10 +250,6 @@ function GalleryGridComponent({
           )
         }
       />
-
-      {pickerOpen ? (
-        <AlbumPickerList albums={albums} currentId={albumId} onSelect={handleSelectAlbum} />
-      ) : null}
     </View>
   )
 }
