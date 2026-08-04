@@ -10,6 +10,8 @@
 
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Image } from 'expo-image'
+import { Video, ResizeMode } from 'expo-av'
 import { Ionicons } from '@expo/vector-icons'
 import { useI18n } from '@/i18n'
 import * as MediaLibrary from 'expo-media-library'
@@ -170,6 +172,9 @@ function SelectScreenComponent({
   const [albums, setAlbums] = useState<AlbumOption[]>([])
   const [albumId, setAlbumId] = useState<string | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
+  /* Média capturé par la caméra : affiche un aperçu plein écran avant
+     d'aller à l'éditeur (comportement TikTok). */
+  const [capturedMedia, setCapturedMedia] = useState<SelectedMedia | null>(null)
 
   const allLabel = t.news.compose.galleryAlbumAll
   const currentAlbum = albums.find((a) => a.id === albumId)
@@ -217,6 +222,21 @@ function SelectScreenComponent({
     onSelectAsset(asset, true)
   }, [onSelectAsset])
 
+  /* ── Caméra : capture → aperçu → suivant ───────────────────────── */
+  const handleCameraCapture = useCallback((captured: SelectedMedia) => {
+    setCapturedMedia(captured)
+  }, [])
+
+  const handleConfirmCapture = useCallback(() => {
+    if (!capturedMedia) return
+    onCapture(capturedMedia)
+    setCapturedMedia(null)
+  }, [capturedMedia, onCapture])
+
+  const handleDiscardCapture = useCallback(() => {
+    setCapturedMedia(null)
+  }, [])
+
   /* ── Selection order pour le mode multi ────────────────────────── */
   const selectionOrder = useMemo(() => {
     if (selectionMode !== 'multi') return undefined
@@ -227,9 +247,52 @@ function SelectScreenComponent({
 
   /* ── Rendu mode caméra ─────────────────────────────────────────── */
   if (mode === 'camera') {
+    /* Aperçu après capture (style TikTok) : photo/vidéo plein écran
+       avec boutons retour et « Suivant ». */
+    if (capturedMedia) {
+      return (
+        <View style={styles.screen}>
+          {capturedMedia.type === 'video' ? (
+            <Video
+              source={{ uri: capturedMedia.uri }}
+              style={StyleSheet.absoluteFill}
+              resizeMode={ResizeMode.COVER}
+              shouldPlay
+              isLooping
+              useNativeControls={false}
+            />
+          ) : (
+            <Image
+              source={{ uri: capturedMedia.uri }}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+            />
+          )}
+          {/* Bouton retour (annuler la capture) */}
+          <Pressable
+            onPress={handleDiscardCapture}
+            accessibilityRole="button"
+            accessibilityLabel="Reprendre la photo"
+            style={({ pressed }) => [styles.cameraBackBtn, pressed && { opacity: 0.6 }]}
+          >
+            <Ionicons name="close" size={28} color="#fff" />
+          </Pressable>
+          {/* Bouton « Suivant » (confirmer → éditeur) */}
+          <Pressable
+            onPress={handleConfirmCapture}
+            accessibilityRole="button"
+            accessibilityLabel={nextLabel}
+            style={({ pressed }) => [styles.cameraNextBtn, pressed && { opacity: 0.6 }]}
+          >
+            <Text style={styles.cameraNextText}>{nextLabel}</Text>
+          </Pressable>
+        </View>
+      )
+    }
+
     return (
       <View style={styles.screen}>
-        <ComposeCamera onCapture={onCapture} topBarInset={64} />
+        <ComposeCamera onCapture={handleCameraCapture} topBarInset={64} />
         <Pressable
           onPress={() => onModeChange('gallery')}
           accessibilityRole="button"
@@ -238,21 +301,6 @@ function SelectScreenComponent({
         >
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </Pressable>
-        {onNext ? (
-          <Pressable
-            onPress={onNext}
-            disabled={nextDisabled}
-            accessibilityRole="button"
-            accessibilityLabel={nextLabel}
-            style={({ pressed }) => [
-              styles.cameraNextBtn,
-              nextDisabled && styles.cameraNextBtnDisabled,
-              pressed && { opacity: 0.6 },
-            ]}
-          >
-            <Text style={styles.cameraNextText}>{nextLabel}</Text>
-          </Pressable>
-        ) : null}
       </View>
     )
   }
