@@ -10,7 +10,6 @@
    La sélection est portée par le flux (`selectedUris`), pas par ce
    composant : l'écran garde la règle « une photo ou une vidéo ». */
 
-import type { ReactElement } from 'react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   FlatList,
@@ -25,6 +24,7 @@ import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import * as MediaLibrary from 'expo-media-library'
 import { useI18n } from '@/i18n'
+import { captureException } from '@/lib/sentry'
 import type { GalleryAsset } from '@/hooks/useGallery'
 import { createColors } from '../theme/createTokens'
 import { AlbumPickerButton, AlbumPickerList, type AlbumOption } from './AlbumPicker'
@@ -32,9 +32,11 @@ import { AlbumPickerButton, AlbumPickerList, type AlbumOption } from './AlbumPic
 interface GalleryGridProps {
   selectedUris: string[]
   onToggle: (asset: GalleryAsset) => void
-  /* Rendu au-dessus de la grille, à l'intérieur de la liste : l'aperçu de
-     `SelectScreen` défile ainsi avec la pellicule et libère l'écran. */
-  header?: ReactElement | null
+  /* Mode de sélection : 'single' (défaut) → tap = sélection immédiate,
+     'multi' → tap = toggle avec badges numérotés. */
+  selectionMode?: 'single' | 'multi'
+  /* Appelé en mode single quand l'utilisateur tape sur une cellule. */
+  onSelectImmediate?: (asset: GalleryAsset) => void
   /* Index de sélection (1, 2, 3, 4) pour chaque URI. Si absent, on affiche
      un checkmark simple (rétrocompatibilité). */
   selectionOrder?: Map<string, number>
@@ -54,7 +56,13 @@ function formatDuration(seconds: number): string {
   return `${m}:${r.toString().padStart(2, '0')}`
 }
 
-function GalleryGridComponent({ selectedUris, onToggle, header, selectionOrder }: GalleryGridProps) {
+function GalleryGridComponent({
+  selectedUris,
+  onToggle,
+  selectionMode = 'single',
+  onSelectImmediate,
+  selectionOrder,
+}: GalleryGridProps) {
   const { t } = useI18n()
   const { width } = useWindowDimensions()
   const [permission, requestPermission] = MediaLibrary.usePermissions()
@@ -161,7 +169,11 @@ function GalleryGridComponent({ selectedUris, onToggle, header, selectionOrder }
       .then((found) => {
         if (alive) setRawAlbums(found)
       })
-      .catch(() => {})
+      .catch((error) => {
+        captureException(error instanceof Error ? error : new Error(String(error)), {
+          context: 'create.galleryAlbums',
+        })
+      })
     return () => {
       alive = false
     }
@@ -215,10 +227,12 @@ function GalleryGridComponent({ selectedUris, onToggle, header, selectionOrder }
         size={cellSize}
         selected={selectedUris.includes(item.uri)}
         selectionIndex={selectionOrder?.get(item.uri)}
+        selectionMode={selectionMode}
         onToggle={onToggle}
+        onSelectImmediate={onSelectImmediate}
       />
     ),
-    [selectedUris, selectionOrder, onToggle, cellSize],
+    [selectedUris, selectionOrder, onToggle, cellSize, selectionMode, onSelectImmediate],
   )
 
   /* Permission non donnée : porte d'entrée vers la demande ou les réglages.
@@ -229,7 +243,6 @@ function GalleryGridComponent({ selectedUris, onToggle, header, selectionOrder }
     const openSettings = () => Linking.openSettings()
     return (
       <View style={styles.root}>
-        {header}
         <View style={styles.gate}>
           <Ionicons name="images-outline" size={52} color={createColors.textTertiary} />
           <Text style={styles.gateText}>
@@ -253,7 +266,6 @@ function GalleryGridComponent({ selectedUris, onToggle, header, selectionOrder }
   if (error && assets.length === 0) {
     return (
       <View style={styles.root}>
-        {header}
         <View style={styles.gate}>
           <Ionicons name="alert-circle-outline" size={52} color={createColors.textTertiary} />
           <Text style={styles.gateText}>{t.news.compose.galleryError}</Text>
@@ -272,6 +284,12 @@ function GalleryGridComponent({ selectedUris, onToggle, header, selectionOrder }
 
   return (
     <View style={styles.root}>
+      <AlbumPickerButton
+        albums={albums}
+        currentId={albumId}
+        open={pickerOpen}
+        onToggleOpen={handleTogglePicker}
+      />
       <FlatList
         data={assets}
         keyExtractor={(item) => item.id}
@@ -284,17 +302,6 @@ function GalleryGridComponent({ selectedUris, onToggle, header, selectionOrder }
         initialNumToRender={12}
         windowSize={5}
         showsVerticalScrollIndicator={false}
-        ListHeaderComponent={
-          <View>
-            {header}
-            <AlbumPickerButton
-              albums={albums}
-              currentId={albumId}
-              open={pickerOpen}
-              onToggleOpen={handleTogglePicker}
-            />
-          </View>
-        }
         ListEmptyComponent={
           loading ? null : (
             <View style={styles.empty}>
@@ -316,17 +323,29 @@ const GridCell = memo(function GridCell({
   size,
   selected,
   selectionIndex,
+  selectionMode,
   onToggle,
+  onSelectImmediate,
 }: {
   item: GalleryAsset
   size: number
   selected: boolean
   selectionIndex?: number
+  selectionMode: 'single' | 'multi'
   onToggle: (asset: GalleryAsset) => void
+  onSelectImmediate?: (asset: GalleryAsset) => void
 }) {
+  const handlePress = useCallback(() => {
+    if (selectionMode === 'single' && onSelectImmediate) {
+      onSelectImmediate(item)
+    } else {
+      onToggle(item)
+    }
+  }, [selectionMode, item, onToggle, onSelectImmediate])
+
   return (
     <Pressable
-      onPress={() => onToggle(item)}
+      onPress={handlePress}
       accessibilityRole="button"
       accessibilityState={{ selected }}
       accessibilityLabel={item.filename}
@@ -343,8 +362,8 @@ const GridCell = memo(function GridCell({
         </View>
       ) : null}
 
-      {selected ? <View style={styles.selectedOverlay} /> : null}
-      {selected ? (
+      {selectionMode === 'multi' && selected ? <View style={styles.selectedOverlay} /> : null}
+      {selectionMode === 'multi' && selected ? (
         <View style={styles.badge}>
           {selectionIndex !== undefined ? (
             <Text style={styles.badgeNumber}>{selectionIndex}</Text>
