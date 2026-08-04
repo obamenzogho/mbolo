@@ -334,11 +334,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  /* Bouton retour caméra — aligné avec l'icône flash du topBar (padding 14 + centre du bouton 22) */
+  /* Bouton retour caméra — après l'icône flash (padding 14 + bouton 44 + gap 8) */
   cameraBackBtn: {
     position: 'absolute',
     top: 16,
-    left: 12,
+    left: 66,
     width: 40,
     height: 40,
     borderRadius: 20,
