@@ -229,7 +229,7 @@ function SelectScreenComponent({
   if (mode === 'camera') {
     return (
       <View style={styles.screen}>
-        <ComposeCamera onCapture={onCapture} />
+        <ComposeCamera onCapture={onCapture} topBarInset={64} />
         <Pressable
           onPress={() => onModeChange('gallery')}
           accessibilityRole="button"

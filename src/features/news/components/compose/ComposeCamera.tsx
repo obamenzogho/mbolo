@@ -40,9 +40,12 @@ function formatTime(seconds: number): string {
 
 interface ComposeCameraProps {
   onCapture: (media: SelectedMedia) => void
+  /* Décalage horizontal du topBar pour laisser de la place à un bouton
+     overlay (ex. bouton retour dans SelectScreen). */
+  topBarInset?: number
 }
 
-export function ComposeCamera({ onCapture }: ComposeCameraProps) {
+export function ComposeCamera({ onCapture, topBarInset }: ComposeCameraProps) {
   const { t } = useI18n()
   const isFocused = useIsFocused()
   const cameraRef = useRef<CameraView>(null)
@@ -175,7 +178,7 @@ export function ComposeCamera({ onCapture }: ComposeCameraProps) {
         />
       ) : null}
 
-      <View style={styles.topBar}>
+      <View style={[styles.topBar, topBarInset ? { paddingLeft: topBarInset } : undefined]}>
         <Pressable
           onPress={() => setFlash((f) => (f === 'on' ? 'off' : 'on'))}
           hitSlop={HIT_SLOP}
