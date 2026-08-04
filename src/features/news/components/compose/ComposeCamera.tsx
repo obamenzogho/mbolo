@@ -7,7 +7,7 @@
    - Flash (on/off)
    - Switch caméra avant/arrière
    - Timer (none, 3s, 10s)
-   - Zoom pince (pinch-to-zoom)
+   - Zoom pince (PanResponder, 0..1 du zoom max de l'appareil)
    - Grid of thirds
    - Ratio d'aspect (9:16, 1:1, 4:5, 16:9, Original)
    - Mode rafale (burst, photo uniquement)
@@ -19,8 +19,8 @@
    laisse l'orchestrateur décider de la suite. */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { Gesture, GestureDetector } from 'react-native-gesture-handler'
+import { PanResponder, Pressable, StyleSheet, Text, View } from 'react-native'
+import type { GestureResponderEvent, NativeTouchEvent } from 'react-native'
 import { CameraView, useCameraPermissions } from 'expo-camera'
 import { useIsFocused } from '@react-navigation/native'
 import * as Haptics from 'expo-haptics'
@@ -37,6 +37,7 @@ import {
 } from '../../theme/postTokens'
 import type { SelectedMedia } from '../../hooks/useComposeState'
 import type { AspectRatioValue, CaptureSpeed } from '@/features/create/types/editing'
+import { DEFAULT_VIDEO_EDIT } from '@/features/create/types/editing'
 import { CameraOverlay } from '@/features/create/components/camera/CameraOverlay'
 import { CameraToolbar } from '@/features/create/components/camera/CameraToolbar'
 
@@ -49,23 +50,51 @@ function formatTime(seconds: number): string {
 }
 
 const BURST_INTERVAL_MS = 150
-const BURST_LIMIT = 10
-const MAX_ZOOM = 10
-const MIN_ZOOM = 0.5
+const DEFAULT_BURST_LIMIT = 10
+/** Compromis Instagram : au-delà, le poids monte sans gain visible. */
+const PHOTO_QUALITY = 0.8
+/* `zoom` d'expo-camera est un pourcentage du zoom max de l'appareil (0..1),
+   pas un facteur optique. */
+const MIN_ZOOM = 0
+const MAX_ZOOM = 1
+/* Écart de doigts (px) au-delà duquel on couvre toute la plage de zoom.
+   Plus la valeur est haute, plus le geste est fin. */
+const PINCH_RANGE_PX = 400
+
+function touchDistance(touches: NativeTouchEvent[]): number {
+  const [a, b] = touches
+  return Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY)
+}
 
 interface ComposeCameraProps {
+  /** Capture unitaire : une photo ou une vidéo. */
   onCapture: (media: SelectedMedia) => void
+  /* Rafale : les clichés arrivent groupés, pour que le parent puisse en
+     faire un carrousel plutôt que d'écraser chaque photo par la suivante.
+     Sans ce callback, le mode rafale est indisponible. */
+  onCaptureBurst?: (media: SelectedMedia[]) => void
+  /* Nombre max de clichés par rafale. Le parent le fixe sur sa propre
+     limite de carrousel : capturer au-delà remplirait le disque pour rien. */
+  burstLimit?: number
   /* Décalage horizontal du topBar pour laisser de la place à un bouton
      overlay (ex. bouton retour dans SelectScreen). */
   topBarInset?: number
 }
 
-export function ComposeCamera({ onCapture, topBarInset }: ComposeCameraProps) {
+export function ComposeCamera({
+  onCapture,
+  onCaptureBurst,
+  burstLimit = DEFAULT_BURST_LIMIT,
+  topBarInset,
+}: ComposeCameraProps) {
   const { t } = useI18n()
   const isFocused = useIsFocused()
   const cameraRef = useRef<CameraView>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const burstRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  /* Drapeau de rafale en cours : lu dans une boucle async, il doit être
+     une ref (un state serait figé à la valeur du rendu qui l'a lancée). */
+  const burstActiveRef = useRef(false)
+  const mountedRef = useRef(true)
 
   const [permission, requestPermission] = useCameraPermissions()
   const [captureMode, setCaptureMode] = useState<CaptureMode>('photo')
@@ -82,9 +111,56 @@ export function ComposeCamera({ onCapture, topBarInset }: ComposeCameraProps) {
   const [captureSpeed, setCaptureSpeed] = useState<CaptureSpeed>('1')
   const [isBursting, setIsBursting] = useState(false)
   const [burstCount, setBurstCount] = useState(0)
-  const burstCountRef = useRef(0)
-  /* zoom = 0→1 pour expo-camera (0 = pas de zoom, 1 = zoom max). */
-  const [zoomLevel, setZoomLevel] = useState(0)
+  const [zoom, setZoom] = useState(MIN_ZOOM)
+
+  /* ── Pinch-to-zoom ────────────────────────────────────────────── */
+  /* `PanResponder` plutôt que `react-native-gesture-handler` : envelopper
+     `CameraView` dans un `GestureDetector` fait planter l'app sous Expo Go.
+     La prop `isPinchToZoomEnabled` d'expo-camera 17 n'existe que sur les
+     options de scan de code-barres, pas sur `CameraView`. */
+  const pinchStartRef = useRef<{ distance: number; zoom: number } | null>(null)
+  const zoomRef = useRef(MIN_ZOOM)
+
+  const pinchResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: (event: GestureResponderEvent) =>
+          event.nativeEvent.touches.length === 2,
+        onMoveShouldSetPanResponder: (event: GestureResponderEvent) =>
+          event.nativeEvent.touches.length === 2,
+        onPanResponderGrant: (event: GestureResponderEvent) => {
+          const { touches } = event.nativeEvent
+          if (touches.length !== 2) return
+          pinchStartRef.current = { distance: touchDistance(touches), zoom: zoomRef.current }
+        },
+        onPanResponderMove: (event: GestureResponderEvent) => {
+          const { touches } = event.nativeEvent
+          const start = pinchStartRef.current
+          /* Un doigt levé en cours de geste : on attend le prochain pinch
+             plutôt que d'interpréter le mouvement restant comme un zoom. */
+          if (touches.length !== 2 || !start) return
+          const delta = (touchDistance(touches) - start.distance) / PINCH_RANGE_PX
+          const next = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, start.zoom + delta))
+          zoomRef.current = next
+          setZoom(next)
+        },
+        onPanResponderRelease: () => {
+          pinchStartRef.current = null
+        },
+        onPanResponderTerminate: () => {
+          pinchStartRef.current = null
+        },
+      }),
+    [],
+  )
+
+  /* Le zoom est propre à l'objectif : le garder au retournement donnerait
+     un cadrage arbitraire sur la caméra frontale. */
+  const handleFlipCamera = useCallback(() => {
+    setFacing((f) => (f === 'back' ? 'front' : 'back'))
+    zoomRef.current = MIN_ZOOM
+    setZoom(MIN_ZOOM)
+  }, [])
 
   /* ── Timer enregistrement ─────────────────────────────────────── */
   const clearTimer = useCallback(() => {
@@ -93,48 +169,6 @@ export function ComposeCamera({ onCapture, topBarInset }: ComposeCameraProps) {
   }, [])
 
   useEffect(() => clearTimer, [clearTimer])
-
-  /* ── Zoom geste pince ─────────────────────────────────────────── */
-  /* zoomLevel est 0→1 pour expo-camera (0 = pas de zoom, 1 = max).
-     Le geste est créé UNE SEULE FOIS (deps vides) et lit/écrit le zoom via
-     des refs : si on dépendait de `zoomLevel`, le geste serait recréé à
-     chaque mise à jour de zoom pendant qu'il est actif, ce qui fait crasher
-     react-native-gesture-handler sur iOS. */
-  const baseZoomRef = useRef(0)
-  const zoomLevelRef = useRef(0)
-  const applyZoom = useCallback((next: number) => {
-    const clamped = Math.min(1, Math.max(0, next))
-    zoomLevelRef.current = clamped
-    setZoomLevel(clamped)
-  }, [])
-
-  const pinchGesture = useMemo(
-    () =>
-      Gesture.Pinch()
-        .onStart(() => {
-          baseZoomRef.current = zoomLevelRef.current
-        })
-        .onUpdate((e) => {
-          applyZoom(baseZoomRef.current * e.scale)
-        }),
-    [applyZoom],
-  )
-
-  /* Double-tap = reset zoom */
-  const doubleTapGesture = useMemo(
-    () =>
-      Gesture.Tap()
-        .numberOfTaps(2)
-        .onEnd(() => {
-          applyZoom(0)
-        }),
-    [applyZoom],
-  )
-
-  const composedGestures = useMemo(
-    () => Gesture.Race(doubleTapGesture, pinchGesture),
-    [doubleTapGesture, pinchGesture],
-  )
 
   /* ── Stop recording ───────────────────────────────────────────── */
   const stopRecording = useCallback(() => {
@@ -163,10 +197,16 @@ export function ComposeCamera({ onCapture, topBarInset }: ComposeCameraProps) {
     try {
       const video = await cameraRef.current.recordAsync({ maxDuration })
       if (video?.uri) {
+        const speed = Number(captureSpeed)
         onCapture({
           uri: video.uri,
           type: 'video',
-          duration: Math.max(1, elapsedRef.current),
+          /* Durée après application de la vitesse : à 2x, la vidéo rendue
+             dure deux fois moins longtemps que la prise de vue. */
+          duration: Math.max(1, Math.round(elapsedRef.current / speed)),
+          /* La vitesse n'est pas appliquée à la capture (expo-camera filme
+             toujours en temps réel) mais au rendu FFmpeg. */
+          video: { ...DEFAULT_VIDEO_EDIT, speed },
         })
       }
     } catch (e) {
@@ -184,7 +224,7 @@ export function ComposeCamera({ onCapture, topBarInset }: ComposeCameraProps) {
     if (!cameraRef.current) return
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
-      const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 })
+      const photo = await cameraRef.current.takePictureAsync({ quality: PHOTO_QUALITY })
       if (photo?.uri) {
         onCapture({
           uri: photo.uri,
@@ -199,75 +239,84 @@ export function ComposeCamera({ onCapture, topBarInset }: ComposeCameraProps) {
   }, [onCapture])
 
   /* ── Burst mode ───────────────────────────────────────────────── */
-  const startBurst = useCallback(() => {
-    if (captureMode !== 'photo' || isBursting) return
-    setIsBursting(true)
-    burstCountRef.current = 0
-    setBurstCount(0)
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy)
+  /* Boucle séquentielle plutôt qu'un setInterval : `takePictureAsync`
+     peut dépasser l'intervalle, et deux prises concurrentes sur la même
+     référence caméra font échouer la seconde. On attend donc chaque
+     cliché avant de programmer le suivant. */
+  const runBurst = useCallback(async () => {
+    const frames: SelectedMedia[] = []
 
-    burstRef.current = setInterval(() => {
-      if (burstCountRef.current >= BURST_LIMIT) {
-        stopBurst()
-        return
-      }
-      if (!cameraRef.current) return
-      cameraRef.current.takePictureAsync({ quality: 0.8 }).then((photo) => {
+    try {
+      while (burstActiveRef.current && frames.length < burstLimit) {
+        if (!cameraRef.current) break
+
+        const photo = await cameraRef.current.takePictureAsync({ quality: PHOTO_QUALITY })
         if (photo?.uri) {
-          onCapture({
+          frames.push({
             uri: photo.uri,
             type: 'image',
             width: photo.width,
             height: photo.height,
           })
+          if (mountedRef.current) setBurstCount(frames.length)
         }
-      }).catch(() => {})
-      burstCountRef.current += 1
-      setBurstCount(burstCountRef.current)
-    }, BURST_INTERVAL_MS)
-  }, [captureMode, isBursting, onCapture])
+
+        if (!burstActiveRef.current || frames.length >= burstLimit) break
+        await new Promise((resolve) => setTimeout(resolve, BURST_INTERVAL_MS))
+      }
+    } catch (e) {
+      /* Une prise ratée n'annule pas la rafale : on remonte ce qui a été
+         capturé avant l'erreur plutôt que de tout perdre. */
+      captureException(e instanceof Error ? e : new Error(String(e)), {
+        context: 'news.compose.burst',
+      })
+    } finally {
+      burstActiveRef.current = false
+      if (mountedRef.current) {
+        setIsBursting(false)
+        setBurstCount(0)
+      }
+      if (frames.length > 0) onCaptureBurst?.(frames)
+    }
+  }, [burstLimit, onCaptureBurst])
+
+  const startBurst = useCallback(() => {
+    /* Sans `onCaptureBurst`, les clichés n'auraient nulle part où aller. */
+    if (!onCaptureBurst || captureMode !== 'photo' || burstActiveRef.current) return
+    burstActiveRef.current = true
+    setIsBursting(true)
+    setBurstCount(0)
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy)
+    void runBurst()
+  }, [onCaptureBurst, captureMode, runBurst])
 
   const stopBurst = useCallback(() => {
-    if (burstRef.current) {
-      clearInterval(burstRef.current)
-      burstRef.current = null
-    }
-    setIsBursting(false)
-    setBurstCount(0)
-    burstCountRef.current = 0
+    burstActiveRef.current = false
   }, [])
 
   useEffect(() => {
     return () => {
-      if (burstRef.current) clearInterval(burstRef.current)
+      mountedRef.current = false
+      burstActiveRef.current = false
     }
   }, [])
 
   /* ── Shutter handler ──────────────────────────────────────────── */
+  /* `onPress` ne se déclenche pas quand `onLongPress` a répondu : un appui
+     court prend une photo, un appui maintenu lance la rafale, et le relâché
+     (`onPressOut`) l'arrête — comme la rafale iOS. */
   const handleShutter = useCallback(() => {
     if (captureMode === 'photo') {
-      if (isBursting) {
-        stopBurst()
-      } else {
-        takePhoto()
-      }
+      takePhoto()
       return
     }
     if (recording) stopRecording()
     else startRecording()
-  }, [captureMode, recording, isBursting, takePhoto, startRecording, stopRecording, stopBurst])
-
-  const handleLongPress = useCallback(() => {
-    if (captureMode === 'photo' && !isBursting) {
-      startBurst()
-    }
-  }, [captureMode, isBursting, startBurst])
+  }, [captureMode, recording, takePhoto, startRecording, stopRecording])
 
   const handlePressOut = useCallback(() => {
-    if (isBursting) {
-      stopBurst()
-    }
-  }, [isBursting, stopBurst])
+    stopBurst()
+  }, [stopBurst])
 
   const handleSwitchMode = useCallback((next: CaptureMode) => {
     if (recording) return
@@ -296,28 +345,24 @@ export function ComposeCamera({ onCapture, topBarInset }: ComposeCameraProps) {
   return (
     <View style={styles.root}>
       {/* ── CameraView ─────────────────────────────────────────────── */}
-      <GestureDetector gesture={composedGestures}>
-        <View style={StyleSheet.absoluteFill}>
-          {isFocused && permission?.granted ? (
-            <CameraView
-              ref={cameraRef}
-              style={StyleSheet.absoluteFill}
-              facing={facing}
-              mode={captureMode === 'video' ? 'video' : 'picture'}
-              flash={flash}
-              zoom={zoomLevel}
-            />
-          ) : null}
-        </View>
-      </GestureDetector>
+      {isFocused && permission?.granted ? (
+        <CameraView
+          ref={cameraRef}
+          style={StyleSheet.absoluteFill}
+          facing={facing}
+          mode={captureMode === 'video' ? 'video' : 'picture'}
+          flash={flash}
+          zoom={zoom}
+        />
+      ) : null}
 
-      {/* ── Overlays (grid, ratio mask, zoom indicator) ────────────── */}
-      <CameraOverlay
-        showGrid={showGrid}
-        aspectRatio={aspectRatio}
-        zoom={zoomLevel}
-        showZoomIndicator
-      />
+      {/* Capteur de pince : posé sous les contrôles (rendus après lui, donc
+          au-dessus), il ne réclame le geste qu'à deux doigts et laisse donc
+          passer les appuis simples. */}
+      <View style={StyleSheet.absoluteFill} {...pinchResponder.panHandlers} />
+
+      {/* ── Overlays (grid, ratio mask) ────────────────────────────── */}
+      <CameraOverlay showGrid={showGrid} aspectRatio={aspectRatio} />
 
       {/* ── Top bar ────────────────────────────────────────────────── */}
       <View style={[styles.topBar, topBarInset ? { paddingLeft: topBarInset } : undefined]}>
@@ -370,7 +415,7 @@ export function ComposeCamera({ onCapture, topBarInset }: ComposeCameraProps) {
         {/* Shutter row */}
         <View style={styles.shutterRow}>
           <Pressable
-            onPress={() => setFacing((f) => (f === 'back' ? 'front' : 'back'))}
+            onPress={handleFlipCamera}
             hitSlop={HIT_SLOP}
             accessibilityRole="button"
             accessibilityLabel={t.news.compose.a11yFlipCamera}
@@ -381,7 +426,7 @@ export function ComposeCamera({ onCapture, topBarInset }: ComposeCameraProps) {
 
           <Pressable
             onPress={handleShutter}
-            onLongPress={handleLongPress}
+            onLongPress={startBurst}
             onPressOut={handlePressOut}
             hitSlop={HIT_SLOP}
             accessibilityRole="button"

@@ -24,10 +24,12 @@ export interface RenderOptions {
   /** PNG transparent des textes/stickers/dessins, à la taille de sortie. */
   overlayUri?: string | null
   onProgress?: (ratio: number) => void
-  /** Renseigné pour permettre l'annulation depuis l'UI. */
+  /** Renseigné pour permettre l'annuation depuis l'UI. */
   onSession?: (sessionId: number) => void
   /** Côté max de sortie. Sert au proxy d'aperçu (320) et aux tests. */
   maxSize?: number
+  /** Mode de géométrie : 'all' = tout, 'straighten' = straighten + couleur (proxy crop tab). */
+  geometryMode?: 'all' | 'color'
 }
 
 export interface RenderResult {
@@ -76,6 +78,17 @@ function complexGraph(chain: string, w: number, h: number, withOverlay: boolean)
   return `[0:v]${chain}[base];[1:v]scale=${w}:${h}[ov];[base][ov]overlay=0:0:format=auto[out]`
 }
 
+/* `atempo` n'accepte qu'un facteur entre 0.5 et 2 : au-delà, on cascade
+   plusieurs passes dont le produit vaut la vitesse demandée. */
+function atempoChain(speed: number): string {
+  const stages: number[] = []
+  let remaining = speed
+  while (remaining > 2) { stages.push(2); remaining /= 2 }
+  while (remaining < 0.5) { stages.push(0.5); remaining /= 0.5 }
+  stages.push(remaining)
+  return stages.map((s) => `atempo=${Math.round(s * 1000) / 1000}`).join(',')
+}
+
 /* ── Photo ────────────────────────────────────────────────────────── */
 
 export async function renderPhoto(
@@ -93,6 +106,7 @@ export async function renderPhoto(
     effectIntensity: media.effectIntensity,
     adjustments: media.adjustments,
     maxSize: options.maxSize ?? 1440,
+    geometryMode: options.geometryMode,
   }
 
   if (!needsRender({ ...input, overlayCount: media.overlay?.length ?? 0 })) {
@@ -152,10 +166,19 @@ export async function renderVideo(
     effectIntensity: media.effectIntensity,
     adjustments: media.adjustments,
     maxSize: options.maxSize ?? 1080,
+    geometryMode: options.geometryMode,
   }
 
   const muted = video?.muted ?? false
-  if (!trimmed && !muted && !needsRender({ ...input, overlayCount: media.overlay?.length ?? 0 })) {
+  /* Vitesse capturée en caméra (0.3x → 3x). 1 = temps réel. */
+  const speed = video?.speed && video.speed > 0 ? video.speed : 1
+  const respeeded = speed !== 1
+  if (
+    !trimmed &&
+    !muted &&
+    !respeeded &&
+    !needsRender({ ...input, overlayCount: media.overlay?.length ?? 0 })
+  ) {
     return { uri: media.uri, width: media.width ?? 0, height: media.height ?? 0 }
   }
 
@@ -164,7 +187,15 @@ export async function renderVideo(
     const { chain, width, height } = buildFilterChain(input)
     const out = `${RENDER_DIR}video-${Date.now()}.mp4`
     const withOverlay = Boolean(options.overlayUri)
-    const durationMs = Math.max(0, (trimEnd || media.duration || 0) - trimStart)
+    const sourceMs = Math.max(0, (trimEnd || media.duration || 0) - trimStart)
+    /* La progression FFmpeg est mesurée sur le flux de sortie : accéléré,
+       il dure moins longtemps que la source. */
+    const durationMs = sourceMs / speed
+    /* `setpts` change la cadence vidéo, `atempo` celle du son : les deux
+       doivent porter le même facteur sous peine de désynchronisation. */
+    const videoChain = respeeded
+      ? `${chain},setpts=${Math.round((1 / speed) * 1000) / 1000}*PTS`
+      : chain
 
     const args = [
       '-y',
@@ -172,10 +203,16 @@ export async function renderVideo(
       ...(trimStart > 0 ? ['-ss', (trimStart / 1000).toFixed(3)] : []),
       '-i', toPath(media.uri),
       ...(withOverlay ? ['-i', toPath(options.overlayUri as string)] : []),
-      ...(durationMs > 0 && trimmed ? ['-t', (durationMs / 1000).toFixed(3)] : []),
-      '-filter_complex', complexGraph(chain, width, height, withOverlay),
+      ...(sourceMs > 0 && trimmed ? ['-t', (sourceMs / 1000).toFixed(3)] : []),
+      '-filter_complex', complexGraph(videoChain, width, height, withOverlay),
       '-map', '[out]',
-      ...(muted ? ['-an'] : ['-map', '0:a?', '-c:a', 'aac', '-b:a', '128k']),
+      ...(muted
+        ? ['-an']
+        : [
+            '-map', '0:a?',
+            ...(respeeded ? ['-af', atempoChain(speed)] : []),
+            '-c:a', 'aac', '-b:a', '128k',
+          ]),
       '-c:v', 'libx264',
       '-preset', 'veryfast',
       '-crf', '23',

@@ -9,7 +9,15 @@
    - Mode multi : tap = toggle sélection avec badges numérotés */
 
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native'
+import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native'
 import { Image } from 'expo-image'
 import { Video, ResizeMode } from 'expo-av'
 import { Ionicons } from '@expo/vector-icons'
@@ -19,7 +27,8 @@ import type { GalleryAsset } from '@/hooks/useGallery'
 import type { SelectedMedia } from '@/features/news/hooks/useComposeState'
 import { GalleryGrid } from './GalleryGrid'
 import { ComposeCamera } from '@/features/news/components/compose/ComposeCamera'
-import { createColors, createType } from '../theme/createTokens'
+import { cameraColors, createColors, createMotion } from '../theme/createTokens'
+import { CREATE_MAX_MEDIA } from '../types'
 import { captureException } from '@/lib/sentry'
 
 interface SelectScreenProps {
@@ -27,7 +36,7 @@ interface SelectScreenProps {
   mode: 'gallery' | 'camera'
   onModeChange: (mode: 'gallery' | 'camera') => void
   onSelectAsset: (asset: GalleryAsset, multiple: boolean) => void
-  onCapture: (media: SelectedMedia) => void
+  onCapture: (media: SelectedMedia[]) => void
   onPickText: () => void
   /* Bouton « Suivant » rendu en overlay dans la caméra (l'en-tête parent
      est masqué en mode caméra). */
@@ -38,6 +47,10 @@ interface SelectScreenProps {
 
 /* Albums système sans intérêt. */
 const HIDDEN_ALBUMS = new Set(['Hidden', 'Recently Deleted', 'Masqué', 'Supprimés récemment'])
+
+/* Largeur réservée au bouton retour posé en overlay : la barre d'outils de
+   la caméra se décale d'autant pour ne pas passer dessous. */
+const CAMERA_TOP_BAR_INSET = 64
 
 /* ── Header Instagram ────────────────────────────────────────────── */
 
@@ -58,6 +71,8 @@ function GalleryHeader({
   onCamera: () => void
   onText: () => void
 }) {
+  const { t } = useI18n()
+
   return (
     <View style={styles.galleryHeader}>
       {/* Gauche : nom de l'album + flèche */}
@@ -82,16 +97,16 @@ function GalleryHeader({
         <Pressable
           onPress={onCamera}
           accessibilityRole="button"
-          accessibilityLabel="Caméra"
-          style={({ pressed }) => [styles.headerModeBtn, pressed && { opacity: 0.6 }]}
+          accessibilityLabel={t.news.compose.a11yCameraOpen}
+          style={({ pressed }) => [styles.headerModeBtn, pressed && styles.pressed]}
         >
           <Ionicons name="camera-outline" size={22} color={createColors.textPrimary} />
         </Pressable>
         <Pressable
           onPress={onText}
           accessibilityRole="button"
-          accessibilityLabel="Texte"
-          style={({ pressed }) => [styles.headerModeBtn, pressed && { opacity: 0.6 }]}
+          accessibilityLabel={t.news.compose.a11yTextPost}
+          style={({ pressed }) => [styles.headerModeBtn, pressed && styles.pressed]}
         >
           <Ionicons name="text" size={22} color={createColors.textPrimary} />
         </Pressable>
@@ -102,8 +117,8 @@ function GalleryHeader({
         onPress={onToggleMode}
         accessibilityRole="button"
         accessibilityState={{ selected: selectionMode === 'multi' }}
-        accessibilityLabel="Sélection multiple"
-        style={({ pressed }) => [styles.headerMultiBtn, pressed && { opacity: 0.6 }]}
+        accessibilityLabel={t.news.compose.a11yMultipleSelection}
+        style={({ pressed }) => [styles.headerMultiBtn, pressed && styles.pressed]}
       >
         <Ionicons
           name="copy-outline"
@@ -168,13 +183,17 @@ function SelectScreenComponent({
   nextDisabled,
 }: SelectScreenProps) {
   const { t } = useI18n()
+  const { width: windowWidth } = useWindowDimensions()
   const [selectionMode, setSelectionMode] = useState<'single' | 'multi'>('single')
   const [albums, setAlbums] = useState<AlbumOption[]>([])
   const [albumId, setAlbumId] = useState<string | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
-  /* Média capturé par la caméra : affiche un aperçu plein écran avant
-     d'aller à l'éditeur (comportement TikTok). */
-  const [capturedMedia, setCapturedMedia] = useState<SelectedMedia | null>(null)
+  /* Médias capturés par la caméra : affiche un aperçu plein écran avant
+     d'aller à l'éditeur. Un tableau, car une rafale produit plusieurs
+     clichés d'un coup. */
+  const [capturedMedia, setCapturedMedia] = useState<SelectedMedia[]>([])
+  /* Cliché affiché dans l'aperçu de rafale. */
+  const [previewIndex, setPreviewIndex] = useState(0)
 
   const allLabel = t.news.compose.galleryAlbumAll
   const currentAlbum = albums.find((a) => a.id === albumId)
@@ -224,18 +243,34 @@ function SelectScreenComponent({
 
   /* ── Caméra : capture → aperçu → suivant ───────────────────────── */
   const handleCameraCapture = useCallback((captured: SelectedMedia) => {
+    setCapturedMedia([captured])
+    setPreviewIndex(0)
+  }, [])
+
+  const handleCameraBurst = useCallback((captured: SelectedMedia[]) => {
     setCapturedMedia(captured)
+    setPreviewIndex(0)
   }, [])
 
   const handleConfirmCapture = useCallback(() => {
-    if (!capturedMedia) return
+    if (capturedMedia.length === 0) return
     onCapture(capturedMedia)
-    setCapturedMedia(null)
+    setCapturedMedia([])
+    setPreviewIndex(0)
   }, [capturedMedia, onCapture])
 
   const handleDiscardCapture = useCallback(() => {
-    setCapturedMedia(null)
+    setCapturedMedia([])
+    setPreviewIndex(0)
   }, [])
+
+  const handlePreviewScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const page = Math.round(event.nativeEvent.contentOffset.x / windowWidth)
+      setPreviewIndex(page)
+    },
+    [windowWidth],
+  )
 
   /* ── Selection order pour le mode multi ────────────────────────── */
   const selectionOrder = useMemo(() => {
@@ -248,41 +283,64 @@ function SelectScreenComponent({
   /* ── Rendu mode caméra ─────────────────────────────────────────── */
   if (mode === 'camera') {
     /* Aperçu après capture (style TikTok) : photo/vidéo plein écran
-       avec boutons retour et « Suivant ». */
-    if (capturedMedia) {
+       avec boutons retour et « Suivant ». Une rafale se feuillette. */
+    if (capturedMedia.length > 0) {
       return (
         <View style={styles.screen}>
-          {capturedMedia.type === 'video' ? (
-            <Video
-              source={{ uri: capturedMedia.uri }}
-              style={StyleSheet.absoluteFill}
-              resizeMode={ResizeMode.COVER}
-              shouldPlay
-              isLooping
-              useNativeControls={false}
-            />
-          ) : (
-            <Image
-              source={{ uri: capturedMedia.uri }}
-              style={StyleSheet.absoluteFill}
-              contentFit="cover"
-            />
-          )}
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={handlePreviewScroll}
+            style={StyleSheet.absoluteFill}
+          >
+            {capturedMedia.map((captured) => (
+              <View key={captured.uri} style={{ width: windowWidth }}>
+                {captured.type === 'video' ? (
+                  <Video
+                    source={{ uri: captured.uri }}
+                    style={StyleSheet.absoluteFill}
+                    resizeMode={ResizeMode.COVER}
+                    shouldPlay
+                    isLooping
+                    useNativeControls={false}
+                  />
+                ) : (
+                  <Image
+                    source={{ uri: captured.uri }}
+                    style={StyleSheet.absoluteFill}
+                    contentFit="cover"
+                  />
+                )}
+              </View>
+            ))}
+          </ScrollView>
+
           {/* Bouton retour (annuler la capture) */}
           <Pressable
             onPress={handleDiscardCapture}
             accessibilityRole="button"
-            accessibilityLabel="Reprendre la photo"
-            style={({ pressed }) => [styles.cameraBackBtn, pressed && { opacity: 0.6 }]}
+            accessibilityLabel={t.news.compose.a11yRetakeCapture}
+            style={({ pressed }) => [styles.cameraBackBtn, pressed && styles.pressed]}
           >
-            <Ionicons name="close" size={28} color="#fff" />
+            <Ionicons name="close" size={28} color={cameraColors.onMedia} />
           </Pressable>
+
+          {/* Compteur de rafale : inutile pour un cliché unique. */}
+          {capturedMedia.length > 1 ? (
+            <View style={styles.previewCounter}>
+              <Text style={styles.previewCounterText}>
+                {`${previewIndex + 1}/${capturedMedia.length}`}
+              </Text>
+            </View>
+          ) : null}
+
           {/* Bouton « Suivant » (confirmer → éditeur) */}
           <Pressable
             onPress={handleConfirmCapture}
             accessibilityRole="button"
             accessibilityLabel={nextLabel}
-            style={({ pressed }) => [styles.cameraNextBtn, pressed && { opacity: 0.6 }]}
+            style={({ pressed }) => [styles.cameraNextBtn, pressed && styles.pressed]}
           >
             <Text style={styles.cameraNextText}>{nextLabel}</Text>
           </Pressable>
@@ -292,14 +350,19 @@ function SelectScreenComponent({
 
     return (
       <View style={styles.screen}>
-        <ComposeCamera onCapture={handleCameraCapture} topBarInset={64} />
+        <ComposeCamera
+          onCapture={handleCameraCapture}
+          onCaptureBurst={handleCameraBurst}
+          burstLimit={CREATE_MAX_MEDIA}
+          topBarInset={CAMERA_TOP_BAR_INSET}
+        />
         <Pressable
           onPress={() => onModeChange('gallery')}
           accessibilityRole="button"
-          accessibilityLabel="Retour à la galerie"
-          style={({ pressed }) => [styles.cameraBackBtn, pressed && { opacity: 0.6 }]}
+          accessibilityLabel={t.news.compose.a11yGalleryBack}
+          style={({ pressed }) => [styles.cameraBackBtn, pressed && styles.pressed]}
         >
-          <Ionicons name="arrow-back" size={24} color="#fff" />
+          <Ionicons name="arrow-back" size={24} color={cameraColors.onMedia} />
         </Pressable>
       </View>
     )
@@ -343,6 +406,7 @@ export const SelectScreen = memo(SelectScreenComponent)
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: createColors.canvas },
+  pressed: { opacity: createMotion.pressedOpacity },
 
   /* Header Instagram */
   galleryHeader: {
@@ -392,7 +456,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: cameraColors.overlayScrim,
   },
   /* Bouton « Suivant » caméra — même ligne que le bouton retour */
   cameraNextBtn: {
@@ -406,12 +470,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: createColors.accent,
   },
-  cameraNextBtnDisabled: {
-    opacity: 0.4,
-  },
   cameraNextText: {
-    color: '#fff',
+    color: cameraColors.onMedia,
     fontSize: 15,
+    fontWeight: '600',
+  },
+
+  /* Compteur de rafale, centré sous les boutons du haut */
+  previewCounter: {
+    position: 'absolute',
+    top: 20,
+    alignSelf: 'center',
+    paddingHorizontal: 10,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: cameraColors.overlayScrim,
+  },
+  previewCounterText: {
+    color: cameraColors.onMedia,
+    fontSize: 13,
     fontWeight: '600',
   },
 

@@ -39,15 +39,8 @@ export interface SelectedMedia {
      valeur par défaut = pas d'édition. Voir src/features/create/types/editing.ts
      pour les types complets. */
 
-  /** Paramètres de recadrage / rotation. */
-  crop?: {
-    aspect: number   // 0 = original, 1 = carré, 0.8 = 4:5…
-    rotation: number // degrés (straighten + increments 90°)
-    flipH: boolean
-    flipV: boolean
-    cropX: number    // 0-1, position X du centre (0.5 = centré)
-    cropY: number    // 0-1, position Y du centre (0.5 = centré)
-  }
+  /** Paramètres de recadrage / rotation / straighten. */
+  crop?: import('../../create/types/editing').CropState
   /** Transformation de l'image pendant le recadrage (pan/zoom). */
   cropTransform?: {
     scale: number
@@ -60,6 +53,7 @@ export interface SelectedMedia {
     trimEnd: number
     muted: boolean
     coverTime: number
+    speed: number
   }
   /** Filtre Instagram appliqué (id du filtre, ex 'clarendon'). */
   filterId?: string
@@ -90,6 +84,8 @@ export interface SelectedMedia {
   >
   /** Chemin du PNG transparent des overlays, capturé via react-native-view-shot. */
   overlayUri?: string | null
+  /** Texte alternatif pour l'accessibilité (description de l'image). */
+  altText?: string
 }
 
 export interface ComposeState {

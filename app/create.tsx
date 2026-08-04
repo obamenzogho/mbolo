@@ -255,8 +255,11 @@ export default function CreateScreen() {
     })
   }, [])
 
-  const handleCapture = useCallback((captured: SelectedMedia) => {
-    setMedia([captured])
+  /* Une rafale caméra remonte plusieurs clichés d'un coup : on borne au
+     nombre de médias qu'un carrousel accepte. */
+  const handleCapture = useCallback((captured: SelectedMedia[]) => {
+    if (captured.length === 0) return
+    setMedia(captured.slice(0, CREATE_MAX_MEDIA))
     setEditingIndex(0)
     setStep('edit')
   }, [])

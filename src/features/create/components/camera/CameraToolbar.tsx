@@ -9,9 +9,11 @@
    Design : rangée horizontale scrollable, icônes compactes,
    fond semi-transparent noir. */
 
-import { memo, useCallback } from 'react'
+import { memo } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { useI18n } from '@/i18n'
+import { cameraColors, createMotion } from '../../theme/createTokens'
 import type { AspectRatioValue, CaptureSpeed } from '../../types/editing'
 import { ASPECT_RATIOS, CAPTURE_SPEEDS } from '../../types/editing'
 
@@ -55,6 +57,8 @@ function CameraToolbarComponent({
   maxDuration,
   onMaxDurationChange,
 }: CameraToolbarProps) {
+  const { t } = useI18n()
+
   return (
     <View style={styles.container}>
       {/* ── Ligne du haut : ratio + grid ─────────────────────────── */}
@@ -70,10 +74,11 @@ function CameraToolbarComponent({
               onPress={() => onAspectRatioChange(r.value)}
               accessibilityRole="button"
               accessibilityState={{ selected: aspectRatio === r.value }}
+              accessibilityLabel={t.news.compose.a11yAspectRatio.replace('{label}', r.label)}
               style={({ pressed }) => [
                 styles.chip,
                 aspectRatio === r.value && styles.chipActive,
-                pressed && { opacity: 0.7 },
+                pressed && styles.chipPressed,
               ]}
             >
               <Text
@@ -91,17 +96,17 @@ function CameraToolbarComponent({
             onPress={onToggleGrid}
             accessibilityRole="button"
             accessibilityState={{ selected: showGrid }}
-            accessibilityLabel="Grille de composition"
+            accessibilityLabel={t.news.compose.a11yGrid}
             style={({ pressed }) => [
               styles.chip,
               showGrid && styles.chipActive,
-              pressed && { opacity: 0.7 },
+              pressed && styles.chipPressed,
             ]}
           >
             <Ionicons
               name="grid-outline"
               size={16}
-              color={showGrid ? '#fff' : 'rgba(255,255,255,0.6)'}
+              color={showGrid ? cameraColors.chipContentActive : cameraColors.chipContentIdle}
             />
           </Pressable>
         </ScrollView>
@@ -121,10 +126,11 @@ function CameraToolbarComponent({
                 onPress={() => onCaptureSpeedChange(s.value)}
                 accessibilityRole="button"
                 accessibilityState={{ selected: captureSpeed === s.value }}
+                accessibilityLabel={t.news.compose.a11yCaptureSpeed.replace('{label}', s.label)}
                 style={({ pressed }) => [
                   styles.chip,
                   captureSpeed === s.value && styles.chipActive,
-                  pressed && { opacity: 0.7 },
+                  pressed && styles.chipPressed,
                 ]}
               >
                 <Text
@@ -146,10 +152,14 @@ function CameraToolbarComponent({
                 onPress={() => onMaxDurationChange(d)}
                 accessibilityRole="button"
                 accessibilityState={{ selected: maxDuration === d }}
+                accessibilityLabel={t.news.compose.a11yMaxDuration.replace(
+                  '{label}',
+                  formatDuration(d),
+                )}
                 style={({ pressed }) => [
                   styles.chip,
                   maxDuration === d && styles.chipActive,
-                  pressed && { opacity: 0.7 },
+                  pressed && styles.chipPressed,
                 ]}
               >
                 <Text
@@ -191,23 +201,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    backgroundColor: cameraColors.chipIdle,
+  },
+  chipPressed: {
+    opacity: createMotion.pressedOpacity,
   },
   chipActive: {
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: cameraColors.chipActive,
   },
   chipText: {
-    color: 'rgba(255,255,255,0.6)',
+    color: cameraColors.chipContentIdle,
     fontSize: 13,
     fontWeight: '500',
   },
   chipTextActive: {
-    color: '#fff',
+    color: cameraColors.chipContentActive,
   },
   separator: {
     width: 1,
     height: 24,
     alignSelf: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: cameraColors.chipSeparator,
   },
 })

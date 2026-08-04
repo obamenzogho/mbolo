@@ -24,12 +24,38 @@ export const createColors = {
   danger: '#ff3b30',
 } as const
 
+/** Caméra studio : overlays et chips posés sur le flux vidéo. */
+export const cameraColors = {
+  /** Voile des boutons overlay (retour, aperçu). */
+  overlayScrim: 'rgba(0, 0, 0, 0.4)',
+  /** Fond d'une pastille d'outil au repos. */
+  chipIdle: 'rgba(0, 0, 0, 0.35)',
+  /** Fond d'une pastille d'outil sélectionnée. */
+  chipActive: 'rgba(255, 255, 255, 0.25)',
+  /** Texte/icône d'une pastille au repos. */
+  chipContentIdle: 'rgba(255, 255, 255, 0.6)',
+  /** Texte/icône d'une pastille sélectionnée. */
+  chipContentActive: '#ffffff',
+  /** Séparateur entre groupes de pastilles. */
+  chipSeparator: 'rgba(255, 255, 255, 0.2)',
+  /** Lignes de la grille de composition. */
+  gridLine: 'rgba(255, 255, 255, 0.2)',
+  /** Masque hors cadre du ratio choisi. */
+  ratioMask: 'rgba(0, 0, 0, 0.6)',
+  onMedia: '#ffffff',
+} as const
+
+/** Opacité appliquée à un élément pressé du flux de création. */
+export const createMotion = { pressedOpacity: 0.6 } as const
+
 /** Écran de légende : clair, comme le prototype. */
 export const captionColors = {
   canvas: '#ffffff',
   hairline: 'rgba(17, 17, 17, 0.1)',
   textPrimary: '#111111',
   textSecondary: '#737373',
+  danger: '#ff3b30',
+  surfaceRaised: '#f5f5f5',
 } as const
 
 export const createType = {

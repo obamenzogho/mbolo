@@ -1,72 +1,48 @@
 /* CameraOverlay.tsx — Overlays de la caméra studio.
 
-   Trois couches rendues par-dessus CameraView :
+   Deux couches rendues par-dessus CameraView :
    1. Grid of thirds (2×2 lignes de composition)
    2. Ratio mask (masque noir semi-transparent troué au ratio choisi)
-   3. Zoom indicator (bulle centrale avec le facteur de zoom)
 
    Tous les overlays sont `pointerEvents="none"` pour ne pas intercepter
-   les touches de la caméra. */
+   les touches de la caméra. Le zoom n'a pas d'indicateur : il est géré
+   nativement par expo-camera (`isPinchToZoomEnabled`), qui n'expose pas
+   le facteur courant. */
 
 import { memo, useMemo } from 'react'
-import { StyleSheet, Text, View, useWindowDimensions } from 'react-native'
+import { StyleSheet, View, useWindowDimensions } from 'react-native'
+import { cameraColors } from '../../theme/createTokens'
+import type { AspectRatioValue } from '../../types/editing'
+import { ASPECT_RATIOS } from '../../types/editing'
 
 interface CameraOverlayProps {
   /** Afficher la grille de composition. */
   showGrid: boolean
   /** Ratio d'aspect actuel. 'original' = pas de masque. */
-  aspectRatio: '9:16' | '1:1' | '4:5' | '16:9' | 'original'
-  /** Facteur de zoom actuel (1 = normal). */
-  zoom: number
-  /** Afficher l'indicateur de zoom. */
-  showZoomIndicator: boolean
+  aspectRatio: AspectRatioValue
 }
 
-function CameraOverlayComponent({
-  showGrid,
-  aspectRatio,
-  zoom,
-  showZoomIndicator,
-}: CameraOverlayProps) {
+function CameraOverlayComponent({ showGrid, aspectRatio }: CameraOverlayProps) {
   const { width, height } = useWindowDimensions()
 
   /* ── Calcul du masque de ratio ─────────────────────────────────── */
   const mask = useMemo(() => {
-    if (aspectRatio === 'original') return null
+    /* ratio 0 = 'original' : le cadre suit l'écran, aucun masque à poser. */
+    const targetRatio = ASPECT_RATIOS.find((r) => r.value === aspectRatio)?.ratio ?? 0
+    if (targetRatio <= 0) return null
 
-    const ratios: Record<string, number> = {
-      '9:16': 9 / 16,
-      '1:1': 1,
-      '4:5': 4 / 5,
-      '16:9': 16 / 9,
-    }
+    const screenRatio = width / height
 
-    const targetRatio = ratios[aspectRatio]
-    if (!targetRatio) return null
-
-    /* Le masque troué est centré. On calcule la zone visible. */
-    const screenHeight = height
-    const screenWidth = width
-    const screenRatio = screenWidth / screenHeight
-
-    let visibleWidth: number
-    let visibleHeight: number
-
-    if (targetRatio > screenRatio) {
-      /* Le ratio est plus large que l'écran → largeur = écran, hauteur calculée. */
-      visibleWidth = screenWidth
-      visibleHeight = screenWidth / targetRatio
-    } else {
-      /* Le ratio est plus haut que l'écran → hauteur = écran, largeur calculée. */
-      visibleHeight = screenHeight
-      visibleWidth = screenHeight * targetRatio
-    }
+    /* Le cadre visible est centré et inscrit dans l'écran : on borne par
+       la largeur si le ratio est plus large que l'écran, par la hauteur sinon. */
+    const visibleWidth = targetRatio > screenRatio ? width : height * targetRatio
+    const visibleHeight = targetRatio > screenRatio ? width / targetRatio : height
 
     return {
       width: visibleWidth,
       height: visibleHeight,
-      top: (screenHeight - visibleHeight) / 2,
-      left: (screenWidth - visibleWidth) / 2,
+      bandHeight: (height - visibleHeight) / 2,
+      bandWidth: (width - visibleWidth) / 2,
     }
   }, [aspectRatio, width, height])
 
@@ -76,11 +52,11 @@ function CameraOverlayComponent({
       {showGrid ? (
         <View style={styles.grid}>
           {/* Lignes horizontales */}
-          <View style={[styles.gridLine, styles.gridLineH, { top: '33.33%' }]} />
-          <View style={[styles.gridLine, styles.gridLineH, { top: '66.66%' }]} />
+          <View style={[styles.gridLine, styles.gridLineH, styles.gridFirstThird]} />
+          <View style={[styles.gridLine, styles.gridLineH, styles.gridSecondThirdH]} />
           {/* Lignes verticales */}
-          <View style={[styles.gridLine, styles.gridLineV, { left: '33.33%' }]} />
-          <View style={[styles.gridLine, styles.gridLineV, { left: '66.66%' }]} />
+          <View style={[styles.gridLine, styles.gridLineV, styles.gridFirstThirdV]} />
+          <View style={[styles.gridLine, styles.gridLineV, styles.gridSecondThirdV]} />
         </View>
       ) : null}
 
@@ -88,22 +64,15 @@ function CameraOverlayComponent({
       {mask ? (
         <View style={styles.maskContainer}>
           {/* Bandeau haut */}
-          <View style={[styles.maskBand, { height: mask.top, width }]} />
+          <View style={[styles.maskBand, { height: mask.bandHeight }]} />
           {/* Bande gauche + zone visible + bande droite */}
-          <View style={{ flexDirection: 'row', height: mask.height }}>
-            <View style={[styles.maskBand, { width: mask.left, height: mask.height }]} />
-            <View style={{ width: mask.width, height: mask.height }} />
-            <View style={[styles.maskBand, { width: mask.left, height: mask.height }]} />
+          <View style={[styles.maskRow, { height: mask.height }]}>
+            <View style={[styles.maskBand, { width: mask.bandWidth }]} />
+            <View style={{ width: mask.width }} />
+            <View style={[styles.maskBand, { width: mask.bandWidth }]} />
           </View>
           {/* Bandeau bas */}
-          <View style={[styles.maskBand, { height: mask.top, width }]} />
-        </View>
-      ) : null}
-
-      {/* ── Zoom indicator ──────────────────────────────────────── */}
-      {showZoomIndicator && Math.abs(zoom - 1) > 0.05 ? (
-        <View style={styles.zoomBubble}>
-          <Text style={styles.zoomText}>{zoom.toFixed(1)}x</Text>
+          <View style={[styles.maskBand, { height: mask.bandHeight }]} />
         </View>
       ) : null}
     </View>
@@ -123,7 +92,7 @@ const styles = StyleSheet.create({
   },
   gridLine: {
     position: 'absolute',
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: cameraColors.gridLine,
   },
   gridLineH: {
     left: 0,
@@ -135,29 +104,19 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: StyleSheet.hairlineWidth,
   },
+  gridFirstThird: { top: '33.33%' },
+  gridSecondThirdH: { top: '66.66%' },
+  gridFirstThirdV: { left: '33.33%' },
+  gridSecondThirdV: { left: '66.66%' },
 
   /* Ratio mask */
   maskContainer: {
     ...StyleSheet.absoluteFillObject,
   },
+  maskRow: {
+    flexDirection: 'row',
+  },
   maskBand: {
-    backgroundColor: 'rgba(0,0,0,0.6)',
-  },
-
-  /* Zoom indicator */
-  zoomBubble: {
-    position: 'absolute',
-    bottom: 160,
-    alignSelf: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  zoomText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-    fontVariant: ['tabular-nums'],
+    backgroundColor: cameraColors.ratioMask,
   },
 })

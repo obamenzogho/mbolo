@@ -211,6 +211,8 @@ export interface VideoEdit {
   muted: boolean
   /** Instant de la vignette de couverture, en millisecondes. */
   coverTime: number
+  /** Facteur de vitesse de lecture. 1 = temps réel, 2 = deux fois plus rapide. */
+  speed: number
 }
 
 export const DEFAULT_VIDEO_EDIT: VideoEdit = {
@@ -218,4 +220,5 @@ export const DEFAULT_VIDEO_EDIT: VideoEdit = {
   trimEnd: 0,
   muted: false,
   coverTime: 1000,
+  speed: 1,
 }
