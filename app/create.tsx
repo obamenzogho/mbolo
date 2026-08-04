@@ -27,8 +27,10 @@ import { useCreatePublish, type CreatePublishError, type EditTarget } from '@/fe
 import { SelectScreen } from '@/features/create/components/SelectScreen'
 import { EditScreen } from '@/features/create/components/edit/EditScreen'
 import { CaptionScreen } from '@/features/create/components/CaptionScreen'
-import { createColors, captionColors, createType } from '@/features/create/theme/createTokens'
+import { createColors, createType } from '@/features/create/theme/createTokens'
+import { CREATE_MAX_MEDIA } from '@/features/create/types'
 import type { GalleryAsset } from '@/hooks/useGallery'
+import { useCurrentUserProfile } from '@/hooks/useCurrentUserProfile'
 
 type Step = 'select' | 'edit' | 'caption' | 'publishing'
 
@@ -44,6 +46,7 @@ export default function CreateScreen() {
   const router = useRouter()
   const { t } = useI18n()
   const user = auth.currentUser
+  const userProfile = useCurrentUserProfile()
 
   const {
     mediaUri,
@@ -226,31 +229,29 @@ export default function CreateScreen() {
   const isEditStep = step === 'edit'
   const isPublishing = step === 'publishing'
 
-  /* Sélection multiple : add/remove avec cap à 4 médias. L'ordre d'ajout
-     détermine la numérotation (1, 2, 3, 4) affichée dans la grille. */
-  const handleToggle = useCallback((asset: GalleryAsset) => {
+  /* Instagram distingue la sélection simple (remplace l'aperçu) et la
+     sélection multiple. Une vidéo est toujours seule : le renderer et le
+     feed n'acceptent pas de carrousel mixte photo/vidéo. */
+  const handleSelectAsset = useCallback((asset: GalleryAsset, multiple: boolean) => {
     setMedia((prev) => {
       const idx = prev.findIndex((m) => m.uri === asset.uri)
-      if (idx !== -1) {
-        /* Déjà sélectionné → retrait. */
+      if (multiple && idx !== -1) {
         return prev.filter((_, i) => i !== idx)
       }
-      if (prev.length >= 4) {
-        /* Cap atteint : on ignore le tap. */
-        return prev
-      }
-      /* Ajout à la fin. */
       const isVideo = asset.mediaType === 'video'
-      return [
-        ...prev,
-        {
-          uri: asset.uri,
-          type: isVideo ? 'video' : 'image',
-          width: asset.width,
-          height: asset.height,
-          duration: asset.duration ?? null,
-        },
-      ]
+      const selectedAsset: SelectedMedia = {
+        uri: asset.uri,
+        type: isVideo ? 'video' : 'image',
+        width: asset.width,
+        height: asset.height,
+        duration: asset.duration ?? null,
+      }
+
+      if (!multiple || isVideo || prev.some((item) => item.type === 'video')) {
+        return [selectedAsset]
+      }
+      if (prev.length >= CREATE_MAX_MEDIA) return prev
+      return [...prev, selectedAsset]
     })
   }, [])
 
@@ -264,6 +265,14 @@ export default function CreateScreen() {
     setMedia([])
     setText('')
     setStep('caption')
+  }, [])
+
+  const handleAltTextChange = useCallback((index: number, altText: string) => {
+    setMedia((prev) => {
+      const next = [...prev]
+      next[index] = { ...next[index], altText }
+      return next
+    })
   }, [])
 
   const detectLocation = useCallback(async () => {
@@ -335,7 +344,7 @@ export default function CreateScreen() {
     router.back()
   }, [step, router])
 
-  const headerColor = isCaptionStep ? captionColors : createColors
+  const headerColor = createColors
 
   /* Titre de l'en-tête selon l'étape. */
   const headerTitle = isEditStep
@@ -363,60 +372,67 @@ export default function CreateScreen() {
     ? t.news.compose.publish
     : t.news.compose.next
 
+  const hideHeader = step === 'select' && mode === 'camera'
+
   return (
-    <View style={[styles.screen, isCaptionStep && styles.screenLight]}>
+    <View style={styles.screen}>
       <SafeAreaView edges={['top']} style={styles.safe}>
-        {/* En-tête du flux : sombre à la sélection/édition, clair à la légende. */}
-        <View style={[styles.header, { borderBottomColor: headerColor.hairline }]}>
-          <Pressable
-            onPress={handleBack}
-            hitSlop={12}
-            accessibilityRole="button"
-            style={({ pressed }) => [styles.headerBtn, pressed && styles.pressed]}
-          >
-            <Ionicons
-              name={backIcon}
-              size={26}
-              color={headerColor.textPrimary}
-            />
-          </Pressable>
+        {/* En-tête du flux : masqué en mode caméra plein écran. */}
+        {!hideHeader ? (
+          <View style={[styles.header, { borderBottomColor: headerColor.hairline }]}>
+            <Pressable
+              onPress={handleBack}
+              hitSlop={12}
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.headerBtn, pressed && styles.pressed]}
+            >
+              <Ionicons
+                name={backIcon}
+                size={26}
+                color={headerColor.textPrimary}
+              />
+            </Pressable>
 
-          <Text
-            style={[
-              styles.headerTitle,
-              createType.title,
-              { color: headerColor.textPrimary },
-            ]}
-            numberOfLines={1}
-          >
-            {headerTitle}
-          </Text>
-
-          <Pressable
-            onPress={handleRightPress}
-            disabled={rightDisabled}
-            accessibilityRole="button"
-            style={({ pressed }) => [styles.headerBtn, pressed && styles.pressed]}
-          >
             <Text
               style={[
-                styles.headerAction,
-                rightDisabled && styles.headerActionDisabled,
+                styles.headerTitle,
+                createType.title,
+                { color: headerColor.textPrimary },
               ]}
+              numberOfLines={1}
             >
-              {rightLabel}
+              {headerTitle}
             </Text>
-          </Pressable>
-        </View>
+
+            <Pressable
+              onPress={handleRightPress}
+              disabled={rightDisabled}
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.headerBtn, pressed && styles.pressed]}
+            >
+              <Text
+                style={[
+                  styles.headerAction,
+                  rightDisabled && styles.headerActionDisabled,
+                ]}
+              >
+                {rightLabel}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         {step === 'select' ? (
           <SelectScreen
             media={media}
             mode={mode}
             onModeChange={setMode}
-            onToggle={handleToggle}
+            onSelectAsset={handleSelectAsset}
             onCapture={handleCapture}
             onPickText={startTextPost}
+            onNext={handleRightPress}
+            nextLabel={rightLabel}
+            nextDisabled={rightDisabled}
           />
         ) : isEditStep && media[editingIndex] ? (
           <EditScreen
@@ -443,6 +459,9 @@ export default function CreateScreen() {
             location={location}
             detectingLocation={detectingLocation}
             onPressLocation={location ? () => setLocation(null) : detectLocation}
+            userName={userProfile.nom}
+            userPhotoURL={userProfile.photoURL}
+            onAltTextChange={handleAltTextChange}
           />
         )}
       </SafeAreaView>
@@ -459,7 +478,7 @@ export default function CreateScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: createColors.canvas },
-  screenLight: { backgroundColor: captionColors.canvas },
+  /* screenLight supprimé : tout le flux est sombre. */
   safe: { flex: 1 },
   header: {
     flexDirection: 'row',

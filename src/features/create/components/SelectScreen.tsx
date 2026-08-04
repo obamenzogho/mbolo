@@ -27,6 +27,11 @@ interface SelectScreenProps {
   onSelectAsset: (asset: GalleryAsset, multiple: boolean) => void
   onCapture: (media: SelectedMedia) => void
   onPickText: () => void
+  /* Bouton « Suivant » rendu en overlay dans la caméra (l'en-tête parent
+     est masqué en mode caméra). */
+  onNext?: () => void
+  nextLabel?: string
+  nextDisabled?: boolean
 }
 
 /* Albums système sans intérêt. */
@@ -156,6 +161,9 @@ function SelectScreenComponent({
   onSelectAsset,
   onCapture,
   onPickText,
+  onNext,
+  nextLabel,
+  nextDisabled,
 }: SelectScreenProps) {
   const { t } = useI18n()
   const [selectionMode, setSelectionMode] = useState<'single' | 'multi'>('single')
@@ -230,6 +238,21 @@ function SelectScreenComponent({
         >
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </Pressable>
+        {onNext ? (
+          <Pressable
+            onPress={onNext}
+            disabled={nextDisabled}
+            accessibilityRole="button"
+            accessibilityLabel={nextLabel}
+            style={({ pressed }) => [
+              styles.cameraNextBtn,
+              nextDisabled && styles.cameraNextBtnDisabled,
+              pressed && { opacity: 0.6 },
+            ]}
+          >
+            <Text style={styles.cameraNextText}>{nextLabel}</Text>
+          </Pressable>
+        ) : null}
       </View>
     )
   }
@@ -322,6 +345,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  /* Bouton « Suivant » caméra */
+  cameraNextBtn: {
+    position: 'absolute',
+    top: 48,
+    right: 12,
+    paddingHorizontal: 16,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: createColors.accent,
+  },
+  cameraNextBtnDisabled: {
+    opacity: 0.4,
+  },
+  cameraNextText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
   },
 
   /* Dropdown album */
