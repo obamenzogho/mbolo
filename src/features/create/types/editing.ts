@@ -12,8 +12,12 @@
 export interface CropState {
   /** Rapport d'aspect de recadrage. 0 = original, 1 = carré, 0.8 = 4:5. */
   aspect: number
-  /** Rotation en degrés (inclut le straighten -45..45 et les 90° increments). */
+  /** Ratio arbitraire choisi dans le mode libre. Prévaut sur `aspect`. */
+  freeformAspect?: number
+  /** Rotation en degrés, incrément de 90° (0, 90, 180, 270). */
   rotation: number
+  /** Redressement libre -45..45° (appliqué après la rotation 90°). 0 par défaut. */
+  straighten?: number
   flipH: boolean
   flipV: boolean
   /** Position X du centre de la zone de recadrage (0-1, relatif à l'image). */
@@ -22,9 +26,19 @@ export interface CropState {
   cropY: number
 }
 
+/** Bornes d'un format libre : de 1:2 (portrait) à 2:1 (paysage). */
+export const FREEFORM_ASPECT_MIN = 0.5
+export const FREEFORM_ASPECT_MAX = 2
+
+/** Une seule source de vérité pour le ratio utilisé par aperçu et export. */
+export function getCropAspect(crop: CropState): number {
+  return crop.freeformAspect ?? crop.aspect
+}
+
 export const DEFAULT_CROP: CropState = {
   aspect: 0,   // 0 = original
   rotation: 0,
+  straighten: 0,
   flipH: false,
   flipV: false,
   cropX: 0.5,  // centré
@@ -146,6 +160,30 @@ export const STICKERS = [
   '😎', '🤔', '💪', '🙌', '✨', '🌟', '💯', '🎵',
   '📸', '🎬', '✈️', '🌍', '☀️', '🌈', '🍕', '🎸',
   '🏆', '💡', '🎨', '🦋', '🌺', '⚡', '🚀', '💎',
+]
+
+/* ── Caméra Studio ─────────────────────────────────────────────── */
+
+/** Ratio d'aspect de la caméra. */
+export type AspectRatioValue = '9:16' | '1:1' | '4:5' | '16:9' | 'original'
+
+export const ASPECT_RATIOS: { value: AspectRatioValue; label: string; ratio: number }[] = [
+  { value: '9:16', label: '9:16', ratio: 9 / 16 },
+  { value: '1:1', label: '1:1', ratio: 1 },
+  { value: '4:5', label: '4:5', ratio: 4 / 5 },
+  { value: '16:9', label: '16:9', ratio: 16 / 9 },
+  { value: 'original', label: 'Original', ratio: 0 },
+]
+
+/** Vitesse de capture vidéo (appliquée au rendu FFmpeg). */
+export type CaptureSpeed = '0.3' | '0.5' | '1' | '2' | '3'
+
+export const CAPTURE_SPEEDS: { value: CaptureSpeed; label: string }[] = [
+  { value: '0.3', label: '0.3x' },
+  { value: '0.5', label: '0.5x' },
+  { value: '1', label: '1x' },
+  { value: '2', label: '2x' },
+  { value: '3', label: '3x' },
 ]
 
 export const COLORS = [
