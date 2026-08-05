@@ -1,29 +1,29 @@
-# Graph Report - .  (2026-07-31)
+# Graph Report - .  (2026-08-05)
 
 ## Corpus Check
 - local update mode - Enhanced architectural extraction
 
 ## Summary
-- 8011 nodes
-- 9971 edges
-- 352 communities
-- 13 Firestore collections
+- 9278 nodes
+- 11525 edges
+- 415 communities
+- 14 Firestore collections
 - Extraction: 100% EXTRACTED
 - Token cost: 0 input - 0 output
 
 ## God Nodes
-1. `functions/src/index.ts` - 152 edges
+1. `functions/src/index.ts` - 153 edges
 2. `scripts/graphify-cli.js` - 145 edges
-3. `functions/lib/functions/src/index.js` - 131 edges
+3. `functions/lib/functions/src/index.js` - 132 edges
 4. `app/(tabs)/profile.tsx` - 126 edges
 5. `functions/src/search.ts` - 111 edges
-6. `functions/lib/functions/src/search.js` - 104 edges
-7. `src/hooks/useComments.ts` - 104 edges
+6. `src/hooks/useComments.ts` - 104 edges
+7. `functions/lib/functions/src/search.js` - 103 edges
 8. `scripts/enrich-graphify-roles.js` - 87 edges
 9. `utils/ffmpeg.ts` - 81 edges
 10. `src/features/feed/hooks/useFollowingFeedData.ts` - 79 edges
-11. `app/(tabs)/messages.tsx` - 76 edges
-12. `src/services/searchService.ts` - 76 edges
+11. `src/features/news/components/compose/ComposeCamera.tsx` - 77 edges
+12. `app/(tabs)/messages.tsx` - 76 edges
 
 ## Firestore Collections
 - `usernames`
@@ -34,6 +34,7 @@
 - `highlights`
 - `posts`
 - `conversations`
+- `sounds`
 - `reposts`
 - `shares`
 - `reports`
