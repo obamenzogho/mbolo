@@ -6,19 +6,38 @@
 import { memo, useCallback } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { useI18n } from '@/i18n'
 import type { CropState } from '../../types/editing'
-import { ASPECT_OPTIONS, DEFAULT_CROP } from '../../types/editing'
+import {
+  ASPECT_OPTIONS,
+  DEFAULT_CROP,
+  FREEFORM_ASPECT_MAX,
+  FREEFORM_ASPECT_MIN,
+} from '../../types/editing'
 import { createColors } from '../../theme/createTokens'
 import { StraightenSlider } from './StraightenSlider'
 
 interface CropTabProps {
   crop: CropState
   onChange: (crop: CropState) => void
+  /** Reset complet : crop + pan/zoom + transform. */
+  onReset?: () => void
 }
 
-export const CropTab = memo(function CropTab({ crop, onChange }: CropTabProps) {
+export const CropTab = memo(function CropTab({ crop, onChange, onReset }: CropTabProps) {
+  const { t } = useI18n()
   const setAspect = useCallback(
-    (ratio: number) => onChange({ ...crop, aspect: ratio }),
+    (ratio: number) => onChange({ ...crop, aspect: ratio, freeformAspect: undefined }),
+    [crop, onChange],
+  )
+
+  const enableFreeform = useCallback(
+    () => onChange({ ...crop, aspect: DEFAULT_CROP.aspect, freeformAspect: 1 }),
+    [crop, onChange],
+  )
+
+  const setFreeformAspect = useCallback(
+    (ratio: number) => onChange({ ...crop, freeformAspect: ratio }),
     [crop, onChange],
   )
 
@@ -37,14 +56,20 @@ export const CropTab = memo(function CropTab({ crop, onChange }: CropTabProps) {
     [crop, onChange],
   )
 
-  const setRotation = useCallback(
-    (r: number) => onChange({ ...crop, rotation: r }),
+  const setStraighten = useCallback(
+    (r: number) => onChange({ ...crop, straighten: r }),
     [crop, onChange],
   )
 
   const reset = useCallback(
-    () => onChange({ ...DEFAULT_CROP, cropX: 0.5, cropY: 0.5 }),
-    [onChange],
+    () => {
+      if (onReset) {
+        onReset()
+      } else {
+        onChange({ ...DEFAULT_CROP, cropX: 0.5, cropY: 0.5 })
+      }
+    },
+    [onReset, onChange],
   )
 
   return (
@@ -61,20 +86,32 @@ export const CropTab = memo(function CropTab({ crop, onChange }: CropTabProps) {
             onPress={() => setAspect(a.ratio)}
             style={[
               styles.toolBtn,
-              crop.aspect === a.ratio && styles.toolBtnActive,
+              crop.freeformAspect === undefined && crop.aspect === a.ratio && styles.toolBtnActive,
             ]}
           >
-            <AspectGlyph kind={a.icon} active={crop.aspect === a.ratio} />
+            <AspectGlyph kind={a.icon} active={crop.freeformAspect === undefined && crop.aspect === a.ratio} />
             <Text
               style={[
                 styles.toolLabel,
-                crop.aspect === a.ratio && styles.toolLabelActive,
+                crop.freeformAspect === undefined && crop.aspect === a.ratio && styles.toolLabelActive,
               ]}
             >
               {a.label}
             </Text>
           </Pressable>
         ))}
+
+        <Pressable
+          onPress={enableFreeform}
+          accessibilityRole="button"
+          accessibilityLabel={t.news.compose.a11yFreeCrop}
+          style={[styles.toolBtn, crop.freeformAspect !== undefined && styles.toolBtnActive]}
+        >
+          <AspectGlyph kind="free" active={crop.freeformAspect !== undefined} />
+          <Text style={[styles.toolLabel, crop.freeformAspect !== undefined && styles.toolLabelActive]}>
+            {t.news.compose.editorFreeCrop}
+          </Text>
+        </Pressable>
 
         <Pressable onPress={rotate90} style={styles.toolBtn}>
           <Ionicons name="refresh" size={26} color={createColors.textSecondary} />
@@ -120,17 +157,32 @@ export const CropTab = memo(function CropTab({ crop, onChange }: CropTabProps) {
         </Pressable>
       </ScrollView>
 
+      {crop.freeformAspect !== undefined ? (
+        <View style={styles.sliderRow}>
+          <Text style={styles.sliderLabel}>{t.news.compose.editorFormat}</Text>
+          <StraightenSlider
+            value={crop.freeformAspect}
+            min={FREEFORM_ASPECT_MIN}
+            max={FREEFORM_ASPECT_MAX}
+            step={0.01}
+            centered={false}
+            onChange={setFreeformAspect}
+          />
+          <Text style={styles.resetText}>{crop.freeformAspect.toFixed(2)}</Text>
+        </View>
+      ) : null}
+
       {/* Straighten slider */}
       <View style={styles.sliderRow}>
         <Text style={styles.sliderLabel}>Redresser</Text>
         <StraightenSlider
-          value={crop.rotation}
+          value={crop.straighten ?? 0}
           min={-45}
           max={45}
-          onChange={setRotation}
+          onChange={setStraighten}
         />
         <Pressable onPress={reset} style={styles.resetBtn}>
-          <Text style={styles.resetText}>{Math.round(crop.rotation)}°</Text>
+          <Text style={styles.resetText}>{Math.round(crop.straighten ?? 0)}°</Text>
         </Pressable>
       </View>
     </View>

@@ -5,7 +5,8 @@
    rendu photo et le rendu vidéo — une seule vérité pour les deux médias. */
 
 import type { Adjustments, CropState, FilterDeltas } from '../types/editing'
-import { DEFAULT_ADJUSTMENTS, DEFAULT_CROP, getEffect, getFilter } from '../types/editing'
+import { DEFAULT_ADJUSTMENTS, DEFAULT_CROP, getCropAspect, getEffect, getFilter } from '../types/editing'
+import { cropWindow, cropPosition, MAX_CROP_ZOOM } from './cropGeometry'
 
 export interface GraphInput {
   width: number
@@ -19,6 +20,8 @@ export interface GraphInput {
   adjustments?: Adjustments
   /** Côté max de sortie. 1080 = standard Instagram. */
   maxSize?: number
+  /** Mode de géométrie : 'all' = tout, 'straighten' = straighten + couleur uniquement (proxy crop tab). */
+  geometryMode?: 'all' | 'color'
 }
 
 export interface FilterChain {
@@ -67,25 +70,31 @@ function addDeltas(a: Deltas, b: Deltas): Deltas {
   }
 }
 
-/* ── Géométrie : flip → rotation → recadrage → resize ─────────────── */
+/* ── Géométrie : flip → rotation 90° → straighten → recadrage → resize ── */
 
 function buildGeometry(input: GraphInput, out: string[]): { w: number; h: number } {
   const crop = input.crop ?? DEFAULT_CROP
   let w = input.width || 1080
   let h = input.height || 1080
+  const mode = input.geometryMode ?? 'all'
 
-  if (crop.flipH) out.push('hflip')
-  if (crop.flipV) out.push('vflip')
+  /* Flip — seulement en mode 'all' (pas en proxy crop tab). */
+  if (mode === 'all') {
+    if (crop.flipH) out.push('hflip')
+    if (crop.flipV) out.push('vflip')
 
-  const rot = ((crop.rotation % 360) + 360) % 360
-  if (rot === 90) { out.push('transpose=1'); [w, h] = [h, w] }
-  else if (rot === 180) { out.push('transpose=1,transpose=1') }
-  else if (rot === 270) { out.push('transpose=2'); [w, h] = [h, w] }
-  else if (rot !== 0) {
-    /* Straighten (-45..45) : on agrandit d'abord pour que la rotation ne
-       laisse pas de coins noirs, on tourne, puis on recadre au format
-       d'origine. C'est exactement le comportement d'Instagram. */
-    const a = (rot * Math.PI) / 180
+    /* Rotation 90° — swap les dims. */
+    const rot = ((crop.rotation % 360) + 360) % 360
+    if (rot === 90) { out.push('transpose=1'); [w, h] = [h, w] }
+    else if (rot === 180) { out.push('transpose=1,transpose=1') }
+    else if (rot === 270) { out.push('transpose=2'); [w, h] = [h, w] }
+  }
+
+  /* Straighten (-45..45) — appliqué uniquement en mode 'all'.
+     En mode 'color' (proxy crop tab), la géométrie est gérée en live. */
+  const straighten = crop.straighten ?? 0
+  if (mode === 'all' && straighten !== 0) {
+    const a = (straighten * Math.PI) / 180
     const c = Math.abs(Math.cos(a))
     const s = Math.abs(Math.sin(a))
     const zoom = Math.max((w * c + h * s) / w, (w * s + h * c) / h)
@@ -94,21 +103,20 @@ function buildGeometry(input: GraphInput, out: string[]): { w: number; h: number
     out.push(`crop=${even(w)}:${even(h)}`)
   }
 
-  if (crop.aspect > 0) {
-    const zoomIn = clamp(input.cropTransform?.scale ?? 1, 1, 8)
-    let cw = w
-    let ch = w / crop.aspect
-    if (ch > h) { ch = h; cw = h * crop.aspect }
-    cw = cw / zoomIn
-    ch = ch / zoomIn
-
-    /* cropX/cropY sont le CENTRE de la fenêtre (0-1). Le pan de l'aperçu
-       déplace l'image, donc la fenêtre part dans le sens inverse. */
-    const px = clamp(crop.cropX, 0, 1) * w - cw / 2 - (input.cropTransform?.translateX ?? 0)
-    const py = clamp(crop.cropY, 0, 1) * h - ch / 2 - (input.cropTransform?.translateY ?? 0)
+  /* Aspect crop — seulement en mode 'all'. */
+  const cropAspect = getCropAspect(crop)
+  if (mode === 'all' && cropAspect > 0) {
+    const zoom = clamp(input.cropTransform?.scale ?? 1, 1, MAX_CROP_ZOOM)
+    const { cw, ch } = cropWindow(w, h, cropAspect, zoom)
+    const { x: px, y: py } = cropPosition(
+      w, h, cw, ch,
+      crop.cropX, crop.cropY,
+      input.cropTransform?.translateX ?? 0,
+      input.cropTransform?.translateY ?? 0,
+    )
 
     w = even(cw); h = even(ch)
-    out.push(`crop=${w}:${h}:${Math.round(clamp(px, 0, Math.max(0, input.width - w)))}:${Math.round(clamp(py, 0, Math.max(0, input.height - h)))}`)
+    out.push(`crop=${w}:${h}:${px}:${py}`)
   }
 
   const max = input.maxSize ?? 1080
@@ -197,7 +205,11 @@ export function buildFilterChain(input: GraphInput): FilterChain {
 export function needsRender(input: GraphInput & { overlayCount?: number }): boolean {
   const crop = input.crop ?? DEFAULT_CROP
   const adj = input.adjustments ?? DEFAULT_ADJUSTMENTS
-  if (crop.aspect > 0 || crop.rotation !== 0 || crop.flipH || crop.flipV) return true
+  const mode = input.geometryMode ?? 'all'
+  if (mode === 'all') {
+    if (getCropAspect(crop) > 0 || crop.rotation !== 0 || crop.flipH || crop.flipV) return true
+  }
+  if (mode === 'all' && (crop.straighten ?? 0) !== 0) return true
   if ((input.filterId ?? 'none') !== 'none') return true
   if ((input.effectId ?? 'ef-none') !== 'ef-none') return true
   if ((input.overlayCount ?? 0) > 0) return true

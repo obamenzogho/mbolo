@@ -23,19 +23,22 @@ const CACHE_MAX = 24
 
 /** Signature de tout ce qui change le rendu. Les overlays sont exclus :
     ils sont dessinés en direct par React, pas gravés dans le proxy. */
-function signature(media: SelectedMedia, frameUri: string): string {
+function signature(media: SelectedMedia, frameUri: string, geometryMode: string): string {
   const c = media.crop
   const a = media.adjustments
-  return [
-    frameUri,
-    c ? `${c.aspect}|${c.rotation}|${c.flipH}|${c.flipV}|${c.cropX}|${c.cropY}` : '-',
-    media.cropTransform
+  const parts = [frameUri, geometryMode]
+  if (geometryMode === 'all') {
+    parts.push(c ? `${c.aspect}|${c.freeformAspect ?? '-'}|${c.rotation}|${c.straighten ?? 0}|${c.flipH}|${c.flipV}|${c.cropX}|${c.cropY}` : '-')
+    parts.push(media.cropTransform
       ? `${media.cropTransform.scale}|${media.cropTransform.translateX}|${media.cropTransform.translateY}`
-      : '-',
-    `${media.filterId ?? 'none'}:${media.filterIntensity ?? 100}`,
-    `${media.effectId ?? 'ef-none'}:${media.effectIntensity ?? 100}`,
-    a ? Object.values(a).join(',') : '-',
-  ].join('#')
+      : '-')
+  } else {
+    parts.push(c ? `s:${c.straighten ?? 0}` : '-')
+  }
+  parts.push(`${media.filterId ?? 'none'}:${media.filterIntensity ?? 100}`)
+  parts.push(`${media.effectId ?? 'ef-none'}:${media.effectIntensity ?? 100}`)
+  parts.push(a ? Object.values(a).join(',') : '-')
+  return parts.join('#')
 }
 
 interface ProxyState {
@@ -53,6 +56,7 @@ interface ProxyState {
 export function useEditPreviewProxy(
   media: SelectedMedia,
   frameUri: string | null,
+  geometryMode: 'all' | 'color' = 'all',
 ): ProxyState {
   const source = frameUri ?? media.uri
   const [state, setState] = useState<ProxyState>({ uri: source, rendering: false })
@@ -82,7 +86,7 @@ export function useEditPreviewProxy(
     }
   }, [])
 
-  const sig = signature(media, source)
+  const sig = signature(media, source, geometryMode)
 
   useEffect(() => {
     if (!source) return
@@ -95,6 +99,7 @@ export function useEditPreviewProxy(
       filterId: media.filterId,
       effectId: media.effectId,
       adjustments: media.adjustments,
+      geometryMode,
     })) {
       latest.current = sig
       setState({ uri: source, rendering: false })
@@ -128,6 +133,7 @@ export function useEditPreviewProxy(
         },
         {
           maxSize: PROXY_SIZE,
+          geometryMode,
           onSession: (id) => { sessionId.current = id },
         },
       )

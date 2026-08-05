@@ -74,7 +74,8 @@ export const EditScreen = memo(function EditScreen({
 
   /* Vidéo : on filtre une frame fixe. Photo : l'image elle-même. */
   const videoFrame = useVideoFrame(isVideo ? media.uri : null, media.video?.coverTime ?? 1000)
-  const preview = useEditPreviewProxy(media, isVideo ? videoFrame : media.uri)
+  const geometryMode = tab === 'crop' ? 'color' : 'all'
+  const preview = useEditPreviewProxy(media, isVideo ? videoFrame : media.uri, geometryMode)
 
   /* ── Helpers de mise à jour ───────────────────────────────────── */
 
@@ -157,6 +158,16 @@ export const EditScreen = memo(function EditScreen({
     [media, onMediaChange],
   )
 
+  /* Reset complet du crop (onglet Recadrer) : crop + pan/zoom. */
+  const resetCrop = useCallback(
+    () => onMediaChange({
+      ...media,
+      crop: { ...DEFAULT_CROP, cropX: 0.5, cropY: 0.5 },
+      cropTransform: { scale: 1, translateX: 0, translateY: 0 },
+    }),
+    [media, onMediaChange],
+  )
+
   /* Changer de média peut retirer l'onglet actif (trim n'existe que sur
      une vidéo) : on retombe sur le premier onglet disponible. */
   useEffect(() => {
@@ -177,7 +188,7 @@ export const EditScreen = memo(function EditScreen({
           />
         )
       case 'crop':
-        return <CropTab crop={crop} onChange={updateCrop} />
+        return <CropTab crop={crop} onChange={updateCrop} onReset={resetCrop} />
       case 'filter':
         return (
           <FilterTab
@@ -262,6 +273,9 @@ export const EditScreen = memo(function EditScreen({
           overlayRef={overlayRef}
           showCropOverlay={tab === 'crop'}
           onTransformChange={tab === 'crop' ? handleTransformChange : undefined}
+          cropTransform={media.cropTransform}
+          sourceWidth={media.width}
+          sourceHeight={media.height}
         />
       </View>
 

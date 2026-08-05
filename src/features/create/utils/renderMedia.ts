@@ -30,6 +30,8 @@ export interface RenderOptions {
   maxSize?: number
   /** Mode de géométrie : 'all' = tout, 'straighten' = straighten + couleur (proxy crop tab). */
   geometryMode?: 'all' | 'color'
+  /** Piste locale de la bibliothèque : remplace l'audio d'origine. */
+  soundUri?: string | null
 }
 
 export interface RenderResult {
@@ -87,6 +89,41 @@ function atempoChain(speed: number): string {
   while (remaining < 0.5) { stages.push(0.5); remaining /= 0.5 }
   stages.push(remaining)
   return stages.map((s) => `atempo=${Math.round(s * 1000) / 1000}`).join(',')
+}
+
+interface AudioArgumentsInput {
+  /** Position de la piste de bibliothèque parmi les `-i` (après overlay éventuel). */
+  soundInputIndex: number
+  soundPath?: string | null
+  muted?: boolean
+  speed?: number
+}
+
+/* Un son de bibliothèque remplace l'audio d'origine : il garde son tempo (pas
+   d'atempo) et boucle si la vidéo est plus longue, `-shortest` coupant l'excédent. */
+export function buildAudioArguments({
+  soundInputIndex,
+  soundPath,
+  muted = false,
+  speed = 1,
+}: AudioArgumentsInput): { inputs: string[]; output: string[] } {
+  if (soundPath) {
+    return {
+      inputs: ['-stream_loop', '-1', '-i', toPath(soundPath)],
+      output: ['-map', `${soundInputIndex}:a`, '-c:a', 'aac', '-b:a', '128k'],
+    }
+  }
+
+  if (muted) return { inputs: [], output: ['-an'] }
+
+  return {
+    inputs: [],
+    output: [
+      '-map', '0:a?',
+      ...(speed !== 1 ? ['-af', atempoChain(speed)] : []),
+      '-c:a', 'aac', '-b:a', '128k',
+    ],
+  }
 }
 
 /* ── Photo ────────────────────────────────────────────────────────── */
@@ -173,10 +210,12 @@ export async function renderVideo(
   /* Vitesse capturée en caméra (0.3x → 3x). 1 = temps réel. */
   const speed = video?.speed && video.speed > 0 ? video.speed : 1
   const respeeded = speed !== 1
+  const soundUri = options.soundUri ?? null
   if (
     !trimmed &&
     !muted &&
     !respeeded &&
+    !soundUri &&
     !needsRender({ ...input, overlayCount: media.overlay?.length ?? 0 })
   ) {
     return { uri: media.uri, width: media.width ?? 0, height: media.height ?? 0 }
@@ -197,22 +236,26 @@ export async function renderVideo(
       ? `${chain},setpts=${Math.round((1 / speed) * 1000) / 1000}*PTS`
       : chain
 
+    const audio = buildAudioArguments({
+      soundInputIndex: withOverlay ? 2 : 1,
+      soundPath: soundUri,
+      muted,
+      speed,
+    })
+
     const args = [
       '-y',
       /* -ss avant -i : seek rapide sur keyframe, puis découpe précise. */
       ...(trimStart > 0 ? ['-ss', (trimStart / 1000).toFixed(3)] : []),
       '-i', toPath(media.uri),
       ...(withOverlay ? ['-i', toPath(options.overlayUri as string)] : []),
+      ...audio.inputs,
       ...(sourceMs > 0 && trimmed ? ['-t', (sourceMs / 1000).toFixed(3)] : []),
       '-filter_complex', complexGraph(videoChain, width, height, withOverlay),
       '-map', '[out]',
-      ...(muted
-        ? ['-an']
-        : [
-            '-map', '0:a?',
-            ...(respeeded ? ['-af', atempoChain(speed)] : []),
-            '-c:a', 'aac', '-b:a', '128k',
-          ]),
+      ...audio.output,
+      /* Le son bouclé est infini : sans -shortest, FFmpeg n'arrêterait jamais. */
+      ...(soundUri ? ['-shortest'] : []),
       '-c:v', 'libx264',
       '-preset', 'veryfast',
       '-crf', '23',
