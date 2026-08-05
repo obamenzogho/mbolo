@@ -178,6 +178,36 @@ export const ASPECT_RATIOS: { value: AspectRatioValue; label: string; ratio: num
 /** Vitesse de capture vidéo (appliquée au rendu FFmpeg). */
 export type CaptureSpeed = '0.3' | '0.5' | '1' | '2' | '3'
 
+/** Mode flash de la caméra studio. `auto` déclenche le flash seulement si
+    l'exposition l'exige (géré par le capteur, pas par l'app). */
+export type FlashMode = 'off' | 'on' | 'auto'
+
+export const FLASH_MODES: FlashMode[] = ['off', 'on', 'auto']
+
+/** Cycle du bouton flash : off → on → auto → off. Pure et testable. */
+export function nextFlashMode(current: FlashMode): FlashMode {
+  return FLASH_MODES[(FLASH_MODES.indexOf(current) + 1) % FLASH_MODES.length]
+}
+
+/** Résolution d'enregistrement vidéo. Android uniquement (iOS choisit la
+    meilleure disponibilité du capteur) ; si l'appareil ne la supporte pas,
+    expo-camera sélectionne la plus proche. */
+export type VideoQualityOption = '720p' | '1080p' | '2160p'
+
+export const VIDEO_QUALITY_OPTIONS: { value: VideoQualityOption; label: string }[] = [
+  { value: '720p', label: '720p' },
+  { value: '1080p', label: '1080p' },
+  { value: '2160p', label: '2160p' },
+]
+
+export function isVideoQualityOption(value: unknown): value is VideoQualityOption {
+  return VIDEO_QUALITY_OPTIONS.some((option) => option.value === value)
+}
+
+/** Stabilisation vidéo iOS : `standard` est le meilleur compromis
+    fluidité/déformation ; `cinematic` est réservé à une évolution future. */
+export type VideoStabilizationOption = 'off' | 'standard'
+
 export interface RecordingSegment {
   uri: string
   durationMs: number

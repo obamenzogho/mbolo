@@ -36,13 +36,20 @@ import {
   postType,
 } from '../../theme/postTokens'
 import type { SelectedMedia } from '../../hooks/useComposeState'
-import type { AspectRatioValue, CaptureSpeed } from '@/features/create/types/editing'
-import { DEFAULT_VIDEO_EDIT } from '@/features/create/types/editing'
+import type {
+  AspectRatioValue,
+  CaptureSpeed,
+  FlashMode,
+  VideoQualityOption,
+} from '@/features/create/types/editing'
+import { DEFAULT_VIDEO_EDIT, nextFlashMode } from '@/features/create/types/editing'
 import { CameraOverlay } from '@/features/create/components/camera/CameraOverlay'
 import { CameraToolbar } from '@/features/create/components/camera/CameraToolbar'
 import { SegmentedProgressBar } from '@/features/create/components/camera/SegmentedProgressBar'
 import { useSegmentedRecording } from '@/features/create/hooks/useSegmentedRecording'
+import { useCameraPreferences } from '@/features/create/hooks/useCameraPreferences'
 import { concatSegments } from '@/features/create/utils/concatSegments'
+import { saveMediaToLibrary } from '@/features/create/utils/cameraRoll'
 
 type CaptureMode = 'photo' | 'video'
 
@@ -103,7 +110,7 @@ export function ComposeCamera({
   const [micPermission, requestMicPermission] = useMicrophonePermissions()
   const [captureMode, setCaptureMode] = useState<CaptureMode>('photo')
   const [facing, setFacing] = useState<'back' | 'front'>('back')
-  const [flash, setFlash] = useState<'off' | 'on'>('off')
+  const [flash, setFlash] = useState<FlashMode>('off')
   const [maxDuration, setMaxDuration] = useState<number>(30)
   const [timerDelay, setTimerDelay] = useState<0 | 3 | 10>(0)
   const [countdown, setCountdown] = useState(0)
@@ -112,6 +119,9 @@ export function ComposeCamera({
   const [elapsed, setElapsed] = useState(0)
   const elapsedRef = useRef(0)
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  /* Préférences persistées (grille, miroir, qualité, stab, pellicule). */
+  const { preferences, updatePreferences } = useCameraPreferences()
 
   const {
     segments,
@@ -124,7 +134,6 @@ export function ComposeCamera({
   } = useSegmentedRecording({ maxDurationMs: maxDuration * 1000 })
 
   /* ── Nouvel état caméra studio ─────────────────────────────────── */
-  const [showGrid, setShowGrid] = useState(false)
   const [aspectRatio, setAspectRatio] = useState<AspectRatioValue>('9:16')
   const [captureSpeed, setCaptureSpeed] = useState<CaptureSpeed>('1')
   const [isBursting, setIsBursting] = useState(false)
@@ -283,6 +292,29 @@ export function ComposeCamera({
     }, 1000)
   }, [recording, timerDelay, canRecord, clearCountdown, startRecording])
 
+  /* ── Sauvegarde pellicule ──────────────────────────────────────── */
+  /* Fire-and-forget : un échec n'interrompt jamais la capture. Seul un
+     refus de permission désactive la préférence (avec un message), et une
+     seule fois par session — une rafale ne doit pas ouvrir 10 dialogs. */
+  const libraryDeniedAlertedRef = useRef(false)
+  const saveCaptureToLibrary = useCallback(
+    async (uri: string) => {
+      if (!preferences.saveToLibrary) return
+      const outcome = await saveMediaToLibrary(uri)
+      if (outcome === 'denied' && !libraryDeniedAlertedRef.current) {
+        libraryDeniedAlertedRef.current = true
+        updatePreferences({ saveToLibrary: false })
+        Alert.alert(t.news.compose.errorTitle, t.news.compose.saveToLibraryDenied)
+      }
+    },
+    [
+      preferences.saveToLibrary,
+      updatePreferences,
+      t.news.compose.errorTitle,
+      t.news.compose.saveToLibraryDenied,
+    ],
+  )
+
   const confirmRecording = useCallback(async () => {
     if (recording || isFinalizing || segments.length === 0) return
 
@@ -294,6 +326,7 @@ export function ComposeCamera({
       const speed = Number(captureSpeed)
       const duration = Math.max(1, Math.round(rawTotalMs / 1000 / speed))
 
+      void saveCaptureToLibrary(outputUri)
       onCapture({
         uri: outputUri,
         type: 'video',
@@ -309,7 +342,17 @@ export function ComposeCamera({
     } finally {
       setIsFinalizing(false)
     }
-  }, [captureSpeed, isFinalizing, onCapture, recording, resetSegments, segments, t.news.compose.errorPublish, t.news.compose.errorTitle])
+  }, [
+    captureSpeed,
+    isFinalizing,
+    onCapture,
+    recording,
+    resetSegments,
+    saveCaptureToLibrary,
+    segments,
+    t.news.compose.errorPublish,
+    t.news.compose.errorTitle,
+  ])
 
   /* ── Take photo ───────────────────────────────────────────────── */
   const takePhoto = useCallback(async () => {
@@ -318,6 +361,7 @@ export function ComposeCamera({
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
       const photo = await cameraRef.current.takePictureAsync({ quality: PHOTO_QUALITY })
       if (photo?.uri) {
+        void saveCaptureToLibrary(photo.uri)
         onCapture({
           uri: photo.uri,
           type: 'image',
@@ -328,7 +372,7 @@ export function ComposeCamera({
     } catch (e) {
       captureException(e instanceof Error ? e : new Error(String(e)), { context: 'news.compose.photo' })
     }
-  }, [onCapture])
+  }, [onCapture, saveCaptureToLibrary])
 
   /* ── Burst mode ───────────────────────────────────────────────── */
   /* Boucle séquentielle plutôt qu'un setInterval : `takePictureAsync`
@@ -350,6 +394,9 @@ export function ComposeCamera({
             width: photo.width,
             height: photo.height,
           })
+          /* Non bloquant : le compteur de rafale ne doit pas attendre les
+             écritures disque (spéc. catégorie 2). */
+          void saveCaptureToLibrary(photo.uri)
           if (mountedRef.current) setBurstCount(frames.length)
         }
 
@@ -370,7 +417,7 @@ export function ComposeCamera({
       }
       if (frames.length > 0) onCaptureBurst?.(frames)
     }
-  }, [burstLimit, onCaptureBurst])
+  }, [burstLimit, onCaptureBurst, saveCaptureToLibrary])
 
   const startBurst = useCallback(() => {
     /* Sans `onCaptureBurst`, les clichés n'auraient nulle part où aller. */
@@ -381,7 +428,6 @@ export function ComposeCamera({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy)
     void runBurst()
   }, [onCaptureBurst, captureMode, runBurst])
-
   const stopBurst = useCallback(() => {
     burstActiveRef.current = false
   }, [])
@@ -468,6 +514,9 @@ export function ComposeCamera({
           mode={captureMode === 'video' ? 'video' : 'picture'}
           flash={flash}
           zoom={zoom}
+          mirror={facing === 'front' && preferences.mirrorSelfie}
+          videoQuality={preferences.videoQuality}
+          videoStabilizationMode={preferences.videoStabilization ? 'standard' : 'off'}
         />
       ) : null}
 
@@ -477,7 +526,7 @@ export function ComposeCamera({
       <View style={StyleSheet.absoluteFill} {...pinchResponder.panHandlers} />
 
       {/* ── Overlays (grid, ratio mask) ────────────────────────────── */}
-      <CameraOverlay showGrid={showGrid} aspectRatio={aspectRatio} />
+      <CameraOverlay showGrid={preferences.showGrid} aspectRatio={aspectRatio} />
 
       {countdown > 0 ? (
         <View style={styles.countdownOverlay} pointerEvents="box-none">
@@ -497,20 +546,64 @@ export function ComposeCamera({
 
       {/* ── Top bar ────────────────────────────────────────────────── */}
       <View style={[styles.topBar, topBarInset ? { paddingLeft: topBarInset } : undefined]}>
+        {/* Flash : cycle off → on → auto. Désactivé pendant l'enregistrement
+            (le rendu en cours ne doit pas être modifié) et en frontale (la
+            plupart des capteurs front n'ont pas de flash ; un cycle silencieux
+            ferait croire à un bug). */}
         <Pressable
-          onPress={() => setFlash((f) => (f === 'on' ? 'off' : 'on'))}
+          onPress={() => setFlash((f) => nextFlashMode(f))}
+          disabled={recording || facing === 'front'}
           hitSlop={HIT_SLOP}
           accessibilityRole="button"
-          accessibilityLabel={t.news.compose.a11yFlash}
+          accessibilityLabel={t.news.compose.a11yFlashMode.replace(
+            '{label}',
+            flash === 'on'
+              ? t.news.compose.flashOn
+              : flash === 'auto'
+                ? t.news.compose.flashAuto
+                : t.news.compose.flashOff,
+          )}
           accessibilityState={{ selected: flash === 'on' }}
-          style={({ pressed }) => [styles.roundButton, pressed && styles.pressed]}
+          style={({ pressed }) => [
+            styles.roundButton,
+            (recording || facing === 'front') && styles.roundButtonDisabled,
+            pressed && styles.pressed,
+          ]}
         >
           <Ionicons
-            name={flash === 'on' ? 'flash' : 'flash-off'}
+            name={flash === 'off' ? 'flash-off' : flash === 'on' ? 'flash' : 'flash-outline'}
             size={20}
             color={flash === 'on' ? postColors.optionMood : postColors.onMedia}
           />
         </Pressable>
+
+        {/* Miroir : exclusivement en caméra frontale, une vue est à
+            l'endroit quand on la regarde. */}
+        {facing === 'front' ? (
+          <Pressable
+            onPress={() =>
+              updatePreferences({ mirrorSelfie: !preferences.mirrorSelfie })
+            }
+            disabled={recording}
+            hitSlop={HIT_SLOP}
+            accessibilityRole="button"
+            accessibilityLabel={t.news.compose.a11yMirrorSelfie}
+            accessibilityState={{ selected: preferences.mirrorSelfie }}
+            style={({ pressed }) => [
+              styles.roundButton,
+              recording && styles.roundButtonDisabled,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Ionicons
+              name={preferences.mirrorSelfie ? 'person' : 'person-outline'}
+              size={20}
+              color={
+                preferences.mirrorSelfie ? postColors.optionMood : postColors.onMedia
+              }
+            />
+          </Pressable>
+        ) : null}
 
         {recording ? (
           <View style={styles.timer}>
@@ -539,8 +632,18 @@ export function ComposeCamera({
           onCaptureSpeedChange={setCaptureSpeed}
           timerDelay={timerDelay}
           onTimerDelayChange={setTimerDelay}
-          showGrid={showGrid}
-          onToggleGrid={() => setShowGrid((v) => !v)}
+          showGrid={preferences.showGrid}
+          onToggleGrid={() => updatePreferences({ showGrid: !preferences.showGrid })}
+          videoQuality={preferences.videoQuality}
+          onVideoQualityChange={(quality: VideoQualityOption) =>
+            updatePreferences({ videoQuality: quality })
+          }
+          videoStabilization={preferences.videoStabilization}
+          onToggleVideoStabilization={() =>
+            updatePreferences({
+              videoStabilization: !preferences.videoStabilization,
+            })
+          }
           maxDuration={maxDuration}
           onMaxDurationChange={setMaxDuration}
         />
@@ -724,6 +827,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: postColors.scrimHeavy,
+  },
+  roundButtonDisabled: {
+    opacity: postMotion.pressedOpacity,
   },
   shutterOuter: {
     width: 74,

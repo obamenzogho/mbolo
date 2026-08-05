@@ -17,6 +17,8 @@ interface JestMockFn<T = any> {
   mockReturnValueOnce(value: T): JestMockFn<T>
   mockResolvedValueOnce(value: T): JestMockFn<T>
   mockRejectedValueOnce(value: any): JestMockFn<T>
+  mockResolvedValue(value: T): JestMockFn<T>
+  mockRejectedValue(value: any): JestMockFn<T>
   mockImplementation(fn: (...args: any[]) => T): JestMockFn<T>
   calls: any[][]
   results: any[]
@@ -52,6 +54,7 @@ interface ExpectResult {
   toHaveBeenCalledWith(...args: any[]): void
   toHaveBeenLastCalledWith(...args: any[]): void
   toHaveProperty(path: string | string[], value?: any): void
+  toMatchObject(expected: any): void
   toContain(item: any): void
   toContainEqual(item: any): void
   toHaveLength(n: number): void

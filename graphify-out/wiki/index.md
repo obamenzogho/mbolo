@@ -1065,3 +1065,11 @@ Résultat : swipe-back de bord fonctionne sur iOS, Android et Web, y compris sur
 ### ADR — CaptionScreen : passage au thème sombre unifié
 
 **Décision :** le CaptionScreen est passé de `captionColors` (blanc, prototype initial) à `createColors` (noir), aligné sur `SelectScreen` et `EditScreen`. Le switch `headerColor` dans `app/create.tsx` est supprimé : l'en-tête reste sombre à chaque étape du flux. L'objectif est une expérience visuelle continue sans rupture de thème entre sélection, édition et légende.
+
+### ADR — Caméra studio catégorie 2 : préférences persistées et qualité de capture
+
+**Décision :** les préférences caméra sont persistées dans `AsyncStorage` (clé versionnée `camera.preferences.v1`, parse strict avec fallback défauts via `parseCameraPreferences`) et consommées par le hook `useCameraPreferences`. Le flash passe à trois états (off/on/auto, cycle `nextFlashMode`), la caméra frontale gagne un miroir (`mirror`), la qualité vidéo Android (720p/1080p/2160p) et la stabilisation iOS (`standard`/`off`) sont exposées dans `CameraToolbar`, et chaque prise peut être copiée dans la pellicule (`saveMediaToLibrary`, `expo-media-library`, permission demandée une seule fois même pour une rafale — requête partagée).
+
+**Règles de la sauvegarde pellicule :** fire-and-forget (un échec n'interrompt jamais la capture) ; refus de permission → désactivation de la préférence + un seul `Alert` par session ; plateforme web → toggle indisponible.
+
+**Impact :** aucun changement Firestore/Storage/index — ces réglages restent strictement locaux. Le zoom pince (PanResponder) n'est pas modifié. Plateformes : qualité vidéo UI conditionnée à Android, stabilisation à iOS, miroir affiché uniquement en caméra frontale.

@@ -10,12 +10,12 @@
    fond semi-transparent noir. */
 
 import { memo } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useI18n } from '@/i18n'
 import { cameraColors, createMotion } from '../../theme/createTokens'
-import type { AspectRatioValue, CaptureSpeed } from '../../types/editing'
-import { ASPECT_RATIOS, CAPTURE_SPEEDS } from '../../types/editing'
+import type { AspectRatioValue, CaptureSpeed, VideoQualityOption } from '../../types/editing'
+import { ASPECT_RATIOS, CAPTURE_SPEEDS, VIDEO_QUALITY_OPTIONS } from '../../types/editing'
 
 interface CameraToolbarProps {
   /** Mode caméra actuel. */
@@ -36,6 +36,14 @@ interface CameraToolbarProps {
   showGrid: boolean
   /** Toggle grille. */
   onToggleGrid: () => void
+  /** Qualité vidéo (Android uniquement). */
+  videoQuality: VideoQualityOption
+  /** Callback changement de qualité vidéo. */
+  onVideoQualityChange: (quality: VideoQualityOption) => void
+  /** Stabilisation vidéo active (iOS uniquement). */
+  videoStabilization: boolean
+  /** Toggle stabilisation vidéo. */
+  onToggleVideoStabilization: () => void
   /** Durée max vidéo (secondes). */
   maxDuration: number
   /** Callback changement durée. */
@@ -61,10 +69,20 @@ function CameraToolbarComponent({
   onTimerDelayChange,
   showGrid,
   onToggleGrid,
+  videoQuality,
+  onVideoQualityChange,
+  videoStabilization,
+  onToggleVideoStabilization,
   maxDuration,
   onMaxDurationChange,
 }: CameraToolbarProps) {
   const { t } = useI18n()
+
+  /* La qualité vidéo n'existe que sur Android, la stabilisation que sur iOS :
+     expo-camera ne les expose pas sur l'autre plateforme. L'UI ne présente
+     que ce que le capteur local sait faire. */
+  const showVideoQuality = Platform.OS === 'android'
+  const showVideoStabilization = Platform.OS === 'ios'
 
   return (
     <View style={styles.container}>
@@ -150,6 +168,64 @@ function CameraToolbarComponent({
                 </Text>
               </Pressable>
             ))}
+
+            {showVideoQuality ? (
+              <>
+                <View style={styles.separator} />
+                {VIDEO_QUALITY_OPTIONS.map((quality) => (
+                  <Pressable
+                    key={quality.value}
+                    onPress={() => onVideoQualityChange(quality.value)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: videoQuality === quality.value }}
+                    accessibilityLabel={t.news.compose.a11yVideoQuality.replace(
+                      '{label}',
+                      quality.label,
+                    )}
+                    style={({ pressed }) => [
+                      styles.chip,
+                      videoQuality === quality.value && styles.chipActive,
+                      pressed && styles.chipPressed,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.chipText,
+                        videoQuality === quality.value && styles.chipTextActive,
+                      ]}
+                    >
+                      {quality.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </>
+            ) : null}
+
+            {showVideoStabilization ? (
+              <>
+                <View style={styles.separator} />
+                <Pressable
+                  onPress={onToggleVideoStabilization}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: videoStabilization }}
+                  accessibilityLabel={t.news.compose.a11yVideoStabilization}
+                  style={({ pressed }) => [
+                    styles.chip,
+                    videoStabilization && styles.chipActive,
+                    pressed && styles.chipPressed,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      videoStabilization && styles.chipTextActive,
+                    ]}
+                  >
+                    {t.news.compose.videoStabilizationLabel}
+                  </Text>
+                </Pressable>
+              </>
+            ) : null}
 
             {captureMode === 'video' ? (
               <>
