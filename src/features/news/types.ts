@@ -15,6 +15,8 @@ export interface NewsPostMedia {
   height?: number
   duration?: number
   thumbnailUrl?: string
+  /** Texte alternatif pour l'accessibilité (description de l'image). */
+  altText?: string
 }
 
 export interface NewsPoll {

@@ -6,6 +6,12 @@ import { colors } from '@/lib/theme'
 interface Props {
   text: string
   style?: StyleProp<TextStyle>
+  numberOfLines?: number
+  /* Style des tokens #/@. Sert au ghost de l'éditeur de légende :
+     on y passe un style SANS fontWeight pour que les métriques de texte
+     collent exactement à celles du TextInput transparent (sinon le caret
+     se pose sur la lettre au lieu de l'interstice). */
+  linkStyle?: StyleProp<TextStyle>
 }
 
 const TOKEN_PATTERN = /(#[\w\u00C0-\u024F]+|@[\w\u00C0-\u024F]+)/g
@@ -14,7 +20,7 @@ function isToken(part: string): boolean {
   return part.startsWith('#') || part.startsWith('@')
 }
 
-export default function RichPostText({ text, style }: Props) {
+export default function RichPostText({ text, style, numberOfLines, linkStyle }: Props) {
   const handlePress = useCallback((token: string) => {
     if (token.startsWith('#')) {
       router.push({
@@ -32,13 +38,13 @@ export default function RichPostText({ text, style }: Props) {
   const parts = text.split(TOKEN_PATTERN)
 
   return (
-    <Text style={[styles.base, style]} selectable>
+    <Text style={[styles.base, style]} selectable numberOfLines={numberOfLines}>
       {parts.map((part, index) =>
         isToken(part) ? (
           <Text
             key={index}
             accessibilityRole="link"
-            style={styles.link}
+            style={[styles.link, linkStyle]}
             onPress={() => handlePress(part)}
           >
             {part}

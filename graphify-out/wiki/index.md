@@ -1036,4 +1036,32 @@ Résultat : swipe-back de bord fonctionne sur iOS, Android et Web, y compris sur
 - `togglePostLike` étant une écriture directe côté client, valider les règles déployées (`firebase deploy --only firestore:rules`) **avant toute mise en production**.
 - Les traductions `a11yUnlike`/`a11yLikes` fang/punu/nzebi sont best-effort, dans le style existant (« J'aime » conservé tel quel dans les 4 langues).
 
+### ADR — Éditeur de création : recadrage libre local et déterministe
 
+**Décision :** le mode « Libre » stocke un `freeformAspect` borné (1:2 à 2:1) dans `CropState`, uniquement dans le brouillon local. Il prévaut sur les ratios prédéfinis et est utilisé par la même fonction `getCropAspect()` dans l’aperçu et dans la chaîne FFmpeg. Aucun schéma Firestore, index ou règle de sécurité ne change : le média déjà rendu est le seul artefact envoyé.
+
+**UX :** le curseur du format se déplace avec une précision de 0,01 ; les ratios fixes restent disponibles et désactivent explicitement le mode libre. Cela conserve un pan/zoom sur le thread UI, sans rerender le cadre à chaque mouvement.
+
+### ADR — Nouveau post : aperçu ancré et sélection explicite
+
+**Décision :** `SelectScreen` possède l’aperçu et la sélection ; `GalleryGrid` ne gère plus que la pellicule paginée et les albums. L’aperçu est donc hors de la `FlatList` et reste visible pendant le défilement de la galerie. La sélection simple remplace le média courant ; le mode multiple est opt-in, limité à quatre photos, et exclut tout mélange photo/vidéo. Les vidéos utilisent une frame locale mise en cache par URI et instant afin que l’aperçu ne tente jamais de décoder directement un fichier vidéo comme une image.
+
+**Impact :** aucun changement Firestore/Storage/index — le choix reste dans le brouillon local jusqu’au flux de rendu/publication existant.
+
+### ADR — CaptionScreen niveau Instagram : auteur, suggestions, alt text, compteur
+
+**Décision :** le CaptionScreen adopte le layout Instagram : ligne auteur (`ComposeAuthorRow`) en haut, compteur de caractères (1000 max, indicateur jaune à 80%), suggestions hashtags/mentions en temps réel (debounce 300 ms, Typesense `searchHashtags`/`searchUsers`), et texte alternatif (`altText`) par média pour l'accessibilité.
+
+**Composants ajoutés :**
+- `src/features/create/hooks/useCaptionSuggestions.ts` — extraction du déclencheur (# ou @), recherche debounce, fonctions d'insertion dans le texte.
+- `src/features/create/components/CaptionScreen.tsx` — réécrit avec `ComposeAuthorRow`, compteur, chips de suggestions, saisie alt text inline.
+
+**Types :** `altText?: string` ajouté à `SelectedMedia` et `NewsPostMedia`. Le champ est optionnel, pas de changement Firestore/rules/index — il est inclus dans le document tel quel à la création.
+
+**Sécurité :** aucun impact — les données restent dans le brouillon local jusqu'à la publication existante. Les recherches passent par Typesense (pas de coût Firestore).
+
+**Accessibilité :** `accessibilityRole="button"` + `accessibilityLabel` sur chaque chip de suggestion et le bouton alt text.
+
+### ADR — CaptionScreen : passage au thème sombre unifié
+
+**Décision :** le CaptionScreen est passé de `captionColors` (blanc, prototype initial) à `createColors` (noir), aligné sur `SelectScreen` et `EditScreen`. Le switch `headerColor` dans `app/create.tsx` est supprimé : l'en-tête reste sombre à chaque étape du flux. L'objectif est une expérience visuelle continue sans rupture de thème entre sélection, édition et légende.
