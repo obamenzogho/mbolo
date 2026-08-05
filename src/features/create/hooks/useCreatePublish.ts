@@ -21,6 +21,8 @@ import {
 } from '@/features/news/services/postMutations'
 import type { NewsPostMedia } from '@/features/news/types'
 import { createVideo, updateVideo } from '../services/videoMutations'
+import { incrementSoundUsage, loadSoundById } from '../services/soundService'
+import { ensureLocalSound } from '../services/soundCache'
 import type { CreateDraft } from '../types'
 import { renderMedia, clearRenderCache } from '../utils/renderMedia'
 
@@ -78,10 +80,22 @@ export function useCreatePublish() {
         try {
           const video = draft.media[0]
 
+          /* Le son choisi doit être local avant le rendu : FFmpeg ne lit pas
+             une URL distante. Un échec de téléchargement ne bloque pas la
+             publication, la vidéo garde alors son audio d'origine. */
+          let soundUri: string | null = null
+          if (draft.soundId) {
+            const sound = await loadSoundById(draft.soundId)
+            if (sound?.audioURL) {
+              soundUri = await ensureLocalSound(sound.id, sound.audioURL)
+            }
+          }
+
           /* Rendu local (trim + filtres + overlays) avant l'upload : 0→15% de la
              barre de progression, l'upload prend les 60% suivants. */
           const rendered = await renderMedia(video, {
             overlayUri: video.overlayUri ?? null,
+            soundUri,
             onProgress: (p) => step(p * 0.15),
           })
 
@@ -122,6 +136,9 @@ export function useCreatePublish() {
 
           if (!id) return 'write'
           step(1)
+          if (draft.soundId) {
+            void incrementSoundUsage(draft.soundId)
+          }
           lastPublishAt.current = Date.now()
           void clearRenderCache()
           return { kind: 'video', id }
@@ -145,7 +162,7 @@ export function useCreatePublish() {
             onProgress: (p) => step((draft.media.length > 0 ? p / draft.media.length : 0) * 0.6),
           })
           if (!url) return 'upload'
-          media.push({ url, type: 'image', width: rendered.width, height: rendered.height })
+          media.push({ url, type: 'image', width: rendered.width, height: rendered.height, altText: item.altText })
         }
         step(0.75)
 
@@ -204,8 +221,17 @@ export function useCreatePublish() {
         let rendered
 
         try {
+          let soundUri: string | null = null
+          if (draft.soundId) {
+            const sound = await loadSoundById(draft.soundId)
+            if (sound?.audioURL) {
+              soundUri = await ensureLocalSound(sound.id, sound.audioURL)
+            }
+          }
+
           rendered = await renderMedia(media, {
             overlayUri: media.overlayUri ?? null,
+            soundUri,
             onProgress: (progress) => step(progress * 0.25),
           })
         } catch {
@@ -246,6 +272,7 @@ export function useCreatePublish() {
           hashtags: extractHashtags(draft.text),
           visibility: draft.visibility,
           commentsEnabled: draft.commentsEnabled,
+          soundId: draft.soundId,
           durationMs: media.duration ?? undefined,
         })
 
