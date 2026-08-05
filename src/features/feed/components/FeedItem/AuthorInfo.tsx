@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
@@ -10,6 +10,7 @@ import type { Video } from '@/types'
 
 // Longueur de description affichée sur une ligne avant « voir plus ».
 const DESC_MAX = 70
+const TOKEN_PATTERN = /(#[\w\u00C0-\u024F]+|@[\w\u00C0-\u024F]+)/g
 
 interface AuthorInfoProps {
   item: Video
@@ -89,9 +90,13 @@ export const AuthorInfo = memo(function AuthorInfo({ item, username, userPhotoUR
           {(description.length > 0 || hasHashtags) && (
             <TouchableOpacity activeOpacity={0.9} onPress={() => canExpand && setExpanded((p) => !p)}>
               {description.length > 0 ? (
-                <Text style={styles.description} numberOfLines={expanded ? undefined : 1}>
-                  {shownDesc}
-                  {!expanded && canExpand && <Text style={styles.more}>voir plus</Text>}
+                <Text style={styles.description}>
+                  {(expanded ? description : shownDesc).split(TOKEN_PATTERN).map((part, i) =>
+                    part.startsWith('#') || part.startsWith('@')
+                      ? <Text key={i} style={styles.hashtag}>{part}</Text>
+                      : part
+                  )}
+                  {!expanded && canExpand ? <Text style={styles.more}>voir plus</Text> : null}
                 </Text>
               ) : (
                 !expanded && (
@@ -154,5 +159,5 @@ const styles = StyleSheet.create({
   disc: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#2a2a2a', alignItems: 'center', justifyContent: 'center', marginRight: 8 },
   audioText: { color: '#FFF', fontSize: 13, flexShrink: 1 },
   hashtagsRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginTop: 6, gap: 4 },
-  hashtag: { color: '#4FC3F7', fontSize: 13, fontWeight: '600' },
+  hashtag: { color: colors.primary, fontSize: 13, fontWeight: '600' },
 })
