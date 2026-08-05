@@ -178,6 +178,13 @@ export const ASPECT_RATIOS: { value: AspectRatioValue; label: string; ratio: num
 /** Vitesse de capture vidéo (appliquée au rendu FFmpeg). */
 export type CaptureSpeed = '0.3' | '0.5' | '1' | '2' | '3'
 
+export interface RecordingSegment {
+  uri: string
+  durationMs: number
+  /** Faux quand le micro a été refusé : le fichier n'a alors aucune piste audio. */
+  hasAudio?: boolean
+}
+
 export const CAPTURE_SPEEDS: { value: CaptureSpeed; label: string }[] = [
   { value: '0.3', label: '0.3x' },
   { value: '0.5', label: '0.5x' },

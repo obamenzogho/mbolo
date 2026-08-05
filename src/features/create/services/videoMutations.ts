@@ -97,6 +97,7 @@ export interface StoredVideo {
   visibility: NewsPostVisibility
   commentsEnabled: boolean
   durationMs?: number
+  soundId?: string
 }
 
 export async function loadVideo(
@@ -120,6 +121,7 @@ export async function loadVideo(
       visibility: data.visibility ?? 'public',
       commentsEnabled: data.commentsEnabled !== false,
       durationMs: data.durationMs,
+      soundId: data.soundId,
     }
   } catch (error) {
     captureException(

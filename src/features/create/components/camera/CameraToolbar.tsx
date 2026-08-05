@@ -28,6 +28,10 @@ interface CameraToolbarProps {
   captureSpeed: CaptureSpeed
   /** Callback changement de vitesse. */
   onCaptureSpeedChange: (speed: CaptureSpeed) => void
+  /** Délai du compte à rebours avant enregistrement. */
+  timerDelay: 0 | 3 | 10
+  /** Callback changement du compte à rebours. */
+  onTimerDelayChange: (seconds: 0 | 3 | 10) => void
   /** Grille active. */
   showGrid: boolean
   /** Toggle grille. */
@@ -39,6 +43,7 @@ interface CameraToolbarProps {
 }
 
 const DURATION_OPTIONS = [15, 30, 60, 180, 600]
+const TIMER_OPTIONS = [0, 3, 10] as const
 
 function formatDuration(seconds: number): string {
   if (seconds < 60) return `${seconds}s`
@@ -52,6 +57,8 @@ function CameraToolbarComponent({
   onAspectRatioChange,
   captureSpeed,
   onCaptureSpeedChange,
+  timerDelay,
+  onTimerDelayChange,
   showGrid,
   onToggleGrid,
   maxDuration,
@@ -143,6 +150,38 @@ function CameraToolbarComponent({
                 </Text>
               </Pressable>
             ))}
+
+            {captureMode === 'video' ? (
+              <>
+                <View style={styles.separator} />
+                {TIMER_OPTIONS.map((delay) => (
+                  <Pressable
+                    key={delay}
+                    onPress={() => onTimerDelayChange(delay)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: timerDelay === delay }}
+                    accessibilityLabel={t.news.compose.a11yTimerDelay.replace(
+                      '{label}',
+                      formatDuration(delay),
+                    )}
+                    style={({ pressed }) => [
+                      styles.chip,
+                      timerDelay === delay && styles.chipActive,
+                      pressed && styles.chipPressed,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.chipText,
+                        timerDelay === delay && styles.chipTextActive,
+                      ]}
+                    >
+                      {formatDuration(delay)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </>
+            ) : null}
 
             <View style={styles.separator} />
 

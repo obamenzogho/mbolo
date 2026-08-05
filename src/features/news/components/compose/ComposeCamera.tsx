@@ -19,9 +19,9 @@
    laisse l'orchestrateur décider de la suite. */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { PanResponder, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Alert, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native'
 import type { GestureResponderEvent, NativeTouchEvent } from 'react-native'
-import { CameraView, useCameraPermissions } from 'expo-camera'
+import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera'
 import { useIsFocused } from '@react-navigation/native'
 import * as Haptics from 'expo-haptics'
 import { Ionicons } from '@expo/vector-icons'
@@ -40,6 +40,9 @@ import type { AspectRatioValue, CaptureSpeed } from '@/features/create/types/edi
 import { DEFAULT_VIDEO_EDIT } from '@/features/create/types/editing'
 import { CameraOverlay } from '@/features/create/components/camera/CameraOverlay'
 import { CameraToolbar } from '@/features/create/components/camera/CameraToolbar'
+import { SegmentedProgressBar } from '@/features/create/components/camera/SegmentedProgressBar'
+import { useSegmentedRecording } from '@/features/create/hooks/useSegmentedRecording'
+import { concatSegments } from '@/features/create/utils/concatSegments'
 
 type CaptureMode = 'photo' | 'video'
 
@@ -97,13 +100,28 @@ export function ComposeCamera({
   const mountedRef = useRef(true)
 
   const [permission, requestPermission] = useCameraPermissions()
+  const [micPermission, requestMicPermission] = useMicrophonePermissions()
   const [captureMode, setCaptureMode] = useState<CaptureMode>('photo')
   const [facing, setFacing] = useState<'back' | 'front'>('back')
   const [flash, setFlash] = useState<'off' | 'on'>('off')
   const [maxDuration, setMaxDuration] = useState<number>(30)
+  const [timerDelay, setTimerDelay] = useState<0 | 3 | 10>(0)
+  const [countdown, setCountdown] = useState(0)
+  const [isFinalizing, setIsFinalizing] = useState(false)
   const [recording, setRecording] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const elapsedRef = useRef(0)
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const {
+    segments,
+    totalDurationMs,
+    remainingDurationMs,
+    canRecord,
+    addSegment,
+    removeLastSegment,
+    reset: resetSegments,
+  } = useSegmentedRecording({ maxDurationMs: maxDuration * 1000 })
 
   /* ── Nouvel état caméra studio ─────────────────────────────────── */
   const [showGrid, setShowGrid] = useState(false)
@@ -168,7 +186,19 @@ export function ComposeCamera({
     timerRef.current = null
   }, [])
 
+  const clearCountdown = useCallback(() => {
+    if (countdownRef.current) clearInterval(countdownRef.current)
+    countdownRef.current = null
+    setCountdown(0)
+  }, [])
+
   useEffect(() => clearTimer, [clearTimer])
+
+  useEffect(() => {
+    return () => {
+      if (countdownRef.current) clearInterval(countdownRef.current)
+    }
+  }, [])
 
   /* ── Stop recording ───────────────────────────────────────────── */
   const stopRecording = useCallback(() => {
@@ -182,7 +212,21 @@ export function ComposeCamera({
 
   /* ── Start recording ──────────────────────────────────────────── */
   const startRecording = useCallback(async () => {
-    if (!cameraRef.current || recording) return
+    if (!cameraRef.current || recording || !canRecord) return
+
+    let audioGranted = micPermission?.granted ?? false
+
+    if (captureMode === 'video' && !audioGranted) {
+      const result = await requestMicPermission()
+      if (!result.granted) {
+        Alert.alert(
+          t.news.compose.errorTitle,
+          t.news.compose.errorMicrophoneDenied,
+        )
+        return
+      }
+      audioGranted = true
+    }
 
     setRecording(true)
     setElapsed(0)
@@ -195,18 +239,22 @@ export function ComposeCamera({
     }, 1000)
 
     try {
-      const video = await cameraRef.current.recordAsync({ maxDuration })
+      const recordedVideo = await cameraRef.current.recordAsync({
+        maxDuration: Math.max(1, Math.ceil(remainingDurationMs / 1000)),
+      })
+      const video = recordedVideo as { uri?: string; duration?: number }
+
       if (video?.uri) {
-        const speed = Number(captureSpeed)
-        onCapture({
+        const rawDurationMs = video.duration
+          ? Number(video.duration) > 1000
+            ? Math.round(Number(video.duration))
+            : Math.round(Number(video.duration) * 1000)
+          : Math.max(1000, elapsedRef.current * 1000)
+
+        addSegment({
           uri: video.uri,
-          type: 'video',
-          /* Durée après application de la vitesse : à 2x, la vidéo rendue
-             dure deux fois moins longtemps que la prise de vue. */
-          duration: Math.max(1, Math.round(elapsedRef.current / speed)),
-          /* La vitesse n'est pas appliquée à la capture (expo-camera filme
-             toujours en temps réel) mais au rendu FFmpeg. */
-          video: { ...DEFAULT_VIDEO_EDIT, speed },
+          durationMs: Math.min(rawDurationMs, remainingDurationMs),
+          hasAudio: audioGranted,
         })
       }
     } catch (e) {
@@ -217,7 +265,51 @@ export function ComposeCamera({
       setElapsed(0)
       elapsedRef.current = 0
     }
-  }, [recording, maxDuration, onCapture, clearTimer, captureSpeed])
+  }, [recording, captureMode, micPermission, requestMicPermission, remainingDurationMs, canRecord, clearTimer, addSegment, t.news.compose.errorTitle, t.news.compose.errorMicrophoneDenied])
+
+  const startCountdown = useCallback(() => {
+    if (recording || countdownRef.current || timerDelay <= 0 || !canRecord) return
+
+    setCountdown(timerDelay)
+    countdownRef.current = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearCountdown()
+          void startRecording()
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+  }, [recording, timerDelay, canRecord, clearCountdown, startRecording])
+
+  const confirmRecording = useCallback(async () => {
+    if (recording || isFinalizing || segments.length === 0) return
+
+    setIsFinalizing(true)
+    try {
+      const outputUri =
+        segments.length === 1 ? segments[0].uri : await concatSegments(segments)
+      const rawTotalMs = segments.reduce((sum, segment) => sum + segment.durationMs, 0)
+      const speed = Number(captureSpeed)
+      const duration = Math.max(1, Math.round(rawTotalMs / 1000 / speed))
+
+      onCapture({
+        uri: outputUri,
+        type: 'video',
+        duration,
+        video: { ...DEFAULT_VIDEO_EDIT, speed },
+      })
+      resetSegments()
+    } catch (error) {
+      captureException(error instanceof Error ? error : new Error(String(error)), {
+        context: 'news.compose.segmentedConfirm',
+      })
+      Alert.alert(t.news.compose.errorTitle, t.news.compose.errorPublish)
+    } finally {
+      setIsFinalizing(false)
+    }
+  }, [captureSpeed, isFinalizing, onCapture, recording, resetSegments, segments, t.news.compose.errorPublish, t.news.compose.errorTitle])
 
   /* ── Take photo ───────────────────────────────────────────────── */
   const takePhoto = useCallback(async () => {
@@ -310,9 +402,16 @@ export function ComposeCamera({
       takePhoto()
       return
     }
-    if (recording) stopRecording()
-    else startRecording()
-  }, [captureMode, recording, takePhoto, startRecording, stopRecording])
+    if (recording) {
+      stopRecording()
+      return
+    }
+    if (timerDelay > 0) {
+      startCountdown()
+      return
+    }
+    void startRecording()
+  }, [captureMode, recording, takePhoto, startRecording, startCountdown, stopRecording, timerDelay])
 
   const handlePressOut = useCallback(() => {
     stopBurst()
@@ -340,7 +439,23 @@ export function ComposeCamera({
     )
   }
 
-  const remaining = Math.max(0, maxDuration - elapsed)
+  if (captureMode === 'video' && micPermission && !micPermission.granted) {
+    return (
+      <View style={styles.gate}>
+        <Ionicons name="mic-off-outline" size={52} color={postColors.textTertiary} />
+        <Text style={styles.gateText}>{t.news.compose.microphonePermission}</Text>
+        <Pressable
+          onPress={requestMicPermission}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.gateButton, pressed && styles.pressed]}
+        >
+          <Text style={styles.gateButtonText}>{t.news.compose.cameraAllow}</Text>
+        </Pressable>
+      </View>
+    )
+  }
+
+  const remaining = Math.max(0, Math.ceil(remainingDurationMs / 1000) - elapsed)
 
   return (
     <View style={styles.root}>
@@ -363,6 +478,22 @@ export function ComposeCamera({
 
       {/* ── Overlays (grid, ratio mask) ────────────────────────────── */}
       <CameraOverlay showGrid={showGrid} aspectRatio={aspectRatio} />
+
+      {countdown > 0 ? (
+        <View style={styles.countdownOverlay} pointerEvents="box-none">
+          <View style={styles.countdownCircle}>
+            <Text style={styles.countdownText}>{countdown}</Text>
+          </View>
+          <Pressable
+            onPress={clearCountdown}
+            accessibilityRole="button"
+            accessibilityLabel={t.news.compose.a11yCancelCountdown}
+            style={({ pressed }) => [styles.countdownCancel, pressed && styles.pressed]}
+          >
+            <Text style={styles.countdownCancelText}>{t.news.compose.cancelCountdown}</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       {/* ── Top bar ────────────────────────────────────────────────── */}
       <View style={[styles.topBar, topBarInset ? { paddingLeft: topBarInset } : undefined]}>
@@ -406,11 +537,39 @@ export function ComposeCamera({
           onAspectRatioChange={setAspectRatio}
           captureSpeed={captureSpeed}
           onCaptureSpeedChange={setCaptureSpeed}
+          timerDelay={timerDelay}
+          onTimerDelayChange={setTimerDelay}
           showGrid={showGrid}
           onToggleGrid={() => setShowGrid((v) => !v)}
           maxDuration={maxDuration}
           onMaxDurationChange={setMaxDuration}
         />
+
+        {segments.length > 0 ? (
+          <View style={styles.segmentedControls}>
+            <SegmentedProgressBar
+              segments={segments}
+              totalDurationMs={totalDurationMs}
+              maxDurationMs={maxDuration * 1000}
+              onRemoveLast={removeLastSegment}
+            />
+            <Pressable
+              onPress={confirmRecording}
+              disabled={isFinalizing || recording}
+              accessibilityRole="button"
+              accessibilityLabel={t.news.compose.a11yFinishRecording}
+              style={({ pressed }) => [
+                styles.confirmButton,
+                (isFinalizing || recording) && styles.confirmButtonDisabled,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={styles.confirmButtonText}>
+                {isFinalizing ? t.news.compose.finalizing : t.news.compose.finishRecording}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         {/* Shutter row */}
         <View style={styles.shutterRow}>
@@ -498,6 +657,58 @@ const styles = StyleSheet.create({
     marginTop: 'auto',
     paddingBottom: 28,
     gap: postSpacing.rowGap,
+  },
+
+  segmentedControls: {
+    gap: 10,
+    paddingHorizontal: 16,
+  },
+  confirmButton: {
+    paddingVertical: 12,
+    borderRadius: 999,
+    backgroundColor: postColors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmButtonDisabled: {
+    backgroundColor: postColors.scrimHeavy,
+  },
+  confirmButtonText: {
+    color: postColors.onMedia,
+    fontWeight: '700',
+  },
+  countdownOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    gap: 16,
+    paddingHorizontal: 24,
+  },
+  countdownCircle: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    borderWidth: 2,
+    borderColor: postColors.accent,
+  },
+  countdownText: {
+    color: postColors.onMedia,
+    fontSize: 56,
+    fontWeight: '800',
+  },
+  countdownCancel: {
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: postColors.scrimHeavy,
+  },
+  countdownCancelText: {
+    color: postColors.textPrimary,
+    fontWeight: '600',
   },
 
   shutterRow: {

@@ -8,6 +8,9 @@
 import type { NewsLocation, NewsPostVisibility } from '@/features/news/types'
 import type { SelectedMedia } from '@/features/news/hooks/useComposeState'
 
+/** Limite produit du carrousel photo. Une vidéo reste toujours seule. */
+export const CREATE_MAX_MEDIA = 4
+
 /** Brouillon du nouveau flux : texte + média (photo ou vidéo) + réglages. */
 export interface CreateDraft {
   text: string

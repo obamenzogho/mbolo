@@ -27,6 +27,7 @@ import { useCreatePublish, type CreatePublishError, type EditTarget } from '@/fe
 import { SelectScreen } from '@/features/create/components/SelectScreen'
 import { EditScreen } from '@/features/create/components/edit/EditScreen'
 import { CaptionScreen } from '@/features/create/components/CaptionScreen'
+import { SoundPickerSheet } from '@/features/create/components/SoundPickerSheet'
 import { createColors, createType } from '@/features/create/theme/createTokens'
 import { CREATE_MAX_MEDIA } from '@/features/create/types'
 import type { GalleryAsset } from '@/hooks/useGallery'
@@ -71,6 +72,8 @@ export default function CreateScreen() {
   const [commentsEnabled, setCommentsEnabled] = useState(true)
   const [location, setLocation] = useState<NewsLocation | null>(null)
   const [visibilityOpen, setVisibilityOpen] = useState(false)
+  const [soundPickerOpen, setSoundPickerOpen] = useState(false)
+  const [soundId, setSoundId] = useState<string | undefined>(undefined)
   const [detectingLocation, setDetectingLocation] = useState(false)
   const [progress, setProgress] = useState(0)
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null)
@@ -189,6 +192,7 @@ export default function CreateScreen() {
           setText(existing.description)
           setVisibility(existing.visibility)
           setCommentsEnabled(existing.commentsEnabled)
+          setSoundId(existing.soundId ?? undefined)
           setEditingIndex(0)
           setStep('edit')
         } catch {
@@ -228,6 +232,12 @@ export default function CreateScreen() {
   const isCaptionStep = step === 'caption'
   const isEditStep = step === 'edit'
   const isPublishing = step === 'publishing'
+
+  useEffect(() => {
+    if (!media.some((item) => item.type === 'video') && soundId) {
+      setSoundId(undefined)
+    }
+  }, [media, soundId])
 
   /* Instagram distingue la sélection simple (remplace l'aperçu) et la
      sélection multiple. Une vidéo est toujours seule : le renderer et le
@@ -320,7 +330,7 @@ export default function CreateScreen() {
       displayName:
         user.displayName || user.email?.split('@')[0] || t.news.compose.userFallback,
     }
-    const draft = { text, media, visibility, commentsEnabled, location }
+    const draft = { text, media, visibility, commentsEnabled, location, soundId }
 
     const outcome = editTarget
       ? await update(editTarget, draft, author, { onProgress: setProgress })
@@ -462,6 +472,8 @@ export default function CreateScreen() {
             location={location}
             detectingLocation={detectingLocation}
             onPressLocation={location ? () => setLocation(null) : detectLocation}
+            soundId={soundId}
+            onPressSound={() => setSoundPickerOpen(true)}
             userName={userProfile.nom}
             userPhotoURL={userProfile.photoURL}
             onAltTextChange={handleAltTextChange}
@@ -474,6 +486,15 @@ export default function CreateScreen() {
         value={visibility}
         onChange={setVisibility}
         onClose={() => setVisibilityOpen(false)}
+      />
+      <SoundPickerSheet
+        visible={soundPickerOpen}
+        selectedSoundId={soundId}
+        onSelect={(selected) => {
+          setSoundId(selected?.id)
+          setSoundPickerOpen(false)
+        }}
+        onClose={() => setSoundPickerOpen(false)}
       />
     </View>
   )
