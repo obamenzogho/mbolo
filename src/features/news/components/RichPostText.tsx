@@ -12,6 +12,9 @@ interface Props {
      collent exactement à celles du TextInput transparent (sinon le caret
      se pose sur la lettre au lieu de l'interstice). */
   linkStyle?: StyleProp<TextStyle>
+  /* Réglage avancé « masquer les mentions et les hashtags » : les tokens
+     restent affichés mais ne sont ni stylés ni cliquables. */
+  interactive?: boolean
 }
 
 const TOKEN_PATTERN = /(#[\w\u00C0-\u024F]+|@[\w\u00C0-\u024F]+)/g
@@ -20,7 +23,7 @@ function isToken(part: string): boolean {
   return part.startsWith('#') || part.startsWith('@')
 }
 
-export default function RichPostText({ text, style, numberOfLines, linkStyle }: Props) {
+export default function RichPostText({ text, style, numberOfLines, linkStyle, interactive = true }: Props) {
   const handlePress = useCallback((token: string) => {
     if (token.startsWith('#')) {
       router.push({
@@ -43,9 +46,9 @@ export default function RichPostText({ text, style, numberOfLines, linkStyle }: 
         isToken(part) ? (
           <Text
             key={index}
-            accessibilityRole="link"
-            style={[styles.link, linkStyle]}
-            onPress={() => handlePress(part)}
+            accessibilityRole={interactive ? 'link' : 'text'}
+            style={interactive ? [styles.link, linkStyle] : undefined}
+            onPress={interactive ? () => handlePress(part) : undefined}
           >
             {part}
           </Text>

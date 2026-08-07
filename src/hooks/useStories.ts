@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  collection, addDoc, doc, updateDoc, deleteDoc, getDocs, getDoc,
-  query, where, serverTimestamp, runTransaction,
+  collection, doc, updateDoc, deleteDoc, getDocs, getDoc,
+  query, where, runTransaction,
 } from 'firebase/firestore'
 import { db, auth } from '../lib/firebase'
-import { uploadToCloudinary } from '../lib/cloudinary'
 import { captureException } from '../lib/sentry'
 
 export interface Story {
@@ -38,75 +37,6 @@ export function useStories() {
   const user = auth.currentUser
   const [myStories, setMyStories] = useState<Story[]>([])
   const [loading, setLoading] = useState(false)
-
-  const uploadStory = useCallback(async (
-    mediaUri: string,
-    mediaType: 'image' | 'video',
-    caption?: string,
-    textOverlay?: string,
-    textPosition?: { x: number; y: number }
-  ): Promise<string> => {
-    if (!user) throw new Error('Non authentifié')
-
-    const isVideo = mediaType === 'video'
-    const mediaUrl = await uploadToCloudinary(mediaUri, isVideo ? 'video' : 'image', {
-      folder: 'stories',
-      timeout: 120000,
-    })
-
-    const now = new Date()
-    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000)
-
-    const storyDoc = await addDoc(collection(db, 'stories'), {
-      userId: user.uid,
-      username: user.displayName || 'Utilisateur',
-      avatarUrl: user.photoURL || '',
-      mediaUrl,
-      mediaType,
-      caption: caption || '',
-      textOverlay: textOverlay || '',
-      textPosition: textPosition || { x: 0, y: 0 },
-      createdAt: serverTimestamp(),
-      expiresAt,
-      savedToHighlight: false,
-      views: 0,
-      viewedBy: [],
-    })
-
-    return storyDoc.id
-  }, [user])
-
-  const uploadTextStory = useCallback(async (
-    text: string,
-    backgroundColor: string,
-    backgroundGradient?: string[],
-  ): Promise<string> => {
-    if (!user) throw new Error('Non authentifié')
-
-    const now = new Date()
-    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000)
-
-    const storyDoc = await addDoc(collection(db, 'stories'), {
-      userId: user.uid,
-      username: user.displayName || 'Utilisateur',
-      avatarUrl: user.photoURL || '',
-      mediaUrl: '',
-      mediaType: 'text',
-      text,
-      backgroundColor,
-      backgroundGradient: backgroundGradient || [],
-      caption: '',
-      textOverlay: '',
-      textPosition: { x: 0, y: 0 },
-      createdAt: serverTimestamp(),
-      expiresAt,
-      savedToHighlight: false,
-      views: 0,
-      viewedBy: [],
-    })
-
-    return storyDoc.id
-  }, [user])
 
   const deleteStory = useCallback(async (storyId: string) => {
     try {
@@ -225,8 +155,6 @@ export function useStories() {
   return {
     myStories,
     loading,
-    uploadStory,
-    uploadTextStory,
     deleteStory,
     getMyStories,
     getUserStories,

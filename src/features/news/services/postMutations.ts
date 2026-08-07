@@ -51,6 +51,8 @@ export interface PostDraft {
   poll: NewsPoll | null
   article: NewsPostArticle | null
   videoShare: NewsPostVideoShare | null
+  /** Réglage avancé : les mentions/hashtags de la légende ne sont pas cliquables. */
+  hideMentionsAndHashtags: boolean
 }
 
 export interface PostAuthor {
@@ -83,6 +85,7 @@ function editableFields(draft: PostDraft) {
     poll: draft.poll,
     article: draft.article,
     videoShare: draft.videoShare,
+    hideMentionsAndHashtags: draft.hideMentionsAndHashtags,
   }
 }
 

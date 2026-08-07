@@ -67,31 +67,6 @@ function StoryCardComponent({ group, onPress }: StoryCardProps) {
   )
 }
 
-interface CreateStoryCardProps {
-  avatarUrl?: string
-  onPress: () => void
-}
-
-export function CreateStoryCard({ avatarUrl, onPress }: CreateStoryCardProps) {
-  return (
-    <Pressable onPress={onPress} style={styles.card}>
-      {avatarUrl ? (
-        <Image source={{ uri: avatarUrl }} style={styles.createTop} resizeMode="cover" />
-      ) : (
-        <View style={[styles.createTop, styles.avatarFallback]}>
-          <Ionicons name="person" size={34} color="#999" />
-        </View>
-      )}
-      <View style={styles.createBottom}>
-        <View style={styles.createPlus}>
-          <Ionicons name="add" size={20} color="#fff" />
-        </View>
-        <Text numberOfLines={1} style={styles.createLabel}>Créer une story</Text>
-      </View>
-    </Pressable>
-  )
-}
-
 export const StoryCard = memo(StoryCardComponent)
 
 const styles = StyleSheet.create({
@@ -129,25 +104,4 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.6)',
     textShadowRadius: 3,
   },
-  createTop: { width: '100%', height: CARD_H - 46 },
-  createBottom: {
-    flex: 1,
-    backgroundColor: '#1A1B1E',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingBottom: 8,
-  },
-  createPlus: {
-    position: 'absolute',
-    top: -16,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 3,
-    borderColor: '#1A1B1E',
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  createLabel: { color: '#E8E8E8', fontSize: 11, fontWeight: '600' },
 })

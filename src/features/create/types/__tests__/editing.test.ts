@@ -1,11 +1,12 @@
-/* editing.test.ts — Cycle du flash et validité des options vidéo.
-   Le flash est un cycle fermé : chaque état mène au suivant, et un état
-   stocké inconnu ne doit pas dérailler le cycle. */
+/* editing.test.ts — Cycle du flash, validité des options vidéo et presets
+   de zoom rapide. Le flash est un cycle fermé : chaque état mène au
+   suivant, et un état stocké inconnu ne doit pas dérailler le cycle. */
 
 import {
   FLASH_MODES,
   isVideoQualityOption,
   nextFlashMode,
+  ZOOM_PRESETS,
 } from '../editing'
 
 describe('nextFlashMode', () => {
@@ -33,5 +34,20 @@ describe('isVideoQualityOption', () => {
     expect(isVideoQualityOption('4k')).toBe(false)
     expect(isVideoQualityOption(1080)).toBe(false)
     expect(isVideoQualityOption(null)).toBe(false)
+  })
+})
+
+describe('ZOOM_PRESETS', () => {
+  it('couvre la plage de zoom d’expo-camera (0..1) sans chevauchement', () => {
+    expect(ZOOM_PRESETS[0]).toEqual({ label: '1x', zoom: 0 })
+    expect(ZOOM_PRESETS[ZOOM_PRESETS.length - 1].zoom).toBeLessThanOrEqual(1)
+    const zooms = ZOOM_PRESETS.map((preset) => preset.zoom)
+    expect(new Set(zooms).size).toBe(zooms.length)
+  })
+
+  it('chaque preset a un label non vide', () => {
+    for (const preset of ZOOM_PRESETS) {
+      expect(preset.label.length).toBeGreaterThan(0)
+    }
   })
 })

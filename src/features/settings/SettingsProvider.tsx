@@ -7,12 +7,12 @@ import {
   useCallback,
   type ReactNode,
 } from 'react'
-import { auth } from '@/lib/firebase'
+import { auth, db } from '@/lib/firebase'
 import { doc, updateDoc } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
 import { onAuthStateChanged } from 'firebase/auth'
 import { useDataSaver } from '@/contexts/DataSaverContext'
-import { useI18n } from '@/i18n/index'
+import { useI18n, type Language } from '@/i18n/index'
+import { translations } from '@/i18n/translations'
 import { DEFAULT_SETTINGS, mergeSettings, type MboloSettings } from './types'
 import {
   subscribeSettings,
@@ -99,8 +99,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (loading) return
-    if (settings.account.language && settings.account.language !== language) {
-      setLanguage(settings.account.language as any)
+    const lang = settings.account.language
+    // Garde : un code stocké en base pour une langue retirée (ex. punu/nzebi)
+    // ne doit jamais être poussé vers le runtime i18n.
+    if (typeof lang === 'string' && lang in translations && lang !== language) {
+      setLanguage(lang as Language)
     }
   }, [settings.account.language, language, loading, setLanguage])
 

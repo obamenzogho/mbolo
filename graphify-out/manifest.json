@@ -15,7 +15,7 @@
     "semantic_hash": "5625526ade7839da5ec0f1eb12d7697a"
   },
   "/home/bruneel/Bureau/mbolo/.claude/settings.local.json": {
-    "mtime": 1785921036.071456,
+    "mtime": 1786062061.494361,
     "ast_hash": "5a94c883bdc0fbbaafe2c2595ce4c2f0",
     "semantic_hash": "5a94c883bdc0fbbaafe2c2595ce4c2f0"
   },
@@ -45,14 +45,9 @@
     "semantic_hash": "79cca6b7bbdb8d386208c19459754e3a"
   },
   "/home/bruneel/Bureau/mbolo/app/(tabs)/(sub)/_layout.tsx": {
-    "mtime": 1785676123.1436322,
-    "ast_hash": "c6fe404d327c104b710004da2d750225",
-    "semantic_hash": "c6fe404d327c104b710004da2d750225"
-  },
-  "/home/bruneel/Bureau/mbolo/app/(tabs)/(sub)/camera.tsx": {
-    "mtime": 1785676046.2018876,
-    "ast_hash": "4f574f81e9af337cb4114b46a45b8665",
-    "semantic_hash": "4f574f81e9af337cb4114b46a45b8665"
+    "mtime": 1786062061.5043612,
+    "ast_hash": "6a1d552445fdc4417ebd8fcd993b7572",
+    "semantic_hash": "6a1d552445fdc4417ebd8fcd993b7572"
   },
   "/home/bruneel/Bureau/mbolo/app/(tabs)/(sub)/discover.tsx": {
     "mtime": 1785516593.6828177,
@@ -130,9 +125,9 @@
     "semantic_hash": "f4c062780e263362f3435313b7ca2a55"
   },
   "/home/bruneel/Bureau/mbolo/app/create.tsx": {
-    "mtime": 1785914369.62904,
-    "ast_hash": "58b6099460ea4524226c50e4b71ad4db",
-    "semantic_hash": "58b6099460ea4524226c50e4b71ad4db"
+    "mtime": 1786066202.3988938,
+    "ast_hash": "27bfdcf18ab928d10e3646d973a47856",
+    "semantic_hash": "27bfdcf18ab928d10e3646d973a47856"
   },
   "/home/bruneel/Bureau/mbolo/app/hashtag/[tag].tsx": {
     "mtime": 1785516593.9078197,
@@ -689,6 +684,11 @@
     "ast_hash": "4a159f5800831384f065cfacebf85604",
     "semantic_hash": "4a159f5800831384f065cfacebf85604"
   },
+  "/home/bruneel/Bureau/mbolo/src/components/ui/ProgressRing.tsx": {
+    "mtime": 1786026897.6277115,
+    "ast_hash": "5d824993720fd4437c84c225cf9804b1",
+    "semantic_hash": "5d824993720fd4437c84c225cf9804b1"
+  },
   "/home/bruneel/Bureau/mbolo/src/components/ui/QueryErrorMessage.tsx": {
     "mtime": 1785516595.4358351,
     "ast_hash": "262acb6714e819751df2c2da24a3090a",
@@ -780,19 +780,24 @@
     "semantic_hash": "18491976278cb3eaf80029a93f74dbba"
   },
   "/home/bruneel/Bureau/mbolo/src/features/create/components/CaptionScreen.tsx": {
-    "mtime": 1785914934.530096,
-    "ast_hash": "b356e0f57dc135bd651df049d218e2a4",
-    "semantic_hash": "b356e0f57dc135bd651df049d218e2a4"
+    "mtime": 1786062062.0683663,
+    "ast_hash": "e4fc767c80a9f813ec6d4b51b8c350ff",
+    "semantic_hash": "e4fc767c80a9f813ec6d4b51b8c350ff"
   },
   "/home/bruneel/Bureau/mbolo/src/features/create/components/GalleryGrid.tsx": {
-    "mtime": 1785854975.0399077,
-    "ast_hash": "76ddd5fbde5e1b6c897c9587aef4891d",
-    "semantic_hash": "76ddd5fbde5e1b6c897c9587aef4891d"
+    "mtime": 1786062062.0863664,
+    "ast_hash": "f6988587611877bdf864d9cefab557a8",
+    "semantic_hash": "f6988587611877bdf864d9cefab557a8"
+  },
+  "/home/bruneel/Bureau/mbolo/src/features/create/components/LocationSheet.tsx": {
+    "mtime": 1786034214.893804,
+    "ast_hash": "89b53425bc5dfa4f95b2f1a1fb1ba5df",
+    "semantic_hash": "89b53425bc5dfa4f95b2f1a1fb1ba5df"
   },
   "/home/bruneel/Bureau/mbolo/src/features/create/components/SelectScreen.tsx": {
-    "mtime": 1785880298.4329858,
-    "ast_hash": "de0504bba9a1e00835a898975dd273bc",
-    "semantic_hash": "de0504bba9a1e00835a898975dd273bc"
+    "mtime": 1786063477.3200068,
+    "ast_hash": "0890d9db02d93af74309038d2074634c",
+    "semantic_hash": "0890d9db02d93af74309038d2074634c"
   },
   "/home/bruneel/Bureau/mbolo/src/features/create/components/SoundPickerSheet.tsx": {
     "mtime": 1785915163.2281427,
@@ -800,19 +805,24 @@
     "semantic_hash": "120f8b22a2883c3ae76ee30b5785bb68"
   },
   "/home/bruneel/Bureau/mbolo/src/features/create/components/__tests__/CaptionScreen.test.tsx": {
-    "mtime": 1785841068.7522404,
-    "ast_hash": "dfd9ee3e8a2ba54a3f7dc0a87cc958ed",
-    "semantic_hash": "dfd9ee3e8a2ba54a3f7dc0a87cc958ed"
+    "mtime": 1786062062.0873663,
+    "ast_hash": "c99b41f09d61fdbd985471e0a085455c",
+    "semantic_hash": "c99b41f09d61fdbd985471e0a085455c"
   },
   "/home/bruneel/Bureau/mbolo/src/features/create/components/camera/CameraOverlay.tsx": {
     "mtime": 1785879784.9833622,
     "ast_hash": "c83e984db21cba4a8042d54e7b54eec9",
     "semantic_hash": "c83e984db21cba4a8042d54e7b54eec9"
   },
-  "/home/bruneel/Bureau/mbolo/src/features/create/components/camera/CameraToolbar.tsx": {
-    "mtime": 1785927936.5086677,
-    "ast_hash": "b629de4b4aee73feb409cedd97e434ac",
-    "semantic_hash": "b629de4b4aee73feb409cedd97e434ac"
+  "/home/bruneel/Bureau/mbolo/src/features/create/components/camera/CameraSideRail.tsx": {
+    "mtime": 1786008234.111825,
+    "ast_hash": "3b0150d75ef467c85f1ba6aa4c80060a",
+    "semantic_hash": "3b0150d75ef467c85f1ba6aa4c80060a"
+  },
+  "/home/bruneel/Bureau/mbolo/src/features/create/components/camera/FocusIndicator.tsx": {
+    "mtime": 1785952424.4313953,
+    "ast_hash": "8d13bcf85179694448fdd35d503e4851",
+    "semantic_hash": "8d13bcf85179694448fdd35d503e4851"
   },
   "/home/bruneel/Bureau/mbolo/src/features/create/components/camera/SegmentedProgressBar.tsx": {
     "mtime": 1785913859.4844742,
@@ -900,9 +910,9 @@
     "semantic_hash": "7a6a1a6f0ae978dd454da8162f612479"
   },
   "/home/bruneel/Bureau/mbolo/src/features/create/hooks/useCreatePublish.ts": {
-    "mtime": 1785921670.5187778,
-    "ast_hash": "bfc3a4ba264ede71b1057b3d78cb9155",
-    "semantic_hash": "bfc3a4ba264ede71b1057b3d78cb9155"
+    "mtime": 1786062062.1123667,
+    "ast_hash": "75853a51a5072bc156a4cdc5cfeda7a5",
+    "semantic_hash": "75853a51a5072bc156a4cdc5cfeda7a5"
   },
   "/home/bruneel/Bureau/mbolo/src/features/create/hooks/useEditPreviewProxy.ts": {
     "mtime": 1785821960.2556446,
@@ -913,6 +923,11 @@
     "mtime": 1785765920.0536358,
     "ast_hash": "35a82f7775aa23bf69047a6fd3727268",
     "semantic_hash": "35a82f7775aa23bf69047a6fd3727268"
+  },
+  "/home/bruneel/Bureau/mbolo/src/features/create/hooks/useLatestGalleryAsset.ts": {
+    "mtime": 1786038116.6722693,
+    "ast_hash": "5538c0290833181f44b6657e69e35fb8",
+    "semantic_hash": "5538c0290833181f44b6657e69e35fb8"
   },
   "/home/bruneel/Bureau/mbolo/src/features/create/hooks/useSegmentedRecording.ts": {
     "mtime": 1785917912.5697508,
@@ -945,29 +960,29 @@
     "semantic_hash": "bcfb4b9e1effb802007e2899d55b83b6"
   },
   "/home/bruneel/Bureau/mbolo/src/features/create/services/videoMutations.ts": {
-    "mtime": 1785914132.1269143,
-    "ast_hash": "c8151e2dcdf24698dbaef3e860c1c2f4",
-    "semantic_hash": "c8151e2dcdf24698dbaef3e860c1c2f4"
+    "mtime": 1786062062.1133666,
+    "ast_hash": "25f702e51434e448b73f014ce12cf21c",
+    "semantic_hash": "25f702e51434e448b73f014ce12cf21c"
   },
   "/home/bruneel/Bureau/mbolo/src/features/create/theme/createTokens.ts": {
-    "mtime": 1785879793.3144503,
-    "ast_hash": "63699252306c55e69a794fb3130c2ab8",
-    "semantic_hash": "63699252306c55e69a794fb3130c2ab8"
+    "mtime": 1786062062.1133666,
+    "ast_hash": "d9e266962be4f6d8a57744aa4366a72b",
+    "semantic_hash": "d9e266962be4f6d8a57744aa4366a72b"
   },
   "/home/bruneel/Bureau/mbolo/src/features/create/types.ts": {
-    "mtime": 1785822942.851171,
-    "ast_hash": "c4394c538544e6255bbb9978efef6217",
-    "semantic_hash": "c4394c538544e6255bbb9978efef6217"
+    "mtime": 1786062062.1143668,
+    "ast_hash": "7ca7ca5370c093e6f2aa6baaae3a563c",
+    "semantic_hash": "7ca7ca5370c093e6f2aa6baaae3a563c"
   },
   "/home/bruneel/Bureau/mbolo/src/features/create/types/__tests__/editing.test.ts": {
-    "mtime": 1785933318.3042803,
-    "ast_hash": "b59079eea868b2e0b2eca5a2e0aaba92",
-    "semantic_hash": "b59079eea868b2e0b2eca5a2e0aaba92"
+    "mtime": 1786062062.1163666,
+    "ast_hash": "47b41baa6dd9cdddeeee0abbe1235d51",
+    "semantic_hash": "47b41baa6dd9cdddeeee0abbe1235d51"
   },
   "/home/bruneel/Bureau/mbolo/src/features/create/types/editing.ts": {
-    "mtime": 1785927874.3040128,
-    "ast_hash": "0a4a7569ea85239453a0171f69ba0693",
-    "semantic_hash": "0a4a7569ea85239453a0171f69ba0693"
+    "mtime": 1786062062.132367,
+    "ast_hash": "90215521cbd00b50eb7eb535ce3670b9",
+    "semantic_hash": "90215521cbd00b50eb7eb535ce3670b9"
   },
   "/home/bruneel/Bureau/mbolo/src/features/create/utils/__tests__/cameraRoll.test.ts": {
     "mtime": 1785933362.5567102,
@@ -1075,9 +1090,9 @@
     "semantic_hash": "4fcf111370d59d7bf826a662489edd9d"
   },
   "/home/bruneel/Bureau/mbolo/src/features/feed/components/FeedItem/AuthorInfo.tsx": {
-    "mtime": 1785836715.772117,
-    "ast_hash": "6e2d1c795923ac238cd7fee256d48ba0",
-    "semantic_hash": "6e2d1c795923ac238cd7fee256d48ba0"
+    "mtime": 1786062062.1603673,
+    "ast_hash": "681bc7562d5f4030828e62fab03e3961",
+    "semantic_hash": "681bc7562d5f4030828e62fab03e3961"
   },
   "/home/bruneel/Bureau/mbolo/src/features/feed/components/FeedItem/CommentPreview.tsx": {
     "mtime": 1785516595.4698355,
@@ -1300,9 +1315,9 @@
     "semantic_hash": "e5dd84476ce9d28d34c923110f98b695"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/components/ImageGalleryModal.tsx": {
-    "mtime": 1785516595.5508363,
-    "ast_hash": "a7ba57ddf0575dc940d6207057978d8e",
-    "semantic_hash": "a7ba57ddf0575dc940d6207057978d8e"
+    "mtime": 1786062062.1613672,
+    "ast_hash": "a0edd7f5e098a278949227cd4adf58e1",
+    "semantic_hash": "a0edd7f5e098a278949227cd4adf58e1"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/components/NewsCommentsModal.tsx": {
     "mtime": 1785516595.5538363,
@@ -1315,9 +1330,9 @@
     "semantic_hash": "b22b26983fd3da5fcb3ce5bc4f1e6889"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/components/RichPostText.tsx": {
-    "mtime": 1785846894.035457,
-    "ast_hash": "ba2d9a1a2bcd7caa5d89807aecf8abf6",
-    "semantic_hash": "ba2d9a1a2bcd7caa5d89807aecf8abf6"
+    "mtime": 1786062062.1613672,
+    "ast_hash": "bd63a522e0bae61fa1c1437a2199b39f",
+    "semantic_hash": "bd63a522e0bae61fa1c1437a2199b39f"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/components/Skeletons.tsx": {
     "mtime": 1785522610.7273562,
@@ -1335,19 +1350,19 @@
     "semantic_hash": "0801fde98b94ab25e0a83276507d13ea"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/components/compose/ComposeCamera.tsx": {
-    "mtime": 1785938829.6510653,
-    "ast_hash": "1ed5cf3fa66c2ae2ba3014c1ebe36db0",
-    "semantic_hash": "1ed5cf3fa66c2ae2ba3014c1ebe36db0"
+    "mtime": 1786063384.7390985,
+    "ast_hash": "9df8225360a03e2faa06d31279e388a2",
+    "semantic_hash": "9df8225360a03e2faa06d31279e388a2"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/components/compose/PublishProgress.tsx": {
-    "mtime": 1785576714.1972692,
-    "ast_hash": "19c2e86bbe0b7fb0fa47c69a6dc0ad96",
-    "semantic_hash": "19c2e86bbe0b7fb0fa47c69a6dc0ad96"
+    "mtime": 1786062062.1633673,
+    "ast_hash": "555e5a97860c11724a7c2275f5b58974",
+    "semantic_hash": "555e5a97860c11724a7c2275f5b58974"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/components/compose/VisibilitySheet.tsx": {
-    "mtime": 1785576568.4489326,
-    "ast_hash": "f97372399f1a8781fef3dd5be6297ff4",
-    "semantic_hash": "f97372399f1a8781fef3dd5be6297ff4"
+    "mtime": 1786062062.1633673,
+    "ast_hash": "84764ccd2940afee5496b90e900888c2",
+    "semantic_hash": "84764ccd2940afee5496b90e900888c2"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/components/post/PostActionBar.tsx": {
     "mtime": 1785531768.780057,
@@ -1355,9 +1370,9 @@
     "semantic_hash": "87abc8082e29dd0ad59fd016439eface"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/components/post/PostBody.tsx": {
-    "mtime": 1785522256.7448266,
-    "ast_hash": "6ed217ff988258de6efb1e3c5277b461",
-    "semantic_hash": "6ed217ff988258de6efb1e3c5277b461"
+    "mtime": 1786062062.1653671,
+    "ast_hash": "6cde77f76c262e83db54aa32b81a2394",
+    "semantic_hash": "6cde77f76c262e83db54aa32b81a2394"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/components/post/PostCard.tsx": {
     "mtime": 1785547491.7016587,
@@ -1375,9 +1390,9 @@
     "semantic_hash": "7f88f920b7f6aa6841fb08cbfeb9a6b3"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/components/post/PostMedia.tsx": {
-    "mtime": 1785538092.5948107,
-    "ast_hash": "0a5cf8330187f2f9ce6984c18368d4d0",
-    "semantic_hash": "0a5cf8330187f2f9ce6984c18368d4d0"
+    "mtime": 1786062062.1853673,
+    "ast_hash": "bdd377e6fb9bff5652815e4347dd6c83",
+    "semantic_hash": "bdd377e6fb9bff5652815e4347dd6c83"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/components/post/PostVideoShare.tsx": {
     "mtime": 1785668985.4347637,
@@ -1415,9 +1430,9 @@
     "semantic_hash": "0aac656f49a8c1ea5e1ba319ca2cad14"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/services/newsFeedSource.ts": {
-    "mtime": 1785667864.5774133,
-    "ast_hash": "601826f5a8606a11fe92e6dc534383fb",
-    "semantic_hash": "601826f5a8606a11fe92e6dc534383fb"
+    "mtime": 1786062062.1883674,
+    "ast_hash": "645e66c6f7722fd8cad7ef1c9866185e",
+    "semantic_hash": "645e66c6f7722fd8cad7ef1c9866185e"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/services/newsNotifications.ts": {
     "mtime": 1785516595.9488404,
@@ -1430,9 +1445,9 @@
     "semantic_hash": "7b221e9cd18c9a2c13a5bb0682dd399e"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/services/postMutations.ts": {
-    "mtime": 1785667226.4549096,
-    "ast_hash": "71da6cc72e5abcd25f9301bfdf2d692f",
-    "semantic_hash": "71da6cc72e5abcd25f9301bfdf2d692f"
+    "mtime": 1786062062.2043676,
+    "ast_hash": "e95c1358571e935bbfba5ca0e7808965",
+    "semantic_hash": "e95c1358571e935bbfba5ca0e7808965"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/services/postRanking.ts": {
     "mtime": 1785525850.6206613,
@@ -1450,9 +1465,9 @@
     "semantic_hash": "b971c202fef185ab5b1ee9a324f23c82"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/types.ts": {
-    "mtime": 1785830206.0827346,
-    "ast_hash": "e4c09a82e08c149dcea2daf8cb89fe91",
-    "semantic_hash": "e4c09a82e08c149dcea2daf8cb89fe91"
+    "mtime": 1786062062.2053676,
+    "ast_hash": "45d7d84e7411b380d9723b45d4cf7a3d",
+    "semantic_hash": "45d7d84e7411b380d9723b45d4cf7a3d"
   },
   "/home/bruneel/Bureau/mbolo/src/features/news/utils.ts": {
     "mtime": 1785516595.9698405,
@@ -1530,9 +1545,9 @@
     "semantic_hash": "572caff877bb8f3bcc8b08c57ca6b89f"
   },
   "/home/bruneel/Bureau/mbolo/src/features/settings/SettingsProvider.tsx": {
-    "mtime": 1785516596.0018408,
-    "ast_hash": "8bf58a6e6f3c1756f63ebb7f273994c6",
-    "semantic_hash": "8bf58a6e6f3c1756f63ebb7f273994c6"
+    "mtime": 1786062062.2223678,
+    "ast_hash": "ef5d7d02fb274f1436a14251284f5183",
+    "semantic_hash": "ef5d7d02fb274f1436a14251284f5183"
   },
   "/home/bruneel/Bureau/mbolo/src/features/settings/appliedStore.ts": {
     "mtime": 1785516596.0058408,
@@ -1570,9 +1585,9 @@
     "semantic_hash": "b8b29f271d017938927db2309568aa60"
   },
   "/home/bruneel/Bureau/mbolo/src/features/settings/types.ts": {
-    "mtime": 1785516596.0168412,
-    "ast_hash": "3d6a47b3f59fdd397af7d4629c3e1e5b",
-    "semantic_hash": "3d6a47b3f59fdd397af7d4629c3e1e5b"
+    "mtime": 1786062062.2243676,
+    "ast_hash": "97d842ac3678a810ac02cdf32245528b",
+    "semantic_hash": "97d842ac3678a810ac02cdf32245528b"
   },
   "/home/bruneel/Bureau/mbolo/src/features/share/analytics/shareAnalytics.ts": {
     "mtime": 1785516596.022841,
@@ -1870,14 +1885,14 @@
     "semantic_hash": "7779e0a60faaa7185859ba64df1cd2ed"
   },
   "/home/bruneel/Bureau/mbolo/src/i18n/index.tsx": {
-    "mtime": 1785516596.1388423,
-    "ast_hash": "40f0fcd84e5721e85c1566d9b7a7afb9",
-    "semantic_hash": "40f0fcd84e5721e85c1566d9b7a7afb9"
+    "mtime": 1786062062.225368,
+    "ast_hash": "34c057817fad437ca78f7c262e57e7fc",
+    "semantic_hash": "34c057817fad437ca78f7c262e57e7fc"
   },
   "/home/bruneel/Bureau/mbolo/src/i18n/translations.ts": {
-    "mtime": 1785933104.9561942,
-    "ast_hash": "6665dcb853491e1289d32e5ab6512979",
-    "semantic_hash": "6665dcb853491e1289d32e5ab6512979"
+    "mtime": 1786064775.079213,
+    "ast_hash": "377097cf26bced3d2edcb7cf5e069cae",
+    "semantic_hash": "377097cf26bced3d2edcb7cf5e069cae"
   },
   "/home/bruneel/Bureau/mbolo/src/lib/blockService.ts": {
     "mtime": 1785516596.1498423,
@@ -1885,9 +1900,9 @@
     "semantic_hash": "3ea34df9bc1359b10791fdde76e243ca"
   },
   "/home/bruneel/Bureau/mbolo/src/lib/cloudinary.ts": {
-    "mtime": 1785766127.3496342,
-    "ast_hash": "cbdb6094424c0605961713b83c7971b4",
-    "semantic_hash": "cbdb6094424c0605961713b83c7971b4"
+    "mtime": 1786062062.2863684,
+    "ast_hash": "b3f0024fc16f28c0bf1c7a8936d479e0",
+    "semantic_hash": "b3f0024fc16f28c0bf1c7a8936d479e0"
   },
   "/home/bruneel/Bureau/mbolo/src/lib/contentFilter.ts": {
     "mtime": 1785516596.1508422,
@@ -2040,9 +2055,9 @@
     "semantic_hash": "1ffca799e821c127ae7ff7bc2c3a6105"
   },
   "/home/bruneel/Bureau/mbolo/src/types/index.ts": {
-    "mtime": 1785516596.212843,
-    "ast_hash": "0a8b4873075143fa8c9675e24aa80e84",
-    "semantic_hash": "0a8b4873075143fa8c9675e24aa80e84"
+    "mtime": 1786062062.2863684,
+    "ast_hash": "1a8dfcd4420d23de4d7d6b795b0b0dea",
+    "semantic_hash": "1a8dfcd4420d23de4d7d6b795b0b0dea"
   },
   "/home/bruneel/Bureau/mbolo/src/types/jest.d.ts": {
     "mtime": 1785938816.7204874,
@@ -2055,9 +2070,9 @@
     "semantic_hash": "ae42cccd8f076d17eb1313368ae10af1"
   },
   "/home/bruneel/Bureau/mbolo/tsconfig.json": {
-    "mtime": 1785516596.220843,
-    "ast_hash": "c7c1328ae707449636c77a72d4c742fc",
-    "semantic_hash": "c7c1328ae707449636c77a72d4c742fc"
+    "mtime": 1786062062.2873683,
+    "ast_hash": "c96e259d9601f8edf780503ee21da89e",
+    "semantic_hash": "c96e259d9601f8edf780503ee21da89e"
   },
   "/home/bruneel/Bureau/mbolo/utils/ffmpeg.ts": {
     "mtime": 1785516596.220843,

@@ -3,16 +3,20 @@
    pendant l'envoi n'a aucun effet utile — mieux vaut le dire clairement. */
 
 import { memo } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
 import OrbitLoader from '@/components/OrbitLoader'
 import { useI18n } from '@/i18n'
-import { postColors, postRadius, postSpacing, postType } from '../../theme/postTokens'
+import { postColors, postMotion, postRadius, postSpacing, postType } from '../../theme/postTokens'
 
 interface PublishProgressProps {
   progress: number
+  /* Annulation utilisateur : le brouillon est conservé, on revient à la
+     légende. Absent → pas de bouton (voile bloquant). */
+  onCancel?: () => void
 }
 
-function PublishProgressBase({ progress }: PublishProgressProps) {
+function PublishProgressBase({ progress, onCancel }: PublishProgressProps) {
   const { t } = useI18n()
 
   return (
@@ -27,6 +31,18 @@ function PublishProgressBase({ progress }: PublishProgressProps) {
         <Text style={styles.label}>
           {t.news.compose.publishing.replace('{n}', String(progress))}
         </Text>
+
+        {onCancel ? (
+          <Pressable
+            onPress={onCancel}
+            accessibilityRole="button"
+            accessibilityLabel={t.news.compose.cancelPublish}
+            style={({ pressed }) => [styles.cancel, pressed && styles.pressed]}
+          >
+            <Ionicons name="close" size={18} color={postColors.textSecondary} />
+            <Text style={styles.cancelText}>{t.news.compose.cancelPublish}</Text>
+          </Pressable>
+        ) : null}
       </View>
     </View>
   )
@@ -56,6 +72,20 @@ const styles = StyleSheet.create({
   },
   fill: { height: '100%', backgroundColor: postColors.accent },
   label: { color: postColors.textSecondary, ...postType.composeCounter },
+  cancel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: postRadius.input,
+  },
+  cancelText: {
+    color: postColors.textSecondary,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  pressed: { opacity: postMotion.pressedOpacity },
 })
 
 export const PublishProgress = memo(PublishProgressBase)

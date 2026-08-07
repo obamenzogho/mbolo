@@ -11,9 +11,7 @@ export default function SubStackLayout() {
         ...slideRight,
       }}
     >
-      <Stack.Screen name="camera" options={slideUpFast} />
       <Stack.Screen name="upload" options={slideUpFast} />
-      <Stack.Screen name="story-upload" options={slideUpFast} />
       <Stack.Screen name="reel-upload" options={slideUpFast} />
       <Stack.Screen name="edit-profile" options={slideRight} />
       <Stack.Screen name="discover" options={slideRight} />

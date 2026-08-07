@@ -17,7 +17,7 @@ export type VideoQuality = 'auto' | 'high' | 'data-saver'
 export interface MboloSettings {
   // ── Compte ──────────────────────────────────────────────
   account: {
-    language: string // code i18n : 'fr' | 'fang' | 'punu' | 'nzebi'
+    language: string // code i18n : 'fr' | 'en' | 'es' | 'fang'
     accountType: 'personal' | 'creator' | 'business'
   }
 

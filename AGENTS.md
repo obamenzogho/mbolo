@@ -38,7 +38,7 @@ You are the lead software architect of the Mbolo mobile social application.
 Cette section existe parce qu'un LLM par défaut a tendance à produire du code "qui compile" plutôt que du code "correct à l'échelle". Avant de livrer, vérifier chaque point.
 
 ### ❌ Interdits absolus (code "basique")
-- **Aucune valeur en dur** : pas de chaînes magiques (`"like"`, `"pending"`, `"admin"`), pas de nombres magiques (`if (count > 50)`), pas d'URLs/IDs Firestore/Cloudinary en dur. Tout passe par des `enum`/`const` typés dans `src/types/` ou `src/constants/`.
+- **Aucune valeur en dur** : pas de chaînes magiques (`"like"`, `"pending"`, `"admin"`), pas de nombres magiques (`if (count > 50)`), pas d'URLs/IDs Firestore/Cloudinary en dur. Tout passe par des types typés (string literal unions) dans `src/types/` — il n'y a PAS de dossier `src/constants/`.
 - **Aucune couleur/dimension en dur** dans le JSX (`color: '#FF0000'`, `padding: 12`) — toujours via les tokens NativeWind/thème du projet.
 - **Aucun texte utilisateur en dur** — même en dev/placeholder, passer par `useI18n()` dès l'écriture, pas en "TODO i18n plus tard".
 - **Aucune donnée mockée codée dans le composant** (`const fakeUsers = [...]`) — un service/hook doit fournir les données, même en dev, via Firestore ou un mock isolé et clairement nommé `__mocks__`.
@@ -77,15 +77,18 @@ Pour toute nouvelle feature impliquant du contenu généré par les utilisateurs
 
 ### File structure
 - **Pages** in `app/` follow expo-router file-based routing. `export default` for pages.
-- **Feature modules** in `src/features/<feature>/` with subfolders: `components/`, `hooks/`, `services/`, `player/`, `cache/`, `analytics/`, `optimizations/`
+- **Feature modules** in `src/features/<feature>/` with subfolders: `components/`, `hooks/`, `services/`, `store/`, `player/`, `cache/`, `analytics/`, `optimizations/`
 - **Generic hooks** in `src/hooks/` — reusable across features
 - **Feature-specific hooks** in `src/features/<feature>/hooks/` — specific to one feature
 - **Reusable UI components** in `src/components/` (or `src/components/ui/` for basic components)
 - **API services** in `src/services/`
 - **Lib** (Firebase, Cloudinary) in `src/lib/`
-- **Shared types** in `src/types/`
-- **Translations** in `src/i18n/`
+- **Shared types** in `src/types/` (string literal unions, pas d'enums)
+- **Translations** in `src/i18n/` — 4 langues : `fr`, `fang`, `punu`, `nzebi`
 - **Utilities** in `utils/`
+- **Client state** : stores Zustand dans `src/features/<feature>/store/` (ex. `feedStore.ts`, `newsFeedStore.ts`)
+- **Contexts/providers globaux** : `src/contexts/`, `src/providers/` (ex. `NavigationHistoryProvider`), transitions dans `src/navigation/`
+- **Cloud Functions** : `functions/` (TypeScript, build `tsc`, deploy `firebase deploy --only functions`)
 
 ### Writing conventions
 - **Hooks**: prefix `use`, named export (`export function useXxx`)
@@ -122,15 +125,17 @@ Pour toute nouvelle feature impliquant du contenu généré par les utilisateurs
 - Duplicate hooks — check with `grep` before creating a new one
 - Copy-paste Firestore blocks — extract to a service
 - Hardcoded `fontFamily` — use NativeWind themes
-- Valeurs métier en dur (statuts, seuils, rôles) hors de `src/constants/` ou `src/types/`
+- Valeurs métier en dur (statuts, seuils, rôles) hors de `src/types/` (pas de `src/constants/`)
 - Recalcul de compteurs par requête agrégée non bornée (coût Firestore incontrôlé)
 
 ### ⚠️ To watch
-- `useVideoFeed` exists in two versions: `src/hooks/useVideoFeed.ts` (old) and `src/features/feed/hooks/useVideoFeed.ts` (refactored) — always use the refactored one
-- `expo-av` is legacy — new video components must use `expo-video`
+- Feed hooks : plus de `useVideoFeed` — l'ancien (`src/hooks/useVideoFeed.ts`) a été supprimé. Utiliser `useFeedData` (Pour Toi), `useFollowingFeedData` (Suivi), `useLocalFeedData` (local) dans `src/features/feed/hooks/`, avec `useVideoPlayerPool`/`useVisibleIndex`/`usePrefetch`
+- `expo-av` is legacy — new video components must use `expo-video` (expo-av ne reste que dans highlights/create/story-upload)
 - Firestore rules have known security vulnerabilities (videos DELETE, messages, stories, notifications, highlights) — documented in wiki
 - Firestore cache is `memoryLocalCache` only — lost on restart
-- No NetInfo — no connectivity detection
+- Connectivité : NetInfo est installé et utilisé (`src/features/feed/hooks/useConnectionStatus.ts`, `src/lib/firebase.ts`)
+- `npm run typecheck` : erreurs tsc préexistantes connues (shareService.ts, repostService.ts, types jest) — CI en `allow_failure`, voir `DEPLOY_STATUS.md`. Ne pas réintroduire de NOUVELLES erreurs
+- `npm run lint` fonctionne en local mais échoue en CI (eslint absent des devDependencies, voir `.gitlab-ci.yml`)
 
 ## Checklist by task type
 
@@ -175,20 +180,24 @@ Pour toute nouvelle feature impliquant du contenu généré par les utilisateurs
 - [ ] `graphify path "<A>" "<B>"` for dependency understanding
 - [ ] Verify all imports are updated
 - [ ] Delete old code (no "TODO: remove" comments)
-- [ ] `graphify update .` after modification
+- [ ] `npm run graphify:refresh` after modification
 
 ## Test workflow
 
 **Before delivering/modifying:**
-1. `npm run typecheck` — check types (if configured)
-2. Manually verify that existing E2E tests cover the change
-3. If new business behavior: add a Playwright test case in `e2e/`
-4. Relire le diff en simulant : liste vide, erreur réseau, utilisateur bloqué, double-tap
+1. `npm run typecheck` — vérifier ne PAS ajouter de nouvelles erreurs (erreurs préexistantes documentées dans `DEPLOY_STATUS.md`)
+2. `npm run lint` — fonctionne en local uniquement
+3. `npm run arch:check` — vérification architecturale automatique (`--fix` pour corriger)
+4. Manually verify that existing E2E tests cover the change
+5. If new business behavior: add a Playwright test case in `e2e/`
+6. Relire le diff en simulant : liste vide, erreur réseau, utilisateur bloqué, double-tap
 
 **After modification:**
-1. `graphify update .` — update architectural graph
+1. `npm run graphify:refresh` — update architectural graph + enrich roles
 2. Verify wiki is up to date (schemas, decisions)
-3. Run `npm run test:e2e` if relevant
+3. Run `npm run test:e2e` if relevant — nécessite l'app web locale : `npx expo start --web --port 8081` (le webServer Playwright n'est lancé qu'en CI)
+
+**Firebase deploy (à NE PAS faire à la légère)** : lire `DEPLOY_STATUS.md` AVANT tout `firebase deploy` — règles live non déployées, Cloud Functions bloquées (plan Blaze), ordre imposé : functions → seed hotScore → règles → client.
 
 ## Review checklist (for PRs)
 
@@ -201,7 +210,7 @@ Pour toute nouvelle feature impliquant du contenu généré par les utilisateurs
 - [ ] Firestore indexes are deployed if new composite query
 - [ ] Memoized components have correct comparator
 - [ ] `captureException` present in all catch blocks, with contexte utile
-- [ ] i18n translations complete for all 4 languages
+- [ ] i18n translations complete for all 4 languages (fr, fang, punu, nzebi)
 - [ ] No unnecessary heavy import (>100KB)
 - [ ] Scalabilité vérifiée (pas de scan/agrégation non bornée)
 - [ ] Modération/blocage/RGPD considérés si contenu utilisateur
@@ -212,14 +221,16 @@ Pour toute nouvelle feature impliquant du contenu généré par les utilisateurs
 - `graphify query "<question>"` — targeted graph search
 - `graphify explain "<concept>"` — file/symbol dependencies
 - `graphify path "<A>" "<B>"` — paths between two concepts
-- `graphify update .` — after every code modification
+- `npm run graphify:refresh` — after every code modification (runs `graphify update .` + enrichissement des rôles)
 
 ## Useful links
 
 - **Architectural wiki**: `graphify-out/wiki/index.md`
 - **Dependency graph**: `graphify-out/graph.html` (open in browser)
+- **Deploy status & ordre de déploiement**: `DEPLOY_STATUS.md` — À LIRE avant tout deploy
 - **Firebase analysis report**: `firebase-analysis-report.md`
 - **Firestore rules**: `firestore.rules`
 - **Storage rules**: `storage.rules`
-- **Firestore indexes**: `firestore.indexes.json`
+- **Firestore indexes**: `firestore.indexes.json` (deploy : `npm run firebase:deploy:indexes`)
 - **Expo config**: `app.json`
+- **CI GitLab**: `.gitlab-ci.yml` (le README.md est un boilerplate GitLab sans valeur)

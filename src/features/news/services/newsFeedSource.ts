@@ -92,6 +92,7 @@ export function mapDocToPost(snapshot: PostSnapshot): NewsPost {
     poll: data.poll,
     article: data.article,
     videoShare: data.videoShare,
+    hideMentionsAndHashtags: data.hideMentionsAndHashtags === true,
     rankingScore:
       typeof data.rankingScore === 'number'
         ? data.rankingScore

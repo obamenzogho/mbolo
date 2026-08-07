@@ -42,6 +42,8 @@ const BASE_PROPS = {
   visibility: 'public' as const,
   commentsEnabled: true,
   onToggleComments: jest.fn(),
+  hideMentionsAndHashtags: false,
+  onToggleHideMentions: jest.fn(),
   location: null,
   detectingLocation: false,
   onPressVisibility: jest.fn(),

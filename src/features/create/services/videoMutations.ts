@@ -39,6 +39,8 @@ export interface VideoDraft {
   lng?: number
   geohash?: string
   soundId?: string
+  /** Réglage avancé : les mentions/hashtags de la légende ne sont pas cliquables. */
+  hideMentionsAndHashtags?: boolean
 }
 
 /**
@@ -84,6 +86,7 @@ export interface VideoUpdateDraft {
   geohash?: string
   soundId?: string
   durationMs?: number
+  hideMentionsAndHashtags?: boolean
 }
 
 export interface StoredVideo {
@@ -98,6 +101,7 @@ export interface StoredVideo {
   commentsEnabled: boolean
   durationMs?: number
   soundId?: string
+  hideMentionsAndHashtags?: boolean
 }
 
 export async function loadVideo(
@@ -122,6 +126,7 @@ export async function loadVideo(
       commentsEnabled: data.commentsEnabled !== false,
       durationMs: data.durationMs,
       soundId: data.soundId,
+      hideMentionsAndHashtags: data.hideMentionsAndHashtags === true,
     }
   } catch (error) {
     captureException(

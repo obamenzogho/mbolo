@@ -21,6 +21,9 @@ interface VisibilitySheetProps {
 function VisibilitySheetBase({ visible, value, onChange, onClose }: VisibilitySheetProps) {
   const { t } = useI18n()
 
+  /* Audience de la publication (style Instagram) : « Tout le monde » ou
+     « Amis proches ». Le compte privé se règle dans les paramètres, pas à
+     la création. */
   const entries: { id: NewsPostVisibility; label: string; description: string }[] = [
     {
       id: 'public',
@@ -31,11 +34,6 @@ function VisibilitySheetBase({ visible, value, onChange, onClose }: VisibilitySh
       id: 'followers',
       label: t.news.compose.audienceFollowers,
       description: t.news.compose.audienceFollowersDesc,
-    },
-    {
-      id: 'private',
-      label: t.news.compose.audiencePrivate,
-      description: t.news.compose.audiencePrivateDesc,
     },
   ]
 

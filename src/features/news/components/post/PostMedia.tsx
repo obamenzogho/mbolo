@@ -111,6 +111,7 @@ function Tile({
   index,
   overlayCount,
   labels,
+  isVideo,
   onPress,
 }: {
   item: NewsPostMedia
@@ -119,6 +120,7 @@ function Tile({
   index: number
   overlayCount?: number
   labels: MediaLabels
+  isVideo?: boolean
   onPress: (index: number) => void
 }) {
   return (
@@ -142,6 +144,14 @@ function Tile({
         transition={postMotion.imageTransition}
         recyclingKey={item.url}
       />
+
+      {isVideo ? (
+        <View style={styles.videoScrim}>
+          <View style={styles.playButton}>
+            <Ionicons name="play" size={26} color={postColors.onMedia} />
+          </View>
+        </View>
+      ) : null}
 
       {overlayCount ? (
         <View style={styles.countOverlay}>
@@ -242,7 +252,10 @@ function renderGrid(
 ) {
   const [first] = media
 
-  if (first.type === 'video') {
+  /* Un carrousel 100 % vidéo : grille de vignettes avec badge play (la
+     lecture se fait dans la galerie). Une vidéo seule garde son aperçu
+     16/9 dédié. */
+  if (first.type === 'video' && media.length === 1) {
     return <VideoPreview item={first} width={width} labels={labels} onPress={onOpenVideo} />
   }
 
@@ -272,6 +285,7 @@ function renderGrid(
             index={index}
             width={cell}
             height={height}
+            isVideo={item.type === 'video'}
             labels={labels}
             onPress={onOpenImage}
           />
@@ -293,6 +307,7 @@ function renderGrid(
           index={0}
           width={main}
           height={height}
+          isVideo={media[0].type === 'video'}
           labels={labels}
           onPress={onOpenImage}
         />
@@ -304,6 +319,7 @@ function renderGrid(
               index={offset + 1}
               width={side}
               height={sideCell}
+              isVideo={item.type === 'video'}
               labels={labels}
               onPress={onOpenImage}
             />
@@ -326,6 +342,7 @@ function renderGrid(
           index={index}
           width={cell}
           height={cell}
+          isVideo={item.type === 'video'}
           overlayCount={
             index === MEDIA_VISIBLE_MAX - 1 && remaining > 0 ? remaining : undefined
           }

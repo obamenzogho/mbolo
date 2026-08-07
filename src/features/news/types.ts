@@ -96,6 +96,8 @@ export interface NewsPost {
   article?: NewsPostArticle
   videoShare?: NewsPostVideoShare
   rankingScore?: number
+  /** Réglage avancé (style Instagram) : mentions et hashtags non cliquables. */
+  hideMentionsAndHashtags?: boolean
 }
 
 // ── NewsComment ───────────────────────────────────────────

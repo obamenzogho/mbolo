@@ -109,6 +109,7 @@ function PostBodyComponent({
           <RichPostText
             text={expanded ? post.text : truncate(post.text, POST_TEXT_LIMIT)}
             style={styles.bodyText}
+            interactive={post.hideMentionsAndHashtags !== true}
           />
 
           {overflows ? expandLink : null}

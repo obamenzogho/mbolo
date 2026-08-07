@@ -10,6 +10,7 @@ import {
 } from 'react-native'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
+import { VideoView, useVideoPlayer } from 'expo-video'
 import type { NewsPostMedia } from '../types'
 
 const { width: W, height: H } = Dimensions.get('window')
@@ -19,6 +20,26 @@ interface Props {
   initialIndex?: number
   visible: boolean
   onClose: () => void
+}
+
+/* Slide vidéo : lecteur en boucle, contrôles natifs. Le player est créé à
+   chaque affichage du slide pour libérer la ressource dès qu'on le quitte. */
+function VideoSlide({ item }: { item: NewsPostMedia }) {
+  const player = useVideoPlayer({ uri: item.url }, (instance) => {
+    instance.loop = true
+    instance.play()
+  })
+
+  return (
+    <View style={styles.slide}>
+      <VideoView
+        player={player}
+        style={styles.video}
+        nativeControls
+        contentFit="contain"
+      />
+    </View>
+  )
 }
 
 export default function ImageGalleryModal({
@@ -58,16 +79,20 @@ export default function ImageGalleryModal({
             )
             setIndex(newIndex)
           }}
-          renderItem={({ item }) => (
-            <View style={styles.slide}>
-              <Image
-                source={{ uri: item.url }}
-                style={styles.image}
-                contentFit="contain"
-                transition={300}
-              />
-            </View>
-          )}
+          renderItem={({ item }) =>
+            item.type === 'video' ? (
+              <VideoSlide item={item} />
+            ) : (
+              <View style={styles.slide}>
+                <Image
+                  source={{ uri: item.url }}
+                  style={styles.image}
+                  contentFit="contain"
+                  transition={300}
+                />
+              </View>
+            )
+          }
         />
 
         {media.length > 1 && (
@@ -106,6 +131,10 @@ const styles = StyleSheet.create({
   image: {
     width: W,
     height: H * 0.8,
+  },
+  video: {
+    width: W,
+    height: H,
   },
   counter: {
     position: 'absolute',

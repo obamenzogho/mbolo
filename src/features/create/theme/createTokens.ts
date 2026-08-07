@@ -43,6 +43,10 @@ export const cameraColors = {
   /** Masque hors cadre du ratio choisi. */
   ratioMask: 'rgba(0, 0, 0, 0.6)',
   onMedia: '#ffffff',
+  /** Anneau de mise au point au tap sur le preview caméra. */
+  focusRing: 'rgba(255, 255, 255, 0.9)',
+  /** Torche active : icône jaune, comme le flash. */
+  torchActive: '#FCD116',
 } as const
 
 /** Opacité appliquée à un élément pressé du flux de création. */

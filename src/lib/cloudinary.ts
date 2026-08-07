@@ -23,6 +23,8 @@ export interface UploadOptions {
   quality?: number
   onProgress?: (progress: number) => void
   compress?: boolean
+  /** Annulation : l'XHR est interrompu et la promesse rejette (AbortError). */
+  signal?: AbortSignal
 }
 
 interface CloudinaryResponse {
@@ -104,6 +106,14 @@ export async function uploadToCloudinary(
       }
     }
 
+    /* Annulation applicative : on coupe le XHR sans capture d'erreur —
+       c'est un geste utilisateur, pas un échec réseau. */
+    const handleAbort = () => xhr.abort()
+    if (options.signal) {
+      if (options.signal.aborted) handleAbort()
+      else options.signal.addEventListener('abort', handleAbort, { once: true })
+    }
+
     xhr.onload = () => {
       try {
         const resp: CloudinaryResponse = JSON.parse(xhr.responseText)
@@ -124,8 +134,11 @@ export async function uploadToCloudinary(
       }
     }
     xhr.onerror = () => {
-      const err = new Error('XHR error')
-      captureUploadError(err, { type })
+      const err = new Error(
+        options.signal?.aborted ? 'Upload annulé' : 'XHR error',
+      )
+      /* Une annulation est un geste utilisateur : pas de capture Sentry. */
+      if (!options.signal?.aborted) captureUploadError(err, { type })
       uploadSpan?.finish()
       reject(err)
     }

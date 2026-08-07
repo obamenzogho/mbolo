@@ -7,11 +7,12 @@
    Remplace l'ancien composeur riche et le legacy video-editor : c'est
    désormais le seul chemin de création. */
 
-import { useCallback, useEffect, useState } from 'react'
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Alert, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import * as MediaLibrary from 'expo-media-library'
 import { auth } from '@/lib/firebase'
 import * as FileSystem from 'expo-file-system/legacy'
 import { useI18n } from '@/i18n'
@@ -28,6 +29,7 @@ import { SelectScreen } from '@/features/create/components/SelectScreen'
 import { EditScreen } from '@/features/create/components/edit/EditScreen'
 import { CaptionScreen } from '@/features/create/components/CaptionScreen'
 import { SoundPickerSheet } from '@/features/create/components/SoundPickerSheet'
+import { LocationSheet } from '@/features/create/components/LocationSheet'
 import { createColors, createType } from '@/features/create/theme/createTokens'
 import { CREATE_MAX_MEDIA } from '@/features/create/types'
 import type { GalleryAsset } from '@/hooks/useGallery'
@@ -35,7 +37,15 @@ import { useCurrentUserProfile } from '@/hooks/useCurrentUserProfile'
 
 type Step = 'select' | 'edit' | 'caption' | 'publishing'
 
-const ERROR_KEYS: Record<CreatePublishError, string> = {
+/* Onglets de la modale de création (style Instagram) : Publication photo /
+   texte, Reel vidéo, Story (flux dédié existant). */
+/* Flux de création unifié : Publication (photo/texte) et Reel vidéo. La
+   Story est volontairement absente — son flux dédié doit être recodé en
+   mode Instagram avant d'être réactivé. */
+type CreateTab = 'post' | 'reel'
+
+/* 'cancelled' est géré séparément (retour à la légende, pas d'alerte). */
+const ERROR_KEYS: Record<Exclude<CreatePublishError, 'cancelled'>, string> = {
   upload: 'errorUpload',
   write: 'errorWrite',
   auth: 'errorAuth',
@@ -46,8 +56,21 @@ const ERROR_KEYS: Record<CreatePublishError, string> = {
 export default function CreateScreen() {
   const router = useRouter()
   const { t } = useI18n()
+  const insets = useSafeAreaInsets()
   const user = auth.currentUser
   const userProfile = useCurrentUserProfile()
+
+  /* Onglets de la modale (labels i18n — le nom de l'onglet est fixé ici). */
+  /* Onglets de la modale (labels i18n — le nom de l'onglet est fixé ici).
+     Mémorisé car `t` peut changer de langue : la liste t-à-t-elle stable tant
+     que la langue ne change pas. */
+  const CREATE_TABS: { id: CreateTab; label: string }[] = useMemo(
+    () => [
+      { id: 'post', label: t.news.compose.createTabPost },
+      { id: 'reel', label: t.news.compose.createTabReel },
+    ],
+    [t.news.compose.createTabPost, t.news.compose.createTabReel],
+  )
 
   const {
     mediaUri,
@@ -64,14 +87,17 @@ export default function CreateScreen() {
   }>()
 
   const [step, setStep] = useState<Step>('select')
+  const [tab, setTab] = useState<CreateTab>('post')
   const [mode, setMode] = useState<'gallery' | 'camera'>('gallery')
   const [media, setMedia] = useState<SelectedMedia[]>([])
   const [editingIndex, setEditingIndex] = useState(0)
   const [text, setText] = useState('')
   const [visibility, setVisibility] = useState<NewsPostVisibility>('public')
   const [commentsEnabled, setCommentsEnabled] = useState(true)
+  const [hideMentionsAndHashtags, setHideMentionsAndHashtags] = useState(false)
   const [location, setLocation] = useState<NewsLocation | null>(null)
   const [visibilityOpen, setVisibilityOpen] = useState(false)
+  const [locationOpen, setLocationOpen] = useState(false)
   const [soundPickerOpen, setSoundPickerOpen] = useState(false)
   const [soundId, setSoundId] = useState<string | undefined>(undefined)
   const [detectingLocation, setDetectingLocation] = useState(false)
@@ -79,7 +105,7 @@ export default function CreateScreen() {
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null)
   const [loadingExisting, setLoadingExisting] = useState(false)
 
-  const { publish, update } = useCreatePublish()
+  const { publish, update, cancel } = useCreatePublish()
 
   async function cacheRemoteMedia(
     uri: string,
@@ -147,6 +173,7 @@ export default function CreateScreen() {
           setText(existing.text)
           setVisibility(existing.visibility)
           setCommentsEnabled(existing.commentsEnabled)
+          setHideMentionsAndHashtags(existing.hideMentionsAndHashtags === true)
           setEditingIndex(0)
           setStep(localMedia.length > 0 ? 'edit' : 'caption')
         } catch {
@@ -192,6 +219,7 @@ export default function CreateScreen() {
           setText(existing.description)
           setVisibility(existing.visibility)
           setCommentsEnabled(existing.commentsEnabled)
+          setHideMentionsAndHashtags(existing.hideMentionsAndHashtags === true)
           setSoundId(existing.soundId ?? undefined)
           setEditingIndex(0)
           setStep('edit')
@@ -233,15 +261,15 @@ export default function CreateScreen() {
   const isEditStep = step === 'edit'
   const isPublishing = step === 'publishing'
 
-  useEffect(() => {
-    if (!media.some((item) => item.type === 'video') && soundId) {
-      setSoundId(undefined)
-    }
-  }, [media, soundId])
+  /* Le son n'a de sens que sur une vidéo unique : un carrousel (photo ou
+     vidéo) repart sans piste de bibliothèque. Valeur dérivée — jamais
+     de setState dans un effet. */
+  const activeSoundId = media.length === 1 && media[0].type === 'video' ? soundId : undefined
 
   /* Instagram distingue la sélection simple (remplace l'aperçu) et la
-     sélection multiple. Une vidéo est toujours seule : le renderer et le
-     feed n'acceptent pas de carrousel mixte photo/vidéo. */
+     sélection multiple. Un carrousel est homogène (photos OU vidéos) :
+     le renderer et le feed n'acceptent pas de carrousel mixte photo/vidéo.
+     Changer de type pendant une sélection multiple vide la sélection. */
   const handleSelectAsset = useCallback((asset: GalleryAsset, multiple: boolean) => {
     setMedia((prev) => {
       const idx = prev.findIndex((m) => m.uri === asset.uri)
@@ -257,22 +285,64 @@ export default function CreateScreen() {
         duration: asset.duration ?? null,
       }
 
-      if (!multiple || isVideo || prev.some((item) => item.type === 'video')) {
+      if (!multiple) return [selectedAsset]
+      if (prev.length >= CREATE_MAX_MEDIA) return prev
+      if (prev.length > 0 && prev.some((item) => item.type !== selectedAsset.type)) {
         return [selectedAsset]
       }
-      if (prev.length >= CREATE_MAX_MEDIA) return prev
       return [...prev, selectedAsset]
     })
   }, [])
 
   /* Une rafale caméra remonte plusieurs clichés d'un coup : on borne au
-     nombre de médias qu'un carrousel accepte. */
+     nombre de médias qu'un carrousel accepte. En mode Reel, seule une
+     vidéo est recevable (Instagram : l'onglet Reel ne crée que des vidéos). */
   const handleCapture = useCallback((captured: SelectedMedia[]) => {
     if (captured.length === 0) return
-    setMedia(captured.slice(0, CREATE_MAX_MEDIA))
+    const keep = tab === 'reel' ? captured.filter((c) => c.type === 'video') : captured
+    if (tab === 'reel' && keep.length === 0) {
+      Alert.alert(t.news.compose.errorTitle, t.news.compose.reelOnlyVideo)
+      return
+    }
+    setMedia(keep.slice(0, CREATE_MAX_MEDIA))
     setEditingIndex(0)
     setStep('edit')
-  }, [])
+  }, [tab, t])
+
+  /* Bascule d'onglet : la sélection est propre à chaque onglet, et le mode
+     caméra/galerie est conservé (un swipe depuis la caméra reste en caméra,
+     en basculant le type photo↔vidéo). */
+  const handleTabChange = useCallback((next: CreateTab) => {
+    if (next === tab) return
+    setTab(next)
+    setMedia([])
+    setText('')
+    setSoundId(undefined)
+    setStep('select')
+  }, [tab])
+
+  /* Swipe horizontal sur la barre d'onglets → bascule post↔reel
+     (comportement Instagram : glisser la page change d'onglet). */
+  const TAB_ORDER = useMemo(() => CREATE_TABS.map((e) => e.id), [CREATE_TABS])
+  const swipeThreshold = 40
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: (_, gesture) =>
+          Math.abs(gesture.dx) > Math.abs(gesture.dy) && Math.abs(gesture.dx) >= 4,
+        onMoveShouldSetPanResponder: (_, gesture) =>
+          Math.abs(gesture.dx) > Math.abs(gesture.dy) && Math.abs(gesture.dx) >= 4,
+        onPanResponderRelease: (_, gesture) => {
+          if (Math.abs(gesture.dx) < swipeThreshold) return
+          const currentIndex = TAB_ORDER.indexOf(tab)
+          const nextIndex = gesture.dx < 0 ? currentIndex + 1 : currentIndex - 1
+          const next = TAB_ORDER[nextIndex]
+          /* La Story navigue vers son propre flux via handleTabChange. */
+          if (next) handleTabChange(next)
+        },
+      }),
+    [TAB_ORDER, handleTabChange, tab],
+  )
 
   const startTextPost = useCallback(() => {
     setMedia([])
@@ -298,6 +368,9 @@ export default function CreateScreen() {
           lat: place.lat,
           lng: place.lng,
         })
+        /* Lieu trouvé : on referme la feuille, l'utilisateur le voit sur
+           la rangée de la légende. */
+        setLocationOpen(false)
       }
     } catch {
       Alert.alert(t.news.compose.errorTitle, t.news.compose.errorLocation)
@@ -308,6 +381,8 @@ export default function CreateScreen() {
 
   const handleError = useCallback(
     (reason: CreatePublishError) => {
+      /* Annulation : traité par l'appelant, jamais ici. */
+      if (reason === 'cancelled') return
       Alert.alert(
         t.news.compose.errorTitle,
         t.news.compose[ERROR_KEYS[reason] as keyof typeof t.news.compose],
@@ -330,7 +405,7 @@ export default function CreateScreen() {
       displayName:
         user.displayName || user.email?.split('@')[0] || t.news.compose.userFallback,
     }
-    const draft = { text, media, visibility, commentsEnabled, location, soundId }
+    const draft = { text, media, visibility, commentsEnabled, hideMentionsAndHashtags, location, soundId: activeSoundId }
 
     const outcome = editTarget
       ? await update(editTarget, draft, author, { onProgress: setProgress })
@@ -341,9 +416,16 @@ export default function CreateScreen() {
       return
     }
 
+    /* Annulation utilisateur : le brouillon est intact, on reste sur la
+       légende sans message d'erreur. */
+    if (outcome === 'cancelled') {
+      setStep('caption')
+      return
+    }
+
     setStep('caption')
     handleError(outcome)
-  }, [user, text, media, visibility, commentsEnabled, location, editTarget, publish, update, router, t, handleError])
+  }, [user, text, media, visibility, commentsEnabled, hideMentionsAndHashtags, location, activeSoundId, editTarget, publish, update, router, t, handleError])
 
   const handleBack = useCallback(() => {
     if (step === 'caption') {
@@ -388,8 +470,8 @@ export default function CreateScreen() {
   const hideHeader = step === 'select' && mode === 'camera'
 
   return (
-    <View style={styles.screen}>
-      <SafeAreaView edges={['top']} style={styles.safe}>
+    <View style={styles.screen} {...panResponder.panHandlers}>
+      <SafeAreaView edges={hideHeader ? [] : ['top']} style={styles.safe}>
         {/* En-tête du flux : masqué en mode caméra plein écran. */}
         {!hideHeader ? (
           <View style={[styles.header, { borderBottomColor: headerColor.hairline }]}>
@@ -435,6 +517,50 @@ export default function CreateScreen() {
           </View>
         ) : null}
 
+        {/* Onglets Publication / Reel / Story, visibles à la sélection.
+            En mode caméra, la barre est en overlay (absolute) par-dessus le
+            flux vidéo, avec un fond translucide et le padding safe area. */}
+        {step === 'select' ? (
+          <View
+            style={[
+              styles.tabsBar,
+              hideHeader && [
+                styles.tabsBarCamera,
+                { paddingTop: insets.top + 6 },
+              ],
+            ]}
+            {...panResponder.panHandlers}
+          >
+            {CREATE_TABS.map((entry) => {
+              const active = entry.id === tab
+              /* En mode caméra, l'onglet Publication devient « Photo » :
+                 c'est là qu'on capture une photo (Reel reste la vidéo). */
+              const label =
+                entry.id === 'post' && mode === 'camera'
+                  ? t.news.compose.createTabPhoto
+                  : entry.label
+              return (
+                <Pressable
+                  key={entry.id}
+                  onPress={() => handleTabChange(entry.id)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  style={({ pressed }) => [styles.tabBtn, pressed && styles.pressed]}
+                >
+                  <Text
+                    style={[
+                      styles.tabLabel,
+                      active && styles.tabLabelActive,
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                </Pressable>
+              )
+            })}
+          </View>
+        ) : null}
+
         {step === 'select' ? (
           <SelectScreen
             media={media}
@@ -442,10 +568,25 @@ export default function CreateScreen() {
             onModeChange={setMode}
             onSelectAsset={handleSelectAsset}
             onCapture={handleCapture}
-            onPickText={startTextPost}
+            onPickText={tab === 'reel' ? undefined : startTextPost}
             onNext={handleRightPress}
             nextLabel={rightLabel}
             nextDisabled={rightDisabled}
+            mediaTypes={
+              tab === 'reel'
+                ? [MediaLibrary.MediaType.video]
+                : [MediaLibrary.MediaType.photo]
+            }
+            captureMode={tab === 'reel' ? 'video' : 'picture'}
+            soundId={activeSoundId}
+            onOpenSound={() => setSoundPickerOpen(true)}
+            onClearSound={() => setSoundId(undefined)}
+            onHorizontalSwipe={(direction) => {
+              const currentIndex = TAB_ORDER.indexOf(tab)
+              const nextIndex = direction === 'left' ? currentIndex + 1 : currentIndex - 1
+              const next = TAB_ORDER[nextIndex]
+              if (next) handleTabChange(next)
+            }}
           />
         ) : isEditStep && media[editingIndex] ? (
           <EditScreen
@@ -459,7 +600,7 @@ export default function CreateScreen() {
             }}
           />
         ) : isPublishing ? (
-          <PublishProgress progress={progress} />
+          <PublishProgress progress={progress} onCancel={cancel} />
         ) : (
           <CaptionScreen
             media={media}
@@ -469,10 +610,12 @@ export default function CreateScreen() {
             onPressVisibility={() => setVisibilityOpen(true)}
             commentsEnabled={commentsEnabled}
             onToggleComments={() => setCommentsEnabled((v) => !v)}
+            hideMentionsAndHashtags={hideMentionsAndHashtags}
+            onToggleHideMentions={() => setHideMentionsAndHashtags((v) => !v)}
             location={location}
             detectingLocation={detectingLocation}
-            onPressLocation={location ? () => setLocation(null) : detectLocation}
-            soundId={soundId}
+            onPressLocation={() => setLocationOpen(true)}
+            soundId={activeSoundId}
             onPressSound={() => setSoundPickerOpen(true)}
             userName={userProfile.nom}
             userPhotoURL={userProfile.photoURL}
@@ -489,12 +632,23 @@ export default function CreateScreen() {
       />
       <SoundPickerSheet
         visible={soundPickerOpen}
-        selectedSoundId={soundId}
+        selectedSoundId={activeSoundId}
         onSelect={(selected) => {
           setSoundId(selected?.id)
           setSoundPickerOpen(false)
         }}
         onClose={() => setSoundPickerOpen(false)}
+      />
+      <LocationSheet
+        visible={locationOpen}
+        value={location}
+        detecting={detectingLocation}
+        onDetect={detectLocation}
+        onSelect={(next) => {
+          setLocation(next)
+          setLocationOpen(false)
+        }}
+        onClose={() => setLocationOpen(false)}
       />
     </View>
   )
@@ -526,4 +680,40 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   headerActionDisabled: { color: createColors.textTertiary },
+
+  /* Barre d'onglets Publication / Reel / Story (style Instagram). */
+  tabsBar: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 28,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: createColors.hairline,
+  },
+  tabBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+  },
+  tabLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: createColors.textTertiary,
+  },
+   tabLabelActive: {
+    color: createColors.textPrimary,
+    fontWeight: '700',
+  },
+  /* En mode caméra (header masqué) : barre d’onglets collée au haut, fond
+     translucide noir pour garder les libellés lisibles sur l’aperçu vidéo
+     (le swipe est géré par `panResponder` sur ce conteneur). */
+  tabsBarCamera: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderBottomColor: 'rgba(255, 255, 255, 0.18)',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
 })

@@ -24,6 +24,7 @@ import {
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import * as MediaLibrary from 'expo-media-library'
+import type { MediaTypeValue } from 'expo-media-library'
 import { useI18n } from '@/i18n'
 import type { GalleryAsset } from '@/hooks/useGallery'
 import { createColors } from '../theme/createTokens'
@@ -41,6 +42,8 @@ interface GalleryGridProps {
   selectionOrder?: Map<string, number>
   /* ID de l'album sélectionné. Si null, affiche toute la pellicule. */
   albumId?: string | null
+  /* Filtre de types sur la pellicule (ex. onglet Reel : vidéos seules). */
+  mediaTypes?: MediaTypeValue[]
 }
 
 const COLUMNS = 3
@@ -61,6 +64,7 @@ function GalleryGridComponent({
   onSelectImmediate,
   selectionOrder,
   albumId,
+  mediaTypes,
 }: GalleryGridProps) {
   const { t } = useI18n()
   const { width } = useWindowDimensions()
@@ -113,7 +117,7 @@ function GalleryGridComponent({
         const options: MediaLibrary.AssetsOptions = {
           first: PAGE_SIZE,
           sortBy: [MediaLibrary.SortBy.creationTime],
-          mediaType: [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video],
+          mediaType: mediaTypes ?? [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video],
         }
         if (albumId) {
           options.album = albumId
@@ -151,7 +155,7 @@ function GalleryGridComponent({
         }
       }
     },
-    [granted, albumId],
+    [granted, albumId, mediaTypes],
   )
 
   /* Chargement initial + rechargement quand albumId change. */

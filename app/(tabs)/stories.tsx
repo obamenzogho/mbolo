@@ -7,23 +7,20 @@ import {
   StyleSheet,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { router } from 'expo-router'
 import { doc, onSnapshot } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
 import { useStoriesFeed } from '@/features/stories/hooks/useStoriesFeed'
 import StoryViewer from '@/features/stories/components/StoryViewer'
-import { StoryCard, CreateStoryCard } from '@/features/stories/components/StoryCard'
+import { StoryCard } from '@/features/stories/components/StoryCard'
 import { StoryCardSkeleton } from '@/features/news/components/Skeletons'
 import { useStories } from '@/hooks/useStories'
 import PageWrapper from '@/components/PageWrapper'
-import CreateButton from '@/components/create/CreateButton'
 
 export default function StoriesScreen() {
   const uid = auth.currentUser?.uid ?? ''
   const { markAsViewed } = useStories()
 
   const [followingIds, setFollowingIds] = useState<string[]>([])
-  const [userPhotoURL, setUserPhotoURL] = useState<string | null>(null)
   const [viewerGroupIndex, setViewerGroupIndex] = useState<number | null>(null)
 
   useEffect(() => {
@@ -31,7 +28,6 @@ export default function StoriesScreen() {
     return onSnapshot(doc(db, 'users', uid), (snap: any) => {
       const data = snap.data()
       setFollowingIds(Array.isArray(data?.following) ? data!.following : [])
-      setUserPhotoURL(data?.photoURL || null)
     })
   }, [uid])
 
@@ -50,12 +46,6 @@ export default function StoriesScreen() {
       <SafeAreaView style={styles.screen} edges={['top']}>
         <View style={styles.topBar}>
           <Text style={styles.title}>Stories</Text>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <CreateButton
-              onPress={() => router.push('/story-upload')}
-              size={38}
-            />
-          </View>
         </View>
 
         <ScrollView
@@ -63,11 +53,6 @@ export default function StoriesScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.storiesRow}
         >
-          <CreateStoryCard
-            avatarUrl={myStoryGroup?.avatarUrl || userPhotoURL || auth.currentUser?.photoURL || undefined}
-            onPress={() => (myStoryGroup ? openStory(uid) : router.push('/story-upload'))}
-          />
-
           {myStoryGroup && (
             <StoryCard group={myStoryGroup} onPress={() => openStory(uid)} />
           )}

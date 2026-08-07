@@ -12,9 +12,11 @@ import { memo, useCallback, useMemo, useRef, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
+import BottomSheet from '@/components/ui/BottomSheet'
 import { useI18n } from '@/i18n'
 import type { SelectedMedia } from '@/features/news/hooks/useComposeState'
 import type { NewsLocation, NewsPostVisibility } from '@/features/news/types'
+import { STICKERS } from '../types/editing'
 import { ComposeAuthorRow } from '@/features/news/components/compose/ComposeAuthorRow'
 import RichPostText from '@/features/news/components/RichPostText'
 import { colors } from '@/lib/theme'
@@ -38,6 +40,8 @@ interface CaptionScreenProps {
   onPressVisibility: () => void
   commentsEnabled: boolean
   onToggleComments: () => void
+  hideMentionsAndHashtags: boolean
+  onToggleHideMentions: () => void
   location: NewsLocation | null
   detectingLocation: boolean
   onPressLocation: () => void
@@ -64,6 +68,8 @@ function CaptionScreenComponent({
   onPressVisibility,
   commentsEnabled,
   onToggleComments,
+  hideMentionsAndHashtags,
+  onToggleHideMentions,
   location,
   detectingLocation,
   onPressLocation,
@@ -100,6 +106,18 @@ function CaptionScreenComponent({
     setInputSelection(undefined)
     setCursorPos(e.nativeEvent.selection.end)
   }, [])
+
+  /* ── Emoji picker ─────────────────────────────────────────────── */
+  const [emojiOpen, setEmojiOpen] = useState(false)
+
+  const handleInsertEmoji = useCallback((emoji: string) => {
+    setEmojiOpen(false)
+    /* Insère à la position du caret (fallback : fin du texte). */
+    const at = cursorPos > 0 && cursorPos <= text.length ? cursorPos : text.length
+    const updated = `${text.slice(0, at)}${emoji}${text.slice(at)}`
+    onChangeText(updated)
+    setInputSelection({ start: at + emoji.length, end: at + emoji.length })
+  }, [cursorPos, text, onChangeText])
 
   const handleInsertHashtag = useCallback((tag: string) => {
     const updated = suggestions.insertHashtag(tag, text)
@@ -213,14 +231,22 @@ function CaptionScreenComponent({
         </View>
       </View>
 
-      {/* ── Compteur de caractères ───────────────────────────────── */}
-      {showCounter ? (
-        <View style={styles.counterRow}>
+      {/* ── Pied d'éditeur : emoji picker + compteur ─────────────── */}
+      <View style={styles.counterRow}>
+        <Pressable
+          onPress={() => setEmojiOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel={t.news.compose.a11yEmojiOpen}
+          style={({ pressed }) => [styles.emojiBtn, pressed && styles.pressed]}
+        >
+          <Ionicons name="happy-outline" size={22} color={createColors.textPrimary} />
+        </Pressable>
+        {showCounter ? (
           <Text style={[styles.counter, { color: counterColor }]}>
             {charCount}/{CHAR_LIMIT}
           </Text>
-        </View>
-      ) : null}
+        ) : null}
+      </View>
 
       {/* ── Chips de suggestions ─────────────────────────────────── */}
       {suggestions.kind === 'hashtag' ? (
@@ -344,7 +370,8 @@ function CaptionScreenComponent({
         </Pressable>
       )}
 
-      {media.some((item) => item.type === 'video') ? (
+      {/* Son — réservé à une vidéo unique (pas de musique sur un carrousel). */}
+      {media.length === 1 && media[0].type === 'video' ? (
         <Pressable
           onPress={onPressSound}
           disabled={!onPressSound}
@@ -383,6 +410,9 @@ function CaptionScreenComponent({
         ) : null}
       </Pressable>
 
+      {/* ── Réglages avancés (section style Instagram) ───────────── */}
+      <Text style={styles.sectionHeader}>{t.news.compose.advancedTitle}</Text>
+
       {/* ── Commentaires ────────────────────────────────────────── */}
       <Pressable
         onPress={onToggleComments}
@@ -399,6 +429,50 @@ function CaptionScreenComponent({
           color={createColors.textPrimary}
         />
       </Pressable>
+
+      {/* ── Masquer les mentions et les hashtags ─────────────────── */}
+      <Pressable
+        onPress={onToggleHideMentions}
+        accessibilityRole="button"
+        accessibilityState={{ checked: hideMentionsAndHashtags }}
+        style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+      >
+        <Ionicons name="at-outline" size={22} color={createColors.textPrimary} />
+        <Text style={[styles.rowLabel, createType.row]}>
+          {t.news.compose.hideMentionsAndHashtags}
+        </Text>
+        <Ionicons
+          name={hideMentionsAndHashtags ? 'toggle' : 'toggle-outline'}
+          size={28}
+          color={createColors.textPrimary}
+        />
+      </Pressable>
+
+      {/* ── Sélecteur d'emojis ───────────────────────────────────── */}
+      <BottomSheet
+        visible={emojiOpen}
+        onClose={() => setEmojiOpen(false)}
+        height="auto"
+      >
+        <View style={styles.emojiSheet}>
+          <Text style={[styles.emojiSheetTitle, createType.row]}>
+            {t.news.compose.emojiPickerTitle}
+          </Text>
+          <View style={styles.emojiGrid}>
+            {STICKERS.map((emoji) => (
+              <Pressable
+                key={emoji}
+                onPress={() => handleInsertEmoji(emoji)}
+                accessibilityRole="button"
+                accessibilityLabel={`${t.news.compose.a11yEmojiInsert} ${emoji}`}
+                style={({ pressed }) => [styles.emojiCell, pressed && styles.pressed]}
+              >
+                <Text style={styles.emojiChar}>{emoji}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      </BottomSheet>
     </View>
   )
 }
@@ -455,13 +529,56 @@ const styles = StyleSheet.create({
 
   /* Compteur */
   counterRow: {
-    alignItems: 'flex-end',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingBottom: 8,
+  },
+  emojiBtn: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   counter: {
     fontSize: 12,
     fontVariant: ['tabular-nums'],
+  },
+
+  /* Section réglages avancés */
+  sectionHeader: {
+    color: createColors.textTertiary,
+    fontSize: 13,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 4,
+  },
+
+  /* Emoji picker */
+  emojiSheet: {
+    paddingHorizontal: 16,
+    paddingBottom: 28,
+  },
+  emojiSheetTitle: {
+    paddingVertical: 12,
+  },
+  emojiGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  emojiCell: {
+    width: '12.5%',
+    aspectRatio: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emojiChar: {
+    fontSize: 26,
   },
 
   /* Suggestions — liste verticale style Instagram */

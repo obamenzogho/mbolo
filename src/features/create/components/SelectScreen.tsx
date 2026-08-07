@@ -17,18 +17,19 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native'
 import { Image } from 'expo-image'
 import { Video, ResizeMode } from 'expo-av'
 import { Ionicons } from '@expo/vector-icons'
 import { useI18n } from '@/i18n'
 import * as MediaLibrary from 'expo-media-library'
+import type { MediaTypeValue } from 'expo-media-library'
 import type { GalleryAsset } from '@/hooks/useGallery'
 import type { SelectedMedia } from '@/features/news/hooks/useComposeState'
 import { GalleryGrid } from './GalleryGrid'
 import { ComposeCamera } from '@/features/news/components/compose/ComposeCamera'
 import { cameraColors, createColors, createMotion } from '../theme/createTokens'
-import { CREATE_MAX_MEDIA } from '../types'
 import { captureException } from '@/lib/sentry'
 
 interface SelectScreenProps {
@@ -37,12 +38,26 @@ interface SelectScreenProps {
   onModeChange: (mode: 'gallery' | 'camera') => void
   onSelectAsset: (asset: GalleryAsset, multiple: boolean) => void
   onCapture: (media: SelectedMedia[]) => void
-  onPickText: () => void
+  /* Poste texte seul — absent de l'onglet Reel (Instagram n'en crée pas). */
+  onPickText?: () => void
   /* Bouton « Suivant » rendu en overlay dans la caméra (l'en-tête parent
      est masqué en mode caméra). */
   onNext?: () => void
   nextLabel?: string
   nextDisabled?: boolean
+  /* Filtre de types sur la pellicule (onglet Reel : vidéos seules). */
+  mediaTypes?: MediaTypeValue[]
+  /* Mode de capture imposé par l'onglet parent : picture (photo uniquement)
+     ou video (enregistrement direct). Transmis à ComposeCamera. */
+  captureMode?: 'picture' | 'video'
+  /* ── Reprise caméra Reel : musique choisie (remonte de ComposeCamera).
+     Le sélecteur de musique reste dans le parent (app/create.tsx). */
+  soundId?: string | null
+  onOpenSound?: () => void
+  onClearSound?: () => void
+  /* Swipe horizontal sur le corps de la caméra (clone Reel) : remonté au
+     parent pour basculer d'onglet. `topBarInset` en miroir. */
+  onHorizontalSwipe?: (direction: 'left' | 'right') => void
 }
 
 /* Albums système sans intérêt. */
@@ -69,7 +84,8 @@ function GalleryHeader({
   selectionMode: 'single' | 'multi'
   onToggleMode: () => void
   onCamera: () => void
-  onText: () => void
+  /* Absent sur l'onglet Reel : pas de poste texte seul. */
+  onText?: () => void
 }) {
   const { t } = useI18n()
 
@@ -102,14 +118,16 @@ function GalleryHeader({
         >
           <Ionicons name="camera-outline" size={22} color={createColors.textPrimary} />
         </Pressable>
-        <Pressable
-          onPress={onText}
-          accessibilityRole="button"
-          accessibilityLabel={t.news.compose.a11yTextPost}
-          style={({ pressed }) => [styles.headerModeBtn, pressed && styles.pressed]}
-        >
-          <Ionicons name="text" size={22} color={createColors.textPrimary} />
-        </Pressable>
+        {onText ? (
+          <Pressable
+            onPress={onText}
+            accessibilityRole="button"
+            accessibilityLabel={t.news.compose.a11yTextPost}
+            style={({ pressed }) => [styles.headerModeBtn, pressed && styles.pressed]}
+          >
+            <Ionicons name="text" size={22} color={createColors.textPrimary} />
+          </Pressable>
+        ) : null}
       </View>
 
       {/* Droite : toggle multi-sélection */}
@@ -181,9 +199,16 @@ function SelectScreenComponent({
   onNext,
   nextLabel,
   nextDisabled,
+  mediaTypes,
+  captureMode,
+  soundId,
+  onOpenSound,
+  onClearSound,
+  onHorizontalSwipe,
 }: SelectScreenProps) {
   const { t } = useI18n()
   const { width: windowWidth } = useWindowDimensions()
+  const insets = useSafeAreaInsets()
   const [selectionMode, setSelectionMode] = useState<'single' | 'multi'>('single')
   const [albums, setAlbums] = useState<AlbumOption[]>([])
   const [albumId, setAlbumId] = useState<string | null>(null)
@@ -244,11 +269,6 @@ function SelectScreenComponent({
   /* ── Caméra : capture → aperçu → suivant ───────────────────────── */
   const handleCameraCapture = useCallback((captured: SelectedMedia) => {
     setCapturedMedia([captured])
-    setPreviewIndex(0)
-  }, [])
-
-  const handleCameraBurst = useCallback((captured: SelectedMedia[]) => {
-    setCapturedMedia(captured)
     setPreviewIndex(0)
   }, [])
 
@@ -321,7 +341,11 @@ function SelectScreenComponent({
             onPress={handleDiscardCapture}
             accessibilityRole="button"
             accessibilityLabel={t.news.compose.a11yRetakeCapture}
-            style={({ pressed }) => [styles.cameraBackBtn, pressed && styles.pressed]}
+style={({ pressed }) => [
+              styles.cameraBackBtn,
+              { top: insets.top + 50 },
+              pressed && styles.pressed,
+            ]}
           >
             <Ionicons name="close" size={28} color={cameraColors.onMedia} />
           </Pressable>
@@ -351,16 +375,26 @@ function SelectScreenComponent({
     return (
       <View style={styles.screen}>
         <ComposeCamera
+          key={captureMode}
           onCapture={handleCameraCapture}
-          onCaptureBurst={handleCameraBurst}
-          burstLimit={CREATE_MAX_MEDIA}
+          initialMode={captureMode}
           topBarInset={CAMERA_TOP_BAR_INSET}
+          topContentOffset={42}
+          onOpenGallery={() => onModeChange('gallery')}
+          soundId={soundId}
+          onOpenSound={onOpenSound}
+          onClearSound={onClearSound}
+          onHorizontalSwipe={onHorizontalSwipe}
         />
         <Pressable
           onPress={() => onModeChange('gallery')}
           accessibilityRole="button"
           accessibilityLabel={t.news.compose.a11yGalleryBack}
-          style={({ pressed }) => [styles.cameraBackBtn, pressed && styles.pressed]}
+          style={({ pressed }) => [
+              styles.cameraBackBtn,
+              { top: insets.top + 50 },
+              pressed && styles.pressed,
+            ]}
         >
           <Ionicons name="arrow-back" size={24} color={cameraColors.onMedia} />
         </Pressable>
@@ -395,6 +429,7 @@ function SelectScreenComponent({
         onSelectImmediate={handleSelectImmediate}
         onToggle={handleToggleAsset}
         selectionOrder={selectionOrder}
+        mediaTypes={mediaTypes}
       />
     </View>
   )

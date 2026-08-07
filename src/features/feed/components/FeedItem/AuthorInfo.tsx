@@ -93,7 +93,9 @@ export const AuthorInfo = memo(function AuthorInfo({ item, username, userPhotoUR
                 <Text style={styles.description}>
                   {(expanded ? description : shownDesc).split(TOKEN_PATTERN).map((part, i) =>
                     part.startsWith('#') || part.startsWith('@')
-                      ? <Text key={i} style={styles.hashtag}>{part}</Text>
+                      ? item.hideMentionsAndHashtags
+                        ? part
+                        : <Text key={i} style={styles.hashtag}>{part}</Text>
                       : part
                   )}
                   {!expanded && canExpand ? <Text style={styles.more}>voir plus</Text> : null}

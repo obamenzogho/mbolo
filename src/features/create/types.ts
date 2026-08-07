@@ -8,8 +8,10 @@
 import type { NewsLocation, NewsPostVisibility } from '@/features/news/types'
 import type { SelectedMedia } from '@/features/news/hooks/useComposeState'
 
-/** Limite produit du carrousel photo. Une vidéo reste toujours seule. */
-export const CREATE_MAX_MEDIA = 4
+/** Limite produit du carrousel (photos OU vidéos, jamais mixte — le renderer
+    du feed n'accepte pas un carrousel mixte photo/vidéo). Alignée sur la
+    limite Instagram. */
+export const CREATE_MAX_MEDIA = 10
 
 /** Brouillon du nouveau flux : texte + média (photo ou vidéo) + réglages. */
 export interface CreateDraft {
@@ -17,6 +19,8 @@ export interface CreateDraft {
   media: SelectedMedia[]
   visibility: NewsPostVisibility
   commentsEnabled: boolean
+  /** Réglage avancé (style Instagram) : mentions et hashtags non cliquables. */
+  hideMentionsAndHashtags: boolean
   location: NewsLocation | null
   soundId?: string
 }

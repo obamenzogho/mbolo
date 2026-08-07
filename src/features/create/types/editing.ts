@@ -100,6 +100,10 @@ export interface FilterDef {
   deltas: FilterDeltas
 }
 
+/* Les 24 filtres Instagram (Original + 23), dans l'ordre exact de la
+   pellicule Instagram. Les LUTs sont propriétaires : les deltas sont des
+   approximations open-source du rendu visuel (brillance/contraste/saturation
+   — les seules dimensions qu'expose FilterDeltas). */
 export const FILTERS: FilterDef[] = [
   { id: 'none', name: 'Original', deltas: {} },
   { id: 'clarendon', name: 'Clarendon', deltas: { brightness: 0.05, contrast: 0.2, saturate: 0.35 } },
@@ -112,9 +116,19 @@ export const FILTERS: FilterDef[] = [
   { id: 'crema', name: 'Crema', deltas: { sepia: 0.2, contrast: -0.05, brightness: 0.03 } },
   { id: 'ludwig', name: 'Ludwig', deltas: { brightness: 0.05, saturate: -0.1, contrast: 0.05 } },
   { id: 'aden', name: 'Aden', deltas: { hue: 18, saturate: -0.18, brightness: 0.05 } },
-  { id: 'inkwell', name: 'Inkwell', deltas: { grayscale: 1, contrast: 0.05 } },
   { id: 'perpetua', name: 'Perpetua', deltas: { saturate: 0.22, brightness: 0.05 } },
+  { id: 'amaro', name: 'Amaro', deltas: { sepia: 0.25, brightness: 0.1, contrast: 0.1 } },
+  { id: 'mayfair', name: 'Mayfair', deltas: { brightness: 0.12, contrast: 0.05, sepia: 0.15 } },
+  { id: 'rise', name: 'Rise', deltas: { brightness: 0.12, sepia: 0.12, saturate: 0.15 } },
+  { id: 'hudson', name: 'Hudson', deltas: { hue: -15, saturate: 0.2, brightness: 0.05 } },
   { id: 'valencia', name: 'Valencia', deltas: { sepia: 0.18, contrast: 0.1, brightness: 0.04 } },
+  { id: 'xpro2', name: 'X-Pro II', deltas: { contrast: 0.25, saturate: 0.35, brightness: -0.03 } },
+  { id: 'sierra', name: 'Sierra', deltas: { brightness: 0.1, contrast: 0.05, sepia: 0.1 } },
+  { id: 'willow', name: 'Willow', deltas: { grayscale: 1, brightness: 0.05, contrast: 0.05 } },
+  { id: 'lofi', name: 'Lo-Fi', deltas: { contrast: 0.3, saturate: 0.3, brightness: -0.05 } },
+  { id: 'inkwell', name: 'Inkwell', deltas: { grayscale: 1, contrast: 0.05 } },
+  { id: 'hefe', name: 'Hefe', deltas: { saturate: 0.3, contrast: 0.15, sepia: 0.05 } },
+  { id: 'nashville', name: 'Nashville', deltas: { brightness: 0.15, sepia: 0.15, saturate: -0.1 } },
 ]
 
 /* ── Effets ─────────────────────────────────────────────────────── */
@@ -203,6 +217,22 @@ export const VIDEO_QUALITY_OPTIONS: { value: VideoQualityOption; label: string }
 export function isVideoQualityOption(value: unknown): value is VideoQualityOption {
   return VIDEO_QUALITY_OPTIONS.some((option) => option.value === value)
 }
+
+/* Zoom rapide (chips au-dessus du déclencheur, pattern reel Instagram).
+   `zoom` d'expo-camera est un pourcentage 0..1 du zoom max de l'appareil,
+   pas un facteur optique : les presets sont donc des paliers approximatifs
+   (1x → capteur natif, 2x → tiers de la plage, 3x → deux tiers). L'ultra-wide
+   (0.5x) n'est pas détectable via expo-camera : le preset 1x le couvre. */
+export interface ZoomPreset {
+  label: string
+  zoom: number
+}
+
+export const ZOOM_PRESETS: ZoomPreset[] = [
+  { label: '1x', zoom: 0 },
+  { label: '2x', zoom: 1 / 3 },
+  { label: '3x', zoom: 2 / 3 },
+]
 
 /** Stabilisation vidéo iOS : `standard` est le meilleur compromis
     fluidité/déformation ; `cinematic` est réservé à une évolution future. */

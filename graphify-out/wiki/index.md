@@ -30,7 +30,7 @@ Stack
 │   ├── notifications → Tab "Notifications" (notifications icon)
 │   └── profile      → Tab "Profil" (person icon)
 │   └── (sub)         → Stack (animations slideRight/slideUpFast)
-│       ├── camera, upload, story-upload, reel-upload, video-editor (slideUpFast)
+│       ├── upload, story-upload, reel-upload, video-editor (slideUpFast)
 │       ├── edit-profile, discover, explore (slideRightEdgeOnly)
 │       ├── messages/conversation/[id]
 │       └── notifications/follow-requests
@@ -99,7 +99,7 @@ app/(tabs)/_layout.tsx
 | 4 | profile | `person` | Profil | 26px |
 
 #### Groupe `(sub)` (href: null, Stack natif)
-`camera`, `upload`, `story-upload`, `reel-upload`, `video-editor`, `edit-profile`, `discover`, `explore`, `messages/conversation/[id]`, `notifications/follow-requests`
+`upload`, `story-upload`, `reel-upload`, `video-editor`, `edit-profile`, `discover`, `explore`, `messages/conversation/[id]`, `notifications/follow-requests`
 
 #### Dépendances ajoutées
 - `expo-haptics` → retour haptique `ImpactFeedbackStyle.Light` au changement d'onglet
@@ -306,11 +306,12 @@ Usage: lookup rapide pseudo → email au login (login.tsx:52)
 - Mode caching preserve scroll position + données lors du switch pourtoi/suivi
 
 ### 3. Camera & Capture
-**Fichiers**: app/(tabs)/(sub)/camera.tsx
+**Fichiers**: src/features/news/components/compose/ComposeCamera.tsx (caméra studio, embarquée dans SelectScreen)
 **Hooks**: useCamera (127 lignes), useVisionCamera (253 lignes)
 **Lib**: config/modules.js (dynamic module loading with mocks dev)
 **Dépendances**: expo-camera, expo-media-library, expo-image-picker, react-native-vision-camera
 **Logique**: 
+- Caméra studio Instagram-like : tap = photo, maintenir = vidéo, flash 3 états + torche, rail d'outils vertical, pause/reprise segmentée, ratios, vitesse, timer, zoom pince + chips 1x/2x/3x + double-tap reset, vignette galerie (dernière prise, useLatestGalleryAsset), préférences persistées
 - Deux systèmes caméra: expo-camera (simple) et VisionCamera (pro)
 - Permissions, flip, zoom, mise au point, enregistrement
 - Galerie: sélection multiple (max 5), albums
@@ -376,7 +377,7 @@ Usage: lookup rapide pseudo → email au login (login.tsx:52)
 **Components**: 18 composants réutilisables dans src/components/
 **Hooks UI**: useAnimations (11 animations reanimated), usePageAnimation (4 transitions)
 **Theme**: src/lib/theme.ts (dark mode, couleurs: primary #009A44, secondary #3A75C4, accent #FCD116)
-**i18n**: src/i18n/ (4 langues: fr, fang, punu, nzebi)
+**i18n**: src/i18n/ (4 langues: fr, en, es, fang)
 **Navigation transitions**: src/navigation/transitions.ts (5 presets: slideUp, slideRight, fade, scale, slideBottom)
 
 ---
@@ -1073,3 +1074,81 @@ Résultat : swipe-back de bord fonctionne sur iOS, Android et Web, y compris sur
 **Règles de la sauvegarde pellicule :** fire-and-forget (un échec n'interrompt jamais la capture) ; refus de permission → désactivation de la préférence + un seul `Alert` par session ; plateforme web → toggle indisponible.
 
 **Impact :** aucun changement Firestore/Storage/index — ces réglages restent strictement locaux. Le zoom pince (PanResponder) n'est pas modifié. Plateformes : qualité vidéo UI conditionnée à Android, stabilisation à iOS, miroir affiché uniquement en caméra frontale.
+
+### ADR — Caméra studio catégorie 3 : vignette galerie, zoom rapide et double-tap
+
+**Décision :** la caméra studio (`ComposeCamera`) rejoint l'écran caméra Instagram sur trois points : (1) une **vignette galerie** à gauche du déclencheur (dernière prise de la pellicule via `useLatestGalleryAsset`, tap → ouvre la galerie) ; (2) des **chips de zoom rapide** 1x/2x/3x au-dessus du déclencheur (presets `ZOOM_PRESETS` dans `editing.ts`) ; (3) le **double-tap = reset zoom 1x** (fenêtre `DOUBLE_TAP_MS` = 300 ms, détecté dans le PanResponder existant, le tap simple gardant l'anneau de focus).
+
+**Limite assumée :** `zoom` d'expo-camera est un pourcentage 0..1 du zoom max de l'appareil, pas un facteur optique → les presets sont des paliers approximatifs (1x = capteur natif, 2x = tiers de la plage, 3x = deux tiers), comme les LUTs des filtres IG. L'ultra-wide 0.5x n'est pas détectable via expo-camera : le preset 1x le couvre.
+
+**Impact :** l'ancienne route `app/(tabs)/(sub)/camera.tsx` (caméra TikTok-like, plus aucune navigation) est supprimée avec sa déclaration de Stack. Aucun changement Firestore/Storage/index. `useLatestGalleryAsset` lit la pellicule locale (expo-media-library), jamais Firestore — la vignette ne montre que les prises locales, conforme à Instagram.
+
+---
+
+## ADR — Caméra : feedback de tap (anneau), torche et gestion d'erreur de montage
+
+**Décision :** la caméra studio (`ComposeCamera`) gagne un anneau de feedback visuel au tap, une torche (lumière continue) et une gestion d'erreur de montage envoyée à Sentry + Alert i18n.
+
+**Détails :**
+- **`FocusIndicator`** (`src/features/create/components/camera/FocusIndicator.tsx`) : anneau 80 px animé sur le thread UI Reanimated (fade in 150 ms → spring scale → hold 600 ms → fade out 200 ms), `pointerEvents="none"`, memoïsé. Le timeout JS retire l'anneau (950 ms) car `runOnJS` dans `withSequence` n'est pas typé en Reanimated v4.
+- **Tap feedback (pas un vrai tap-to-focus)** : expo-camera v17 n'expose **pas** d'API de mise au point par point (contrairement à VisionCamera). L'anneau + l'haptique donnent un retour de geste à la TikTok/Instagram. Sur iOS uniquement, `autofocus='on'` re-déclenche un cycle d'autofocus global pendant `FOCUS_LOCK_MS = 3000` avant retour à l'autofocus continu (`'off'`). Android : visuel + haptique seuls.
+- **Pinch-to-zoom corrigé** : le grant du `PanResponder` arrive avec le 1er doigt — la distance de référence du pinch est donc initialisée **au premier mouvement à 2 doigts** (`onPanResponderMove`), et réinitialisée quand un doigt est levé (retour à 1 doigt). Sans cette correction, `pinchStartRef` restait `null` et le zoom ne partait jamais.
+- **Torche** : fusionnée avec le flash dans **un seul bouton contextuel** (comportement Instagram, ADR 2026-08-05) — en mode photo il cycle off/on/auto (`nextFlashMode`), en mode vidéo il bascule `enableTorch` (icône `flash` jaune via `cameraColors.torchActive`), coupée automatiquement en basculant en frontale et en revenant en mode photo (`handleSwitchMode`). Désactivé pendant l'enregistrement. L'ancien bouton `flashlight` séparé a été supprimé.
+- **`onMountError`** : `captureException` avec contexte `news.compose.cameraMountError` + `Alert` avec `cameraMountError` (i18n 4 langues). Prop `autofocus` forcé à `'off'` en caméra frontale (pas de flash/focus front).
+
+**Impact :** aucun changement Firestore/Storage/index. Ajout de 3 clés i18n (`a11yTorch`, `a11yTapToFocus`, `cameraMountError`) en fr/fang/punu/nzebi. Limites : expo-camera v17 n'expose pas d'API de focus ponctuel (l'anneau est un feedback de geste assumé ; le seul re-focus réel iOS passe par `autofocus='on'` global), pas de persistance de l'état torche entre sessions. Évolution possible : migrer la capture vers VisionCamera pour un vrai tap-to-focus (`camera.focus({x,y})`), au prix d'un dev build.
+
+---
+
+## ADR — Caméra studio : disposition Instagram (rail vertical + flip à droite)
+
+**Décision (2026-08-05) :** la caméra studio (`ComposeCamera`) adopte la disposition de la caméra Instagram, frontend d'abord (le backend suivra une fois le visuel validé) :
+
+- **Rail d'outils vertical à gauche** (`src/features/create/components/camera/CameraSideRail.tsx`, remplace `CameraToolbar.tsx` supprimé) : grille (toggle), ratio, vitesse, durée, timer, qualité (Android), stab (iOS). Les options multi-valeurs **cyclent au tap** comme le bouton flash (ratio 9:16→1:1→4:5→16:9→Original, vitesse 0.3x→3x, durée 15s→600s, timer 0s→3s→10s, qualité 720p→2160p) et affichent la **valeur courante sous l'icône** ; les toggles (grille, stab) se basculent avec état actif. Les boutons sont en pastille 52 px (`cameraColors.chipIdle`/`chipActive`), accessibles (`a11y*` existants).
+- **Flip caméra déplacé à droite du déclencheur** (comme Instagram) ; l'ancien bouton photo séparé est supprimé (le shutter prend déjà la photo en mode photo — tap = photo, maintenir = vidéo, comme Instagram).
+- Flash contextuel unique conservé en haut (voir ADR torche).
+
+**Impact :** aucun changement Firestore/Storage/index — UI pure. Le composant est memoïsé, positionné absolument (`sideRail`, top 9 %, zIndex 10), `pointerEvents="box-none"`. Les tests e2e existants ne référencent aucun sélecteur de la toolbar — aucun impact.
+
+## ADR — Caméra studio : clone complet de la caméra Instagram (2026-08-05)
+
+**Décision :** alignement complet de `ComposeCamera` sur l'anatomie de la caméra Instagram (Stories/Reels), après validation de la disposition en frontend :
+
+- **Top bar** : contrôles alignés à droite (spacer flexible à gauche, bouton retour/galerie du parent à gauche via `topBarInset`). Flash contextuel unique (photo : off/on/auto, vidéo : torche) + badge timer d'enregistrement. **Le bouton miroir est sorti de la top bar** (Instagram n'en affiche pas) et vit désormais dans le rail, caméra frontale uniquement.
+- **Rail gauche verticalement centré** (`CameraSideRail.tsx`) : icônes pures 48 px en pastille translucide (`cameraColors.chipIdle`/`chipActive`), sans libellé — comme Instagram. **Pattern sheet** : les outils multi-valeurs (format, vitesse, minuterie, durée, qualité) ouvrent un `MboloBottomSheet` (snap 42 %) listant les options avec coche sur l'option active, au lieu de cycler ; les toggles (grille, miroir, stab) basculent directement. Une icône est mise en évidence quand son réglage s'écarte de son défaut (9:16, 1x, 0 s, 30 s, 1080p). A11y : labels `a11y*` existants enrichis de la valeur courante.
+- **Bas d'écran** : rangée déclencheur avec placeholder galerie (gauche), shutter (centre), **flip caméra à droite** (comme Instagram) ; `SegmentedProgressBar` au-dessus en enregistrement.
+
+**i18n :** 6 nouvelles clés (`sheetTitleRatio/Speed/Timer/Duration/Quality`, `optionSelected`) ajoutées dans les 4 langues (fr/fang/punu/nzebi — copies françaises existantes conservées).
+
+**Impact :** aucun changement Firestore/Storage/index — UI pure, aucune logique métier. `MboloBottomSheet` (@gorhom/bottom-sheet) déjà utilisé ailleurs dans l'app. Tests e2e non impactés (aucun sélecteur lié).
+
+- **Minuteur + bouton Terminer relocalisés (clone Instagram, 2026-08-06)** : le décompteur quitte la top bar pour flotter **au-dessus du déclencheur** (pilule sombre `scrimHeavy` + point rouge plein pendant l'enregistrement, atténué en pause ; `shutterTimerOverlay` en absolu dans `shutterRow`, `pointerEvents="none"`). Le bouton **Terminer** prend sa place dans la top bar (pilule accent compacte à droite du flash), visible **uniquement après la première prise** (`segments.length > 0`), désactivé pendant `recording`/`isFinalizing`. L'ancien bouton Terminer du bas (`confirmButton`) est supprimé — la rangée basse ne garde que `SegmentedProgressBar`. Le temps restant (`remaining`) reste partagé avec l'anneau `ProgressRing`.
+- **Animation du déclencheur (clone Instagram, 2026-08-06)** : morph 0 = disque blanc, 1 = carré rouge arrondi. **API : core RN `Animated`** (pattern ProgressBar) — les shared values Reanimated écrites depuis des callbacks sont rejetées par le React Compiler d'Expo SDK 54 (« value previously passed as an argument to a hook »), `useDerivedValue` et les écritures dans un `useEffect` crashaient au montage (« object is frozen »). `morph` est un `Animated.Value` porté par `useState(() => new Animated.Value(0))` (pattern ProgressBar : zéro erreur lint, contrairement au `useRef(...).current` lu au render — « Cannot access refs during render »). Le scale (58 → 26 px) et le borderRadius (29 → 6) s'animent via `Animated.timing` (`Easing.out(cubic)`, 220 ms, JS driver) ; la couleur bascule avec l'état `morphActive` (le core RN n'interpole pas les couleurs). `animateMorph(0|1)` est appelé depuis les handlers du geste uniquement : timeout du pressIn (morph pendant le hold), pressOut sans démarrage, `abort()`, `finally` de `startRecording` (minuterie mains-libres comprise).
+
+## ADR — Caméra studio : déclencheur Instagram (tap = photo, maintenir = vidéo, suppression du sélecteur Photo/Vidéo et de la rafale)
+
+**Décision (2026-08-06) :** le déclencheur de `ComposeCamera` adopte exactement le comportement de la caméra Instagram : **un tap prend une photo, un maintien ≥ `HOLD_THRESHOLD_MS` (170 ms) enregistre une vidéo** — plus aucun sélecteur Photo/Vidéo affiché en bas, plus de rafale (burst supprimée, validé avec le produit).
+
+- **Geste** : `onPressIn` arme un `setTimeout` de 170 ms ; s'il expire, `didHoldFireRef` + `holdIntentRef` sont posés et `cameraMode` bascule en `'video'`. Un `useEffect` consomme `holdIntentRef` et lance `startRecording` **une fois le `CameraView` re-rendu en mode `'video'`** (expo-camera exige `mode='video'` pour `recordAsync`). Au relâché (`onPressOut`) : si `didHoldFireRef` → arrêt de l'enregistrement ; sinon tap → photo (ou compte à rebours si minuterie réglée, ou arrêt du mains-libres si enregistrement actif).
+- **Fiabilité du démarrage (fix 2026-08-06)** : le changement de `mode` reconfigure le capteur de façon asynchrone — `recordAsync` appelé trop tôt échouait silencieusement (« Camera is not running »). Deux protections : (1) état `cameraReady` alimenté par `onCameraReady` (reset par ref-callback quand le CameraView se démonte), l'effet du hold-intent n'attend que si le capteur est prêt ; (2) retry borné (3 × 250 ms) autour de `recordAsync` dans `startRecording`. Un garde `trigger === 'hold' && !didHoldFireRef.current` annule le démarrage si le doigt a été relâché pendant le dialog de permission micro (l'intention est morte, le mode est déjà revenu en `'picture'`).
+- **Pleine robustesse (fix final 2026-08-06)** : l'état `cameraReady` s'est révélé fragile (si `onCameraReady` ne se re-déclenche pas après le re-mount du capteur à la bascule de mode, l'intention reste pendante pour toujours). Le pipeline est désormais **sans aucun `useEffect`** : le timeout du `pressIn` appelle directement `startRecording('hold')`, qui (1) attend la caméra (boucle bornée 10 × 100 ms, couvre le re-mount), (2) demande le micro si besoin, (3) laisse 150 ms au `CameraView` pour re-rendre en `'video'`, (4) **ré-évalue l'intention** (`didHoldFireRef`) juste avant de capturer — annulation propre via `abort()` (mode `'picture'` + `startPendingRef` false) si le doigt a été relâché, (5) `recordAsync` avec retry 5 × 300 ms. `startPendingRef` empêche le `pressOut` de repasser le mode en `'picture'` pendant que le démarrage est en attente.
+- **Mode capteur** : `captureMode` ('photo'|'video') renommé `cameraMode` ('picture'|'video', valeurs expo-camera). Reset à `'picture'` dans le `finally` de `startRecording`, à l'annulation du compte à rebours, et au relâché si la vidéo n'a pas pu démarrer (micro refusé, durée max atteinte) — jamais d'état vidéo orphelin.
+- **Minuterie** : avec un délai > 0, le tap passe en **mains-libres** : `startCountdown` bascule `cameraMode` en `'video'` immédiatement, le compte à rebours s'affiche, puis `startRecording` démarre seul ; un tap pendant l'enregistrement l'arrête. `handleCancelCountdown` annule le tout (mode repassé en `'picture'`).
+- **Micro** : le gate plein écran « mode vidéo sans micro » est supprimé — la permission est demandée à la volée dans `startRecording` (avec Alert en cas de refus), comme Instagram.
+- **Flash** : le bouton unique reste contextuel sur `cameraMode` (photo : off/on/auto, vidéo : torche), désactivé en frontale et pendant l'enregistrement.
+- **Rail** : la prop `captureMode` de `CameraSideRail` est supprimée — les outils vidéo (vitesse, durée, qualité, stab) sont **toujours visibles** (plus de mode explicite auquel les accrocher), comme sur Instagram.
+
+**Impact :** aucun changement Firestore/Storage/index — UI pure. `SelectScreen` ne reçoit plus `onCaptureBurst`/`burstLimit` (props supprimées de `ComposeCameraProps`), l'import `CREATE_MAX_MEDIA` et `handleCameraBurst` sont retirés. Clés i18n `cameraPhoto`/`cameraVideo` devenues orphelines (laissées en place, réutilisables). Nettoyage unmount : le hold-timer est purgé avec le countdown. Tests e2e non impactés.
+
+## ADR 2026-08-06: Réduction des langues à 4 — fr, en, es, fang
+
+**Décision :** la liste des langues supportées passe de 4 (fr, fang, punu, nzebi) à 4 nouvelles (fr, en, es, fang). `punu` et `nzebi` sont retirés de `src/i18n/translations.ts` ; `en` (anglais) et `es` (espagnol) sont ajoutés avec une traduction complète des ~325 clés.
+
+**Détails :**
+- `Language = keyof typeof translations` dérive automatiquement → `'fr' | 'en' | 'es' | 'fang'`.
+- `getTranslation()` garde le fallback français pour toute clé manquante.
+- `availableLanguages` mis à jour dans `src/i18n/index.tsx` (la sélection de langue dans Paramètres affiche fr/en/es/fang).
+- Garde dans `SettingsProvider.tsx` : une valeur stockée en Firestore pour une langue retirée (`punu`/`nzebi`) n'est plus poussée vers le runtime i18n (`lang in translations` avant `setLanguage`).
+- Comme pour les anciennes langues gabonaises, les traductions `en`/`es` sont best-effort (à faire relire par un locuteur natif).
+
+**Impact :** aucun changement Firestore/Storage/index. Le doc de réglages `users/{uid}/settings/preferences` reste invariant (champ `account.language` inchangé). Tests e2e non impactés.

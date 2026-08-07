@@ -70,6 +70,8 @@ export interface Video {
   views?: number
   likedBy?: string[]
   corrupted?: boolean
+  /** Réglage avancé (style Instagram) : mentions et hashtags non cliquables. */
+  hideMentionsAndHashtags?: boolean
   place?: string
   lat?: number
   lng?: number

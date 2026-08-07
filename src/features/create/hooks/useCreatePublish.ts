@@ -24,12 +24,12 @@ import { createVideo, updateVideo } from '../services/videoMutations'
 import { incrementSoundUsage, loadSoundById } from '../services/soundService'
 import { ensureLocalSound } from '../services/soundCache'
 import type { CreateDraft } from '../types'
-import { renderMedia, clearRenderCache } from '../utils/renderMedia'
+import { renderMedia, clearRenderCache, cancelRender } from '../utils/renderMedia'
 
 /** 15 s entre deux créations : garde-fou applicatif (le serveur garde le sien). */
 const PUBLISH_COOLDOWN_MS = 15_000
 
-export type CreatePublishError = 'upload' | 'write' | 'auth' | 'render' | 'rateLimit'
+export type CreatePublishError = 'upload' | 'write' | 'auth' | 'render' | 'rateLimit' | 'cancelled'
 
 export interface CreateResult {
   kind: 'post' | 'video'
@@ -59,6 +59,32 @@ export type UpdateOutcome =
 
 export function useCreatePublish() {
   const lastPublishAt = useRef(0)
+  /* Annulation : le geste utilisateur pose le drapeau, coupe le rendu FFmpeg
+     en cours et abat l'upload Cloudinary. Le brouillon est conservé. */
+  const cancelledRef = useRef(false)
+  const renderSessionRef = useRef<number | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
+
+  const cancel = useCallback(() => {
+    cancelledRef.current = true
+    if (renderSessionRef.current != null) {
+      cancelRender(renderSessionRef.current)
+      renderSessionRef.current = null
+    }
+    abortRef.current?.abort()
+  }, [])
+
+  /* Nouvelle tentative (ou nouvelle publication) : rejoue propre. */
+  const beginPublish = useCallback((): AbortSignal => {
+    cancelledRef.current = false
+    abortRef.current = new AbortController()
+    return abortRef.current.signal
+  }, [])
+
+  /* Retourne 'cancelled' si l'utilisateur a annulé entre deux étapes. */
+  const isCancelled = useCallback((): CreatePublishError | null => {
+    return cancelledRef.current ? 'cancelled' : null
+  }, [])
 
   const publish = useCallback(
     async (
@@ -73,6 +99,7 @@ export function useCreatePublish() {
         return 'rateLimit'
       }
 
+      const signal = beginPublish()
       const step = (progress: number) => options.onProgress?.(progress)
 
       /* Un seul média vidéo → le feed vidéo (collection `videos`). */
@@ -90,6 +117,7 @@ export function useCreatePublish() {
               soundUri = await ensureLocalSound(sound.id, sound.audioURL)
             }
           }
+          if (isCancelled()) return 'cancelled'
 
           /* Rendu local (trim + filtres + overlays) avant l'upload : 0→15% de la
              barre de progression, l'upload prend les 60% suivants. */
@@ -97,14 +125,20 @@ export function useCreatePublish() {
             overlayUri: video.overlayUri ?? null,
             soundUri,
             onProgress: (p) => step(p * 0.15),
+            onSession: (sessionId) => {
+              renderSessionRef.current = sessionId
+            },
           })
+          if (isCancelled()) return 'cancelled'
 
           const videoUrl = await uploadToCloudinary(rendered.uri, 'video', {
             folder: 'reels',
             timeout: 180000,
+            signal,
             onProgress: (p) => step(0.15 + p * 0.6),
           })
           if (!videoUrl) return 'upload'
+          if (isCancelled()) return 'cancelled'
           step(0.8)
 
           const postAuthor = await loadPostAuthor(author.uid, author.displayName)
@@ -127,6 +161,7 @@ export function useCreatePublish() {
             hashtags: extractHashtags(draft.text),
             visibility: draft.visibility,
             commentsEnabled: draft.commentsEnabled,
+            hideMentionsAndHashtags: draft.hideMentionsAndHashtags,
             place: draft.location?.name,
             lat: draft.location?.lat,
             lng: draft.location?.lng,
@@ -143,6 +178,7 @@ export function useCreatePublish() {
           void clearRenderCache()
           return { kind: 'video', id }
         } catch (error) {
+          if (isCancelled()) return 'cancelled'
           captureException(
             error instanceof Error ? error : new Error(String(error)),
             { context: 'news.create.publishVideo' },
@@ -151,18 +187,30 @@ export function useCreatePublish() {
         }
       }
 
-      /* Photo / texte → collection `posts`. */
+      /* Photo / texte → collection `posts`. Un carrousel peut contenir des
+         vidéos (homogène) : chaque item est rendu puis uploadé selon son type. */
       try {
         const media: NewsPostMedia[] = []
         for (const item of draft.media) {
+          const isVideo = item.type === 'video'
           const rendered = await renderMedia(item, { overlayUri: item.overlayUri ?? null })
 
-          const url = await uploadToCloudinary(rendered.uri, 'image', {
-            timeout: 120000,
+          if (isCancelled()) return 'cancelled'
+
+          const url = await uploadToCloudinary(rendered.uri, isVideo ? 'video' : 'image', {
+            timeout: isVideo ? 180000 : 120000,
+            signal,
             onProgress: (p) => step((draft.media.length > 0 ? p / draft.media.length : 0) * 0.6),
           })
           if (!url) return 'upload'
-          media.push({ url, type: 'image', width: rendered.width, height: rendered.height, altText: item.altText })
+          media.push({
+            url,
+            type: isVideo ? 'video' : 'image',
+            width: rendered.width,
+            height: rendered.height,
+            duration: isVideo ? item.duration ?? undefined : undefined,
+            altText: item.altText,
+          })
         }
         step(0.75)
 
@@ -174,6 +222,7 @@ export function useCreatePublish() {
           media,
           visibility: draft.visibility,
           commentsEnabled: draft.commentsEnabled,
+          hideMentionsAndHashtags: draft.hideMentionsAndHashtags,
           background: 'none',
           location: draft.location,
           mood: null,
@@ -188,6 +237,7 @@ export function useCreatePublish() {
         void clearRenderCache()
         return { kind: 'post', id }
       } catch (error) {
+        if (isCancelled()) return 'cancelled'
         captureException(
           error instanceof Error ? error : new Error(String(error)),
           { context: 'news.create.publishPost' },
@@ -195,7 +245,7 @@ export function useCreatePublish() {
         return 'upload'
       }
     },
-    [],
+    [beginPublish, isCancelled],
   )
 
   const update = useCallback(
@@ -207,6 +257,7 @@ export function useCreatePublish() {
     ): Promise<UpdateOutcome> => {
       if (!author.uid) return 'auth'
 
+      const signal = beginPublish()
       const step = (progress: number) => {
         options.onProgress?.(progress)
       }
@@ -233,9 +284,12 @@ export function useCreatePublish() {
             overlayUri: media.overlayUri ?? null,
             soundUri,
             onProgress: (progress) => step(progress * 0.25),
+            onSession: (sessionId) => {
+              renderSessionRef.current = sessionId
+            },
           })
         } catch {
-          return 'render'
+          return isCancelled() ?? 'render'
         }
 
         let videoURL: string | null = null
@@ -244,15 +298,17 @@ export function useCreatePublish() {
           videoURL = await uploadToCloudinary(rendered.uri, 'video', {
             folder: 'reels',
             timeout: 180000,
+            signal,
             onProgress: (progress) => {
               step(0.25 + progress * 0.6)
             },
           })
         } catch {
-          return 'upload'
+          return isCancelled() ?? 'upload'
         }
 
         if (!videoURL) return 'upload'
+        if (isCancelled()) return 'cancelled'
 
         const trimStart = media.video?.trimStart ?? 0
         const coverTime = Math.max(
@@ -272,6 +328,7 @@ export function useCreatePublish() {
           hashtags: extractHashtags(draft.text),
           visibility: draft.visibility,
           commentsEnabled: draft.commentsEnabled,
+          hideMentionsAndHashtags: draft.hideMentionsAndHashtags,
           soundId: draft.soundId,
           durationMs: media.duration ?? undefined,
         })
@@ -297,17 +354,18 @@ export function useCreatePublish() {
             onProgress: (progress) => step(progress * 0.5),
           })
         } catch {
-          return 'render'
+          return isCancelled() ?? 'render'
         }
 
         let url: string | null = null
 
         try {
           url = await uploadToCloudinary(rendered.uri, 'image', {
+            signal,
             onProgress: (progress) => step(0.5 + progress * 0.4),
           })
         } catch {
-          return 'upload'
+          return isCancelled() ?? 'upload'
         }
 
         if (!url) return 'upload'
@@ -331,6 +389,7 @@ export function useCreatePublish() {
         media: renderedMedia,
         visibility: draft.visibility,
         commentsEnabled: draft.commentsEnabled,
+        hideMentionsAndHashtags: draft.hideMentionsAndHashtags,
         background: 'none',
         location: draft.location,
         mood: null,
@@ -348,10 +407,10 @@ export function useCreatePublish() {
         id: target.id,
       }
     },
-    [],
+    [beginPublish, isCancelled],
   )
 
-  return { publish, update }
+  return { publish, update, cancel }
 }
 
 export type { PostAuthor }

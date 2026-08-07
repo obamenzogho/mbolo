@@ -17,9 +17,9 @@ const defaultContext: I18nContextType = {
   setLanguage: async () => {},
   availableLanguages: [
     { code: 'fr', label: 'Français' },
+    { code: 'en', label: 'English' },
+    { code: 'es', label: 'Español' },
     { code: 'fang', label: 'Fang' },
-    { code: 'punu', label: 'Punu' },
-    { code: 'nzebi', label: 'Nzebi' },
   ],
 }
 
